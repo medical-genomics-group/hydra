@@ -7,7 +7,21 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		50E376831FC585380038770F /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376821FC585380038770F /* main.cpp */; };
+		50E376C81FC58EEC0038770F /* gctb.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376AE1FC58EEC0038770F /* gctb.cpp */; };
+		50E376C91FC58EEC0038770F /* data.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376B01FC58EEC0038770F /* data.cpp */; };
+		50E376CA1FC58EEC0038770F /* gadgets.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376B21FC58EEC0038770F /* gadgets.cpp */; };
+		50E376CB1FC58EEC0038770F /* hsq.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376B41FC58EEC0038770F /* hsq.cpp */; };
+		50E376CC1FC58EEC0038770F /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376B61FC58EEC0038770F /* main.cpp */; };
+		50E376CE1FC58EEC0038770F /* mcmc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376B81FC58EEC0038770F /* mcmc.cpp */; };
+		50E376CF1FC58EEC0038770F /* model.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376BA1FC58EEC0038770F /* model.cpp */; };
+		50E376D01FC58EEC0038770F /* mympi.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376BC1FC58EEC0038770F /* mympi.cpp */; };
+		50E376D11FC58EEC0038770F /* options.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376BE1FC58EEC0038770F /* options.cpp */; };
+		50E376D21FC58EEC0038770F /* predict.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376C01FC58EEC0038770F /* predict.cpp */; };
+		50E376D31FC58EEC0038770F /* stat.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376C21FC58EEC0038770F /* stat.cpp */; };
+		50E376D41FC58EEC0038770F /* vgmaf.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376C41FC58EEC0038770F /* vgmaf.cpp */; };
+		50E376D51FC58EEC0038770F /* xci.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 50E376C61FC58EEC0038770F /* xci.cpp */; };
+		50E376D71FC596B60038770F /* libiomp5.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 50E376D61FC596B60038770F /* libiomp5.dylib */; };
+		50E376D91FC5981A0038770F /* libmpi_cxx.1.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 50E376D81FC5981A0038770F /* libmpi_cxx.1.dylib */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -24,7 +38,33 @@
 
 /* Begin PBXFileReference section */
 		50E3767F1FC585380038770F /* gctb */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = gctb; sourceTree = BUILT_PRODUCTS_DIR; };
-		50E376821FC585380038770F /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		50E376AE1FC58EEC0038770F /* gctb.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = gctb.cpp; path = scr/gctb.cpp; sourceTree = SOURCE_ROOT; };
+		50E376AF1FC58EEC0038770F /* gctb.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = gctb.hpp; path = scr/gctb.hpp; sourceTree = SOURCE_ROOT; };
+		50E376B01FC58EEC0038770F /* data.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = data.cpp; path = scr/data.cpp; sourceTree = SOURCE_ROOT; };
+		50E376B11FC58EEC0038770F /* data.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = data.hpp; path = scr/data.hpp; sourceTree = SOURCE_ROOT; };
+		50E376B21FC58EEC0038770F /* gadgets.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = gadgets.cpp; path = scr/gadgets.cpp; sourceTree = SOURCE_ROOT; };
+		50E376B31FC58EEC0038770F /* gadgets.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = gadgets.hpp; path = scr/gadgets.hpp; sourceTree = SOURCE_ROOT; };
+		50E376B41FC58EEC0038770F /* hsq.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = hsq.cpp; path = scr/hsq.cpp; sourceTree = SOURCE_ROOT; };
+		50E376B51FC58EEC0038770F /* hsq.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = hsq.hpp; path = scr/hsq.hpp; sourceTree = SOURCE_ROOT; };
+		50E376B61FC58EEC0038770F /* main.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = main.cpp; path = scr/main.cpp; sourceTree = SOURCE_ROOT; };
+		50E376B81FC58EEC0038770F /* mcmc.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mcmc.cpp; path = scr/mcmc.cpp; sourceTree = SOURCE_ROOT; };
+		50E376B91FC58EEC0038770F /* mcmc.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = mcmc.hpp; path = scr/mcmc.hpp; sourceTree = SOURCE_ROOT; };
+		50E376BA1FC58EEC0038770F /* model.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = model.cpp; path = scr/model.cpp; sourceTree = SOURCE_ROOT; };
+		50E376BB1FC58EEC0038770F /* model.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = model.hpp; path = scr/model.hpp; sourceTree = SOURCE_ROOT; };
+		50E376BC1FC58EEC0038770F /* mympi.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = mympi.cpp; path = scr/mympi.cpp; sourceTree = SOURCE_ROOT; };
+		50E376BD1FC58EEC0038770F /* mympi.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = mympi.hpp; path = scr/mympi.hpp; sourceTree = SOURCE_ROOT; };
+		50E376BE1FC58EEC0038770F /* options.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = options.cpp; path = scr/options.cpp; sourceTree = SOURCE_ROOT; };
+		50E376BF1FC58EEC0038770F /* options.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = options.hpp; path = scr/options.hpp; sourceTree = SOURCE_ROOT; };
+		50E376C01FC58EEC0038770F /* predict.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = predict.cpp; path = scr/predict.cpp; sourceTree = SOURCE_ROOT; };
+		50E376C11FC58EEC0038770F /* predict.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = predict.hpp; path = scr/predict.hpp; sourceTree = SOURCE_ROOT; };
+		50E376C21FC58EEC0038770F /* stat.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = stat.cpp; path = scr/stat.cpp; sourceTree = SOURCE_ROOT; };
+		50E376C31FC58EEC0038770F /* stat.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = stat.hpp; path = scr/stat.hpp; sourceTree = SOURCE_ROOT; };
+		50E376C41FC58EEC0038770F /* vgmaf.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = vgmaf.cpp; path = scr/vgmaf.cpp; sourceTree = SOURCE_ROOT; };
+		50E376C51FC58EEC0038770F /* vgmaf.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = vgmaf.hpp; path = scr/vgmaf.hpp; sourceTree = SOURCE_ROOT; };
+		50E376C61FC58EEC0038770F /* xci.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = xci.cpp; path = scr/xci.cpp; sourceTree = SOURCE_ROOT; };
+		50E376C71FC58EEC0038770F /* xci.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; name = xci.hpp; path = scr/xci.hpp; sourceTree = SOURCE_ROOT; };
+		50E376D61FC596B60038770F /* libiomp5.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libiomp5.dylib; path = ../../../../usr/local/Cellar/libiomp/20150701/lib/libiomp5.dylib; sourceTree = "<group>"; };
+		50E376D81FC5981A0038770F /* libmpi_cxx.1.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libmpi_cxx.1.dylib; path = "../../../../usr/local/Cellar/open-mpi/1.10.3/lib/libmpi_cxx.1.dylib"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +72,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				50E376D91FC5981A0038770F /* libmpi_cxx.1.dylib in Frameworks */,
+				50E376D71FC596B60038770F /* libiomp5.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -41,7 +83,9 @@
 		50E376761FC585380038770F = {
 			isa = PBXGroup;
 			children = (
-				50E376811FC585380038770F /* gctb */,
+				50E376D81FC5981A0038770F /* libmpi_cxx.1.dylib */,
+				50E376D61FC596B60038770F /* libiomp5.dylib */,
+				50E376811FC585380038770F /* scr */,
 				50E376801FC585380038770F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -54,11 +98,36 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		50E376811FC585380038770F /* gctb */ = {
+		50E376811FC585380038770F /* scr */ = {
 			isa = PBXGroup;
 			children = (
-				50E376821FC585380038770F /* main.cpp */,
+				50E376AE1FC58EEC0038770F /* gctb.cpp */,
+				50E376AF1FC58EEC0038770F /* gctb.hpp */,
+				50E376B01FC58EEC0038770F /* data.cpp */,
+				50E376B11FC58EEC0038770F /* data.hpp */,
+				50E376B21FC58EEC0038770F /* gadgets.cpp */,
+				50E376B31FC58EEC0038770F /* gadgets.hpp */,
+				50E376B41FC58EEC0038770F /* hsq.cpp */,
+				50E376B51FC58EEC0038770F /* hsq.hpp */,
+				50E376B61FC58EEC0038770F /* main.cpp */,
+				50E376B81FC58EEC0038770F /* mcmc.cpp */,
+				50E376B91FC58EEC0038770F /* mcmc.hpp */,
+				50E376BA1FC58EEC0038770F /* model.cpp */,
+				50E376BB1FC58EEC0038770F /* model.hpp */,
+				50E376BC1FC58EEC0038770F /* mympi.cpp */,
+				50E376BD1FC58EEC0038770F /* mympi.hpp */,
+				50E376BE1FC58EEC0038770F /* options.cpp */,
+				50E376BF1FC58EEC0038770F /* options.hpp */,
+				50E376C01FC58EEC0038770F /* predict.cpp */,
+				50E376C11FC58EEC0038770F /* predict.hpp */,
+				50E376C21FC58EEC0038770F /* stat.cpp */,
+				50E376C31FC58EEC0038770F /* stat.hpp */,
+				50E376C41FC58EEC0038770F /* vgmaf.cpp */,
+				50E376C51FC58EEC0038770F /* vgmaf.hpp */,
+				50E376C61FC58EEC0038770F /* xci.cpp */,
+				50E376C71FC58EEC0038770F /* xci.hpp */,
 			);
+			name = scr;
 			path = gctb;
 			sourceTree = "<group>";
 		};
@@ -118,7 +187,19 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				50E376831FC585380038770F /* main.cpp in Sources */,
+				50E376CB1FC58EEC0038770F /* hsq.cpp in Sources */,
+				50E376D41FC58EEC0038770F /* vgmaf.cpp in Sources */,
+				50E376D01FC58EEC0038770F /* mympi.cpp in Sources */,
+				50E376CE1FC58EEC0038770F /* mcmc.cpp in Sources */,
+				50E376CF1FC58EEC0038770F /* model.cpp in Sources */,
+				50E376D31FC58EEC0038770F /* stat.cpp in Sources */,
+				50E376C81FC58EEC0038770F /* gctb.cpp in Sources */,
+				50E376D11FC58EEC0038770F /* options.cpp in Sources */,
+				50E376D21FC58EEC0038770F /* predict.cpp in Sources */,
+				50E376CA1FC58EEC0038770F /* gadgets.cpp in Sources */,
+				50E376CC1FC58EEC0038770F /* main.cpp in Sources */,
+				50E376D51FC58EEC0038770F /* xci.cpp in Sources */,
+				50E376C91FC58EEC0038770F /* data.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -209,6 +290,25 @@
 		50E376871FC585380038770F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CC = "/usr/local/bin/clang-omp";
+				CLANG_ENABLE_MODULES = NO;
+				HEADER_SEARCH_PATHS = (
+					..,
+					../Eigen3,
+					/usr/local/include,
+					/usr/local/include/libiomp,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					/usr/local/lib,
+					/usr/local/Cellar/libiomp/20150701/lib,
+					"/usr/local/Cellar/open-mpi/1.10.3/lib",
+				);
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = "-fopenmp";
+				OTHER_LDFLAGS = (
+					"-lmpi",
+					"-lm",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Debug;
@@ -216,6 +316,25 @@
 		50E376881FC585380038770F /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CC = "/usr/local/bin/clang-omp";
+				CLANG_ENABLE_MODULES = NO;
+				HEADER_SEARCH_PATHS = (
+					..,
+					../Eigen3,
+					/usr/local/include,
+					/usr/local/include/libiomp,
+				);
+				LIBRARY_SEARCH_PATHS = (
+					/usr/local/lib,
+					/usr/local/Cellar/libiomp/20150701/lib,
+					"/usr/local/Cellar/open-mpi/1.10.3/lib",
+				);
+				ONLY_ACTIVE_ARCH = YES;
+				OTHER_CFLAGS = "-fopenmp";
+				OTHER_LDFLAGS = (
+					"-lmpi",
+					"-lm",
+				);
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
 			name = Release;
