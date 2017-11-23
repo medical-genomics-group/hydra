@@ -191,7 +191,7 @@ public:
     void reindexSnp(vector<SnpInfo*> snpInfoVec);
     void initVariances(const float heritability);
     
-    void outputSnpResults(const VectorXf &posteriorMean, const VectorXf &pip, const string &filename) const;
+    void outputSnpResults(const VectorXf &posteriorMean, const VectorXf &posteriorSqrMean, const VectorXf &pip, const string &filename) const;
     void outputFixedEffects(const MatrixXf &fixedEffects, const string &filename) const;
     void outputWindowResults(const VectorXf &posteriorMean, const string &filename) const;
     void summarizeSnpResults(const SparseMatrix<float> &snpEffects, const string &filename) const;

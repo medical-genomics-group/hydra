@@ -39,6 +39,7 @@ public:
     SparseMatrix<float> datMatSp; // most of the snp effects will be zero if pi value is high
     
     VectorXf posteriorMean;
+    VectorXf posteriorSqrMean;
     VectorXf pip;  // for snp effects, will consider to remove
     
     FILE *bout;
@@ -59,13 +60,14 @@ public:
             cerr << "Error: Unrecognized storage mode: " << storage_mode << endl;
         }
         posteriorMean.setZero(ncol);
+        posteriorSqrMean.setZero(ncol);
         pip.setZero(ncol);
     }
     
     McmcSamples(const string &label): label(label) {}
     
     void getSample(const unsigned iter, const VectorXf &sample, bool writeBinPosterior);
-    void getSample(const unsigned iter, const float sample);
+    void getSample(const unsigned iter, const float sample, ofstream &out);
     void writeSampleBin(const unsigned iter, const VectorXf &sample, const string &title);
     void writeSampleTxt(const unsigned iter, const float sample, const string &title);
     VectorXf mean(void);
@@ -81,11 +83,15 @@ public:
 
 class MCMC {
 private:
+    string outfilename;
+    ofstream out;
+    
+    void initTxtFile(const vector<Parameter*> &paramVec, const string &title);
     vector<McmcSamples*> initMcmcSamples(const Model &model, const unsigned chainLength, const unsigned burnin,
                                          const unsigned thin, const string &title, const bool writeBinPosterior);
     void collectSamples(const Model &model, vector<McmcSamples*> &mcmcSampleVec, const unsigned iteration, const bool writeBinPosterior);
     void printStatus(const vector<Parameter*> &paramToPrint, const unsigned thisIter, const unsigned outputFreq, const string &timeLeft);
-    void printSummary(const vector<Parameter*> &paramToPrint, const vector<McmcSamples*> &mcmcSampleVec);
+    void printSummary(const vector<Parameter*> &paramToPrint, const vector<McmcSamples*> &mcmcSampleVec, const string &filename);
     
 public:
     vector<McmcSamples*> run(Model &model, const unsigned chainLength, const unsigned burnin, const unsigned thin,

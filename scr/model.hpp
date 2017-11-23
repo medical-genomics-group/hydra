@@ -62,7 +62,7 @@ public:
         // all fixed effects has flat prior
     public:
         FixedEffects(const vector<string> &header)
-        : ParamSet("FixedEffects", header){}
+        : ParamSet("CovEffects", header){}
         
         void sampleFromFC(VectorXf &ycorr, const MatrixXf &X, const VectorXf &XPXdiag, const float vare);
     };

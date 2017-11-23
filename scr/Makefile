@@ -26,7 +26,7 @@ ifeq ($(SYS),LINUX)
 endif
 
 ifeq ($(SYS),MAC)
- CXXFLAGS += -fopenmp -I /Users/j.zeng/XCode/Eigen3 -I /Users/j.zeng/XCode/ -I /usr/local/include/libiomp -DUNIX -Dfopen64=fopen 
+ CXXFLAGS += -fopenmp -I /usr/local/include -I /usr/local/lib -I /Users/j.zeng/XCode/Eigen3 -I /Users/j.zeng/XCode -I /usr/local/include/libiomp -DUNIX -Dfopen64=fopen 
  LIB += -lz -lmpi -lm
  CXX = $(CXX_MAC)
 endif

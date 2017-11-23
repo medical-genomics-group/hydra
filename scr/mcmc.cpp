@@ -20,6 +20,7 @@ void McmcSamples::getSample(const unsigned iter, const VectorXf &sample, bool wr
         if (iter >= burnin) {
             datMat.row(thin_iter_post_burnin) = sample;
             posteriorMean.array() += (sample - posteriorMean).array()/(thin_iter_post_burnin+1);
+            posteriorSqrMean.array() += (sample.array().square() - posteriorSqrMean.array())/(thin_iter_post_burnin+1);
         }
     } else if (storageMode == sparse) {
         //SparseVector<float>::InnerIterator it(sample.sparseView());
@@ -43,17 +44,19 @@ void McmcSamples::getSample(const unsigned iter, const VectorXf &sample, bool wr
         if (iter >= burnin) {
             pip.array() += (delta - pip.array())/(thin_iter_post_burnin+1);
             posteriorMean.array() += (sample - posteriorMean).array()/(thin_iter_post_burnin+1);
+            posteriorSqrMean.array() += (sample.array().square() - posteriorSqrMean.array())/(thin_iter_post_burnin+1);
         }
     }
 }
 
-void McmcSamples::getSample(const unsigned iter, const float sample){
-    tout << sample << endl;
+void McmcSamples::getSample(const unsigned iter, const float sample, ofstream &out){
+    out << boost::format("%12s ") %sample;
     if (iter % thin) return;
     unsigned thin_iter_post_burnin = iter/thin - burnin/thin;
     if (iter >= burnin) {
         datMat(thin_iter_post_burnin,0) = sample;
         posteriorMean.array() += (sample - posteriorMean.array())/(thin_iter_post_burnin+1);
+        posteriorSqrMean.array() += (sample*sample - posteriorSqrMean.array())/(thin_iter_post_burnin+1);
     }
 }
 
@@ -185,6 +188,20 @@ void McmcSamples::writeDataTxt(const string &title){
     out.close();
 }
 
+void MCMC::initTxtFile(const vector<Parameter*> &paramVec, const string &title){
+    if (myMPI::rank) return;
+    outfilename = title + ".mcmcsamples.Par";
+    out.open(outfilename.c_str());
+    if (!out) {
+        throw("Error: cannot open file " + outfilename);
+    }
+    for (unsigned i=0; i<paramVec.size(); ++i) {
+        Parameter *par = paramVec[i];
+        out << boost::format("%12s ") %par->label;
+    }
+    out << endl;
+}
+
 vector<McmcSamples*> MCMC::initMcmcSamples(const Model &model, const unsigned chainLength, const unsigned burnin,
                                            const unsigned thin, const string &title, const bool writeBinPosterior){
     vector<McmcSamples*> mcmcSampleVec;
@@ -209,9 +226,10 @@ vector<McmcSamples*> MCMC::initMcmcSamples(const Model &model, const unsigned ch
     for (unsigned i=0; i<model.paramVec.size(); ++i) {
         Parameter *par = model.paramVec[i];
         McmcSamples *mcmcSamples = new McmcSamples(par->label, chainLength, burnin, thin, 1);
-        mcmcSamples->initTxtFile(title);
+        //mcmcSamples->initTxtFile(title);
         mcmcSampleVec.push_back(mcmcSamples);
     }
+    initTxtFile(model.paramVec, title);
     return mcmcSampleVec;
 }
 
@@ -225,8 +243,9 @@ void MCMC::collectSamples(const Model &model, vector<McmcSamples*> &mcmcSampleVe
     for (unsigned j=0; j<model.paramVec.size(); ++j) {
         McmcSamples *mcmcSamples = mcmcSampleVec[i++];
         Parameter *par = model.paramVec[j];
-        mcmcSamples->getSample(iteration, par->value);
+        mcmcSamples->getSample(iteration, par->value, out);
     }
+    out << endl;
 }
 
 void MCMC::printStatus(const vector<Parameter*> &paramToPrint, const unsigned thisIter, const unsigned outputFreq, const string &timeLeft){
@@ -250,10 +269,16 @@ void MCMC::printStatus(const vector<Parameter*> &paramToPrint, const unsigned th
     cout.flush();
 }
 
-void MCMC::printSummary(const vector<Parameter*> &paramToPrint, const vector<McmcSamples*> &mcmcSampleVec){
-    cout << "\nPosterior summary:\n\n";
+void MCMC::printSummary(const vector<Parameter*> &paramToPrint, const vector<McmcSamples*> &mcmcSampleVec, const string &filename){
+    ofstream out;
+    out.open(filename.c_str());
+    if (!out) {
+        throw("Error: cannot open file " + filename);
+    }
+    cout << "\nPosterior statistics from MCMC samples:\n\n";
     cout << boost::format("%13s %-15s %-15s\n") %"" % "Mean" % "SD ";
-    
+    out << "Posterior statistics from MCMC samples:\n\n";
+    out << boost::format("%13s %-15s %-15s\n") %"" % "Mean" % "SD ";
     for (unsigned i=0; i<paramToPrint.size(); ++i) {
         Parameter *par = paramToPrint[i];
         for (unsigned j=0; j<mcmcSampleVec.size(); ++j) {
@@ -264,10 +289,16 @@ void MCMC::printSummary(const vector<Parameter*> &paramToPrint, const vector<Mcm
                 % ""
                 % mcmcSamples->mean()
                 % mcmcSamples->sd();
+                out << boost::format("%10s %2s %-15.6f %-15.6f\n")
+                % par->label
+                % ""
+                % mcmcSamples->mean()
+                % mcmcSamples->sd();
                 break;
             }
         }
-    }    
+    }
+    out.close();
 }
 
 vector<McmcSamples*> MCMC::run(Model &model, const unsigned chainLength, const unsigned burnin, const unsigned thin,
@@ -302,7 +333,7 @@ vector<McmcSamples*> MCMC::run(Model &model, const unsigned chainLength, const u
 
     if (myMPI::rank==0) {
         cout << "\nMCMC cycles completed." << endl;
-        printSummary(model.paramToPrint, mcmcSampleVec);
+        printSummary(model.paramToPrint, mcmcSampleVec, title + ".parRes");
     }
     
     return mcmcSampleVec;

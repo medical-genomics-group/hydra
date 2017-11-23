@@ -100,18 +100,21 @@ void GCTB::saveMcmcSamples(const vector<McmcSamples*> &mcmcSampleVec, const stri
 }
 
 void GCTB::outputResults(const Data &data, const vector<McmcSamples*> &mcmcSampleVec, const string &filename){
+    vector<McmcSamples*> mcmcSamplesPar;
     for (unsigned i=0; i<mcmcSampleVec.size(); ++i) {
         McmcSamples *mcmcSamples = mcmcSampleVec[i];
         if (mcmcSamples->label == "SnpEffects") {
             //mcmcSamples->readDataBin(mcmcSamples->filename);
-            data.outputSnpResults(mcmcSamples->posteriorMean, mcmcSamples->pip, filename + ".snpRes");
+            data.outputSnpResults(mcmcSamples->posteriorMean, mcmcSamples->posteriorSqrMean, mcmcSamples->pip, filename + ".snpRes");
         }
-        if (mcmcSamples->label == "FixedEffects") {
-            data.outputFixedEffects(mcmcSamples->datMat, filename + ".fxdRes");
+        else if (mcmcSamples->label == "CovEffects") {
+            data.outputFixedEffects(mcmcSamples->datMat, filename + ".covRes");
         }
-        if (mcmcSamples->label == "WindowDelta") {
+        else if (mcmcSamples->label == "WindowDelta") {
             //mcmcSamples->readDataBin(mcmcSamples->filename);
             data.outputWindowResults(mcmcSamples->posteriorMean, filename + ".window");
+        } else {
+            mcmcSamplesPar.push_back(mcmcSamples);
         }
     }
 }

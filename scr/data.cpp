@@ -872,29 +872,31 @@ void Data::buildSparseMME(const string &bedFile, const unsigned windowWidth){
 }
 
 
-void Data::outputSnpResults(const VectorXf &posteriorMean, const VectorXf &pip, const string &filename) const {
+void Data::outputSnpResults(const VectorXf &posteriorMean, const VectorXf &posteriorSqrMean, const VectorXf &pip, const string &filename) const {
     if (myMPI::rank) return;
     ofstream out(filename.c_str());
-    out << boost::format("%6s %20s %6s %12s %8s %12s %8s %8s\n")
+    out << boost::format("%6s %20s %6s %12s %8s %12s %12s %8s %8s\n")
     % "Id"
     % "Name"
     % "Chrom"
     % "Position"
     % "GeneFrq"
     % "Effect"
+    % "SE"
     % "PIP"
     % "Window";
     for (unsigned i=0, idx=0; i<numSnps; ++i) {
         SnpInfo *snp = snpInfoVec[i];
         if(!fullSnpFlag[i]) continue;
         if(snp->isQTL) continue;
-        out << boost::format("%6s %20s %6s %12s %8.6f %12.6f %8.3f %8s\n")
+        out << boost::format("%6s %20s %6s %12s %8.6f %12.6f %12.6f %8.3f %8s\n")
         % (idx+1)
         % snp->ID
         % snp->chrom
         % snp->physPos
         % snp->af
         % posteriorMean[idx]
+        % sqrt(posteriorSqrMean[idx]-posteriorMean[idx]*posteriorMean[idx])
         % pip[idx]
         % snp->window;
         ++idx;
@@ -951,9 +953,11 @@ void Data::summarizeSnpResults(const SparseMatrix<float> &snpEffects, const stri
 void Data::outputFixedEffects(const MatrixXf &fixedEffects, const string &filename) const {
     if (myMPI::rank) return;
     ofstream out(filename.c_str());
+    long nrow = fixedEffects.rows();
     VectorXf mean = fixedEffects.colwise().mean();
+    VectorXf sd = (fixedEffects.rowwise() - mean.transpose()).colwise().squaredNorm().cwiseSqrt()/sqrt(nrow);
     for (unsigned i=0; i<numFixedEffects; ++i) {
-        out << boost::format("%20s %8.6f\n") % fixedEffectNames[i] %mean[i];
+        out << boost::format("%20s %12.6f %12.6f\n") % fixedEffectNames[i] %mean[i] %sd[i];
     }
     out.close();
 }

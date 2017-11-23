@@ -24,7 +24,7 @@ int main(int argc, const char * argv[]) {
     
     if (myMPI::rank==0) {
         cout << "***********************************************\n";
-        cout << "* GCTB 2.0                                    *\n";
+        cout << "* GCTB 1.9                                    *\n";
         cout << "* Genome-wide Complex Trait Bayesian analysis *\n";
         cout << "* Author: Jian Zeng                           *\n";
         cout << "* MIT License                                 *\n";
