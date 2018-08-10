@@ -182,11 +182,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
     
     //if (bayesType == "Cap" || bayesType == "Sap") myMPI::partition = "bycol";
     
-    omp_set_num_threads(numThread);
-    if (numThread > 1) {
-#pragma omp parallel
-        printf("Hello from thread %d, nthreads %d\n", omp_get_thread_num(), omp_get_num_threads());
-    }
+
 
 }
 
@@ -288,11 +284,11 @@ void Options::readFile(const string &file){  // input options from file
     }
     in.close();
     
-    cout << ss.str() << endl;
+    MPI_Comm_rank(MPI_COMM_WORLD, &myMPI::rank);
+    if(myMPI::rank==0) cout << ss.str() << endl;
     
     //if (bayesType == "Cap" || bayesType == "Sap") myMPI::partition = "bycol";
     
-
 
 }
 

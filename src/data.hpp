@@ -19,9 +19,9 @@
 #include <Eigen/Eigen>
 #include <Eigen/Sparse>
 #include <boost/format.hpp>
-
-
-#include "../src/gadgets.hpp"
+#include <mpi.h>
+#include "gadgets.hpp"
+#include "mympi.hpp"
 
 using namespace std;
 using namespace Eigen;
@@ -196,8 +196,6 @@ public:
     void summarizeSnpResults(const SparseMatrix<float> &snpEffects, const string &filename) const;
     void buildSparseMME(void);
     void readMultiLDmatInfoFile(const string &mldmatFile);
-    void readMultiLDmatBinFile(const string &mldmatFile);
-    void outputSnpEffectSamples(const SparseMatrix<float> &snpEffects, const unsigned burnin, const unsigned outputFreq, const string &snpResFile, const string &filename) const;
 };
 
 #endif /* data_hpp */

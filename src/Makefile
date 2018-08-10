@@ -13,51 +13,31 @@ OUTPUT = gctb
 
 # Put C++ compiler here
 CXX_UNIX = mpicxx   #g++
-CXX_MAC = clang-omp   #g++
+CXX_MAC = gcc   #g++
 
 # Any other compiler flags here ( -Wall, -g, etc)
-CXXFLAGS = -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++0x -I.
+CXXFLAGS = -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./
 
-# Some system specific flags
-ifeq ($(SYS),LINUX)
- CXXFLAGS += -fopenmp -I ../../Eigen3 -I ../.. -DUNIX -m64 -ldl
-# LIB += -static -Wl,--start-group -Wl,--end-group -lpthread -lm -ldl
- CXX = $(CXX_UNIX)
-endif
-
-ifeq ($(SYS),MAC)
- CXXFLAGS += -fopenmp -I /usr/local/include -I /usr/local/lib -I /Users/j.zeng/XCode/Eigen3 -I /Users/j.zeng/XCode -I /usr/local/include/libiomp -DUNIX -Dfopen64=fopen 
- LIB += -lz -lmpi -lm
+ CXXFLAGS += -I../ -I../../  -I/usr/local/include -I/usr/local/include/Eigen -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ -DUNIX -m64 -ldl
+ LIB += -lz -lmpi -lm  -lc++
+ LDFLAGS+= -L/usr/local/opt/llvm/lib
  CXX = $(CXX_MAC)
-endif
 
 
 HDR = gctb.hpp \
       data.hpp \
       gadgets.hpp \
-      hsq.hpp \
-      mcmc.hpp \
-      model.hpp \
       options.hpp \
-      predict.hpp \
-      stat.hpp \
       mympi.hpp \
-      xci.hpp \
-      vgmaf.hpp
+      BayesRRtoy.hpp
 
 SRC = gctb.cpp \
       data.cpp \
       gadgets.cpp \
-      hsq.cpp \
       main.cpp \
-      mcmc.cpp \
-      model.cpp \
       options.cpp \
-      predict.cpp \
-      stat.cpp \
       mympi.cpp \
-      xci.cpp \
-      vgmaf.cpp
+      BayesRRtoy.cpp
 
 	   
 OBJ = $(SRC:.cpp=.o)

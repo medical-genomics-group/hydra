@@ -17,10 +17,9 @@
 #include <string>
 #include <limits.h>
 #include <mpi.h>
-#include <omp.h>
 #include <boost/format.hpp>
-#include "../src/gadgets.hpp"
 #include "mympi.hpp"
+#include "gadgets.hpp"
 
 using namespace std;
 using namespace boost;

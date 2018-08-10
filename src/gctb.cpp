@@ -34,10 +34,6 @@ void GCTB::inputSnpInfo(Data &data, const string &includeSnpFile, const string &
     data.includeChr(includeChr);
     data.readGwasSummaryFile(gwasSummaryFile);
     data.includeMatchedSnp();
-    if (multiLDmat)
-        data.readMultiLDmatBinFile(ldmatrixFile);
-    else
-        data.readLDmatrixBinFile(ldmatrixFile + ".bin");
     data.buildSparseMME();
 }
 
