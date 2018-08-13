@@ -1,6 +1,6 @@
 
 # -----------------------------------------------------------------
-#   Makefile for gctb 
+#   Makefile for testing repo 
 #   
 #   Supported platforms
 #       Unix / Linux                UNIX
