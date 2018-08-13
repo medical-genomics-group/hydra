@@ -12,5 +12,5 @@ This will read in a data file that is in a specific format, select a column at r
 
 On line 45 the file /src/data.cpp the binary file that contains the data is read into memory. Instead of this, we would like Eigen to operate on a memory mapped version of this file, so that only one randomly selected column is read into memory at any time, rather than the entire file.
 
-Our overall aim is to apply this to a datset that has 470,000 rows and 38 million columns, with each data entry consisting of 8 bytes. The computations we are doing require only one randomly selected column at a time and so we hope to reduce the RAM requirements as much as possible throuhg memory mapping.
+Our overall aim is to apply this to a datset that has 470,000 rows and 38 million columns, with each data entry consisting of 8 bytes. The computations we are doing require only one randomly selected column at a time and so we hope to reduce the RAM requirements as much as possible through memory mapping.
 
