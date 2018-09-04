@@ -5,11 +5,19 @@
 //  Created by Jian Zeng on 14/06/2016.
 //  Copyright © 2016 Jian Zeng. All rights reserved.
 //
+// most read file methods are adopted from GCTA with modification
 
 #include "data.hpp"
 #include <mpi.h>
 #include <Eigen/Eigen>
-// most read file methods are adopted from GCTA with modification
+#include <sys/mman.h>
+#include <sys/stat.h> 
+#include <fcntl.h>
+
+
+#define handle_error(msg)                               \
+    do { perror(msg); exit(EXIT_FAILURE); } while (0)
+
 
 bool SnpInfo::isProximal(const SnpInfo &snp2, const float genWindow) const {
     return chrom == snp2.chrom && fabs(genPos - snp2.genPos) < genWindow;
@@ -68,7 +76,154 @@ void Data::readBimFile(const string &bimFile) {
         cout << numSnps << " SNPs to be included from [" + bimFile + "]." << endl;
 }
 
-/*void Data::readBedFile(const string &bedFile){
+
+//EO: Method to get a specific SNP data from a bed file using mmap
+//----------------------------------------------------------------
+void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint snpInd, VectorXf &snpData) {
+
+    struct stat sb;
+
+    ZPZdiag.resize(numIncdSnps);
+    
+    //EO: check how this should be dealt with
+    //
+    // Early return if SNP is to be ignored
+    if (!snpInfoVec[snpInd]->included)
+        return;
+
+    int fd = open(bedFile.c_str(), O_RDONLY);
+    if (fd == -1)
+        handle_error("opening bedFile");
+
+    if (fstat(fd, &sb) == -1)
+        handle_error("fstat");
+    
+    if (!S_ISREG(sb.st_mode))
+        handle_error("Not a regular file");
+  
+    off_t offset    = 3 + snpInd * snpLenByt;
+    off_t pa_offset = offset & ~(memPageSize - 1);
+
+    size_t relOffset  = offset - pa_offset;
+    size_t bytesToMap = relOffset + snpLenByt;
+
+
+    char  *addr = static_cast<char*>(mmap(0, bytesToMap, PROT_READ, MAP_PRIVATE, fd, pa_offset));  
+    if (addr == MAP_FAILED)
+        handle_error("mmap failed");
+  
+    // Index of first byte to read
+    unsigned ir = relOffset;
+
+    int   nmiss = 0;
+    float mean  = 0.f;
+    int   sumi  = 0;
+
+    int N = omp_get_max_threads();
+    //if (snpInd%100 == 0)
+    //    cout << "Max number of frame N = " << N << endl;
+    
+    vector<vector<int>> snpDataVec(N);
+
+    int Nmax = numInds%4 ? numInds/4 + 1 : numInds/4;
+    //printf("Nmax = %d\n", Nmax);
+    if (Nmax < N)
+        omp_set_num_threads(Nmax);
+
+#pragma omp parallel
+    {
+        int id, i, Nthrds, istart, iend;
+        id = omp_get_thread_num();
+        Nthrds = omp_get_num_threads();
+        //if (snpInd%100 == 0 && id == 0)
+        //    cout << "Will use N = " << N << " threads" << endl;
+        istart =  id    * (numInds/4) / Nthrds * 4;
+        iend   = (id+1) * (numInds/4) / Nthrds * 4;
+        if (id == Nthrds-1) iend = numInds;
+
+        snpDataVec[id].reserve((iend-istart)*4+1);
+
+        unsigned allele1=0, allele2=0;
+        bitset<8> b;
+        uint tmiss = 0;
+        uint tsum  = 0;
+
+        for(i=istart; i<iend; i+=4) {
+            
+            b = addr[relOffset + i/4];
+
+            for (uint k=0; k<4 && i+k<iend; ++k) {
+
+                if (indInfoVec[i+k]->kept) {
+                    allele1 = (!b[2*k]);
+                    allele2 = (!b[2*k+1]);
+                    if (allele1 == 0 && allele2 == 1) {  // missing genotype
+                        snpDataVec[id].push_back(-9);
+                    } else {
+                        snpDataVec[id].push_back(allele1 + allele2);
+                    }
+                }
+            }
+        }
+    }
+
+
+    if (munmap(addr, bytesToMap) == -1)
+        handle_error("munmap");
+    
+    if (close(fd) == -1)
+        handle_error("closing bedFile");
+
+#pragma omp parallel for reduction(+:sumi, nmiss)
+    for (int i=0; i<N; ++i) {
+        for ( auto &it : snpDataVec[i] ) {
+            if (it == -9) {
+                ++nmiss;
+            } else {
+                sumi += it;
+            }
+        }
+    }
+
+    mean = float(sumi) / float(numKeptInds-nmiss);
+
+    //if (snpInd%100 == 0)
+    //    printf("marker %6d mean = %12.7f computed with sumi = %6d on %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
+    
+    snpData.resize(numKeptInds);
+
+    float c2 = 0.f;
+
+#pragma omp parallel for reduction(+:c2) 
+    for (int i=0; i<N; ++i) {
+        
+        int absi = 0;
+        for (int j=0; j<i; ++j)
+            absi += snpDataVec[j].size();
+
+        for ( auto &it : snpDataVec[i] ) {
+
+            if (nmiss && it == -9) {
+                snpData(absi) = mean;
+            } else {
+                snpData(absi) = it;
+            }
+
+            c2 += snpData(absi);
+            ++absi;
+        }
+    }
+
+    
+    //if (snpInd%100 == 0)
+    //    printf("mean vs mean %13.7f %13.7f sum = %20.7f %13.7f nmiss=%d\n", mean, snpData.mean(), c2, c2/float(numKeptInds), nmiss);
+
+    snpData.array() -= snpData.mean();
+    ZPZdiag[snpInd]  = snpData.squaredNorm();
+}
+
+
+void Data::readBedFile_noMPI(const string &bedFile){
     unsigned i = 0, j = 0, k = 0;
     
     if (numIncdSnps == 0) throw ("Error: No SNP is retained for analysis.");
@@ -120,13 +275,24 @@ void Data::readBimFile(const string &bimFile) {
         }
 
         // fill missing values with the mean
+        float sum = mean;
         mean /= float(numKeptInds-nmiss);
+
+    
+        //if (j%100 == 0)
+        //    printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n", j, mean, sum, numKeptInds-nmiss, numKeptInds, nmiss);
+
         if (nmiss) {
             for (i=0; i<numKeptInds; ++i) {
                 if (Z(i,snp) == -9) Z(i,snp) = mean;
             }
         }
         
+        //if (j%100 == 0)
+        //    printf("mean vs mean %13.7f %13.7f sum = %20.7f nmiss=%d\n", mean, Z.col(j).mean(), Z.col(j).sum(), nmiss);
+
+
+
         // compute allele frequency
         snpInfo->af = 0.5f*mean;
         snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
@@ -142,6 +308,8 @@ void Data::readBimFile(const string &bimFile) {
     // standardize genotypes
     for (i=0; i<numIncdSnps; ++i) {
         Z.col(i).array() -= Z.col(i).mean();
+        //if (i%10 == 0)
+        //  printf("marker %2d new mean = %13.6E computed with %d elements (%d - %d)\n", i, Z.col(i).mean(), Z.col(i).size());
         //Z.col(i).array() /= sqrtf(gadgets::calcVariance(Z.col(i))*numKeptInds);
         ZPZdiag[i] = Z.col(i).squaredNorm();
     }
@@ -149,7 +317,7 @@ void Data::readBimFile(const string &bimFile) {
     //cout << "Z" << endl << Z << endl;
     
     cout << "Genotype data for " << numKeptInds << " individuals and " << numIncdSnps << " SNPs are included from [" + bedFile + "]." << endl;
-}*/
+}
 
 void Data::readBedFile(const string &bedFile){
     unsigned i = 0, j = 0;
@@ -230,12 +398,12 @@ void Data::readBedFile(const string &bedFile){
         if (++snp == numIncdSnps) break;
     }
     in.close();
-    
+
     
     // standardize genotypes
     VectorXf colsums = Z.colwise().sum();
     VectorXf colsums_all(numIncdSnps);
-    
+
     MPI_Allreduce(&colsums[0], &colsums_all[0], numIncdSnps, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
     
     Z.rowwise() -= colsums_all.transpose()/numKeptInds_all;  // center
@@ -718,29 +886,29 @@ void Data::outputSnpResults(const VectorXf &posteriorMean, const VectorXf &poste
     if (myMPI::rank) return;
     ofstream out(filename.c_str());
     out << boost::format("%6s %20s %6s %12s %8s %12s %12s %8s %8s\n")
-    % "Id"
-    % "Name"
-    % "Chrom"
-    % "Position"
-    % "GeneFrq"
-    % "Effect"
-    % "SE"
-    % "PIP"
-    % "Window";
+        % "Id"
+        % "Name"
+        % "Chrom"
+        % "Position"
+        % "GeneFrq"
+        % "Effect"
+        % "SE"
+        % "PIP"
+        % "Window";
     for (unsigned i=0, idx=0; i<numSnps; ++i) {
         SnpInfo *snp = snpInfoVec[i];
         if(!fullSnpFlag[i]) continue;
         if(snp->isQTL) continue;
         out << boost::format("%6s %20s %6s %12s %8.6f %12.6f %12.6f %8.3f %8s\n")
-        % (idx+1)
-        % snp->ID
-        % snp->chrom
-        % snp->physPos
-        % snp->af
-        % posteriorMean[idx]
-        % sqrt(posteriorSqrMean[idx]-posteriorMean[idx]*posteriorMean[idx])
-        % pip[idx]
-        % snp->window;
+            % (idx+1)
+            % snp->ID
+            % snp->chrom
+            % snp->physPos
+            % snp->af
+            % posteriorMean[idx]
+            % sqrt(posteriorSqrMean[idx]-posteriorMean[idx]*posteriorMean[idx])
+            % pip[idx]
+            % snp->window;
         ++idx;
     }
     out.close();
@@ -752,8 +920,8 @@ void Data::outputWindowResults(const VectorXf &posteriorMean, const string &file
     out << boost::format("%6s %8s\n") %"Id" %"PIP";
     for (unsigned i=0; i<posteriorMean.size(); ++i) {
         out << boost::format("%6s %8.3f\n")
-        % (i+1)
-        % posteriorMean[i];
+            % (i+1)
+            % posteriorMean[i];
     }
     out.close();
 }
@@ -863,29 +1031,29 @@ void Data::readLDmatrixBinFile(const string &ldmatrixFile){
         SnpInfo *snpi = snpInfoVec[i];
         windStartLDM[i] = snpi->windStart;
         windSizeLDM[i]  = snpi->windSize;
-//        if (snpi->included) {
-//            int windStarti=0, windSizei=0;
-//            for (unsigned j=0, incj=0; j<snpi->windSize; ++j) {
-//                snpj = snpInfoVec[snpi->windStart+j];
-//                if (snpj->included) {
-//                    if (!incj) windStarti = snpj->index;
-//                    ++incj;
-//                    ++windSizei;
-//                }
-//            }
-//            snpi->windStart = windStart[inci] = windStarti;
-//            snpi->windSize  = windSize [inci] = windSizei;
-//            ++inci;
-//        } else {
-//            snpi->windStart = -1;
-//            snpi->windSize  = 0;
-//        }
+        //        if (snpi->included) {
+        //            int windStarti=0, windSizei=0;
+        //            for (unsigned j=0, incj=0; j<snpi->windSize; ++j) {
+        //                snpj = snpInfoVec[snpi->windStart+j];
+        //                if (snpj->included) {
+        //                    if (!incj) windStarti = snpj->index;
+        //                    ++incj;
+        //                    ++windSizei;
+        //                }
+        //            }
+        //            snpi->windStart = windStart[inci] = windStarti;
+        //            snpi->windSize  = windSize [inci] = windSizei;
+        //            ++inci;
+        //        } else {
+        //            snpi->windStart = -1;
+        //            snpi->windSize  = 0;
+        //        }
     }
     
-//    cout << "windStartLDM " << windStartLDM.transpose() << endl;
-//    cout << "windSizeLDM " << windSizeLDM.transpose() << endl;
-//    cout << "windStart " << windStart.transpose() << endl;
-//    cout << "windSize " << windSize.transpose() << endl;
+    //    cout << "windStartLDM " << windStartLDM.transpose() << endl;
+    //    cout << "windSizeLDM " << windSizeLDM.transpose() << endl;
+    //    cout << "windStart " << windStart.transpose() << endl;
+    //    cout << "windSize " << windSize.transpose() << endl;
 
     FILE *in = fopen(ldmatrixFile.c_str(), "rb");
     if (!in) {
@@ -974,23 +1142,23 @@ void Data::buildSparseMME(){
     //b.array() -= b.mean();
     ZPy.array() = D.array()*b.array();
     
-//    cout << "ZPZdiag " << ZPZdiag.transpose() << endl;
-//    cout << "ZPZ.back() " << ZPZ.back().transpose() << endl;
-//    cout << "ZPZ.front() " << ZPZ.front().transpose() << endl;
-//    cout << "ZPy " << ZPy.head(100).transpose() << endl;
-//    cout << "b.mean() " << b.mean() << endl;
+    //    cout << "ZPZdiag " << ZPZdiag.transpose() << endl;
+    //    cout << "ZPZ.back() " << ZPZ.back().transpose() << endl;
+    //    cout << "ZPZ.front() " << ZPZ.front().transpose() << endl;
+    //    cout << "ZPy " << ZPy.head(100).transpose() << endl;
+    //    cout << "b.mean() " << b.mean() << endl;
     
     // estimate ypy
     ypy = (D.array()*(n.array()*se.array().square()+b.array().square())).mean();
     numKeptInds = n.mean();
     
     //cout << ZPZ.size() << " " << ZPy.size() << " " << ypy << endl;
-//    cout << ZPy << endl;
-//    for (unsigned i=0; i<numIncdSnps; ++i) {
-//        cout << D[i] << "\t" << ZPZdiag[i] << endl;
-//    }
-//    
-//    cout << ZPZ << endl;
+    //    cout << ZPy << endl;
+    //    for (unsigned i=0; i<numIncdSnps; ++i) {
+    //        cout << D[i] << "\t" << ZPZdiag[i] << endl;
+    //    }
+    //    
+    //    cout << ZPZ << endl;
     
     // no fixed effects
     numFixedEffects = 0;
@@ -1009,7 +1177,7 @@ void Data::readMultiLDmatInfoFile(const string &mldmatFile){
     while (getline(in, inputStr)) {
         vector<SnpInfo*> vec;
         readLDmatrixInfoFile(inputStr+".info", vec);
-//        numSnpMldVec.push_back(numSnps);
+        //        numSnpMldVec.push_back(numSnps);
         mldmVec.push_back(vec);
     }
 }

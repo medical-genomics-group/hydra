@@ -10,31 +10,36 @@
 BayesRRtoy::BayesRRtoy(Data &data):data(data) {}
 
 BayesRRtoy::~BayesRRtoy() {
-	// TODO Auto-generated destructor stub
+    // TODO Auto-generated destructor stub
 }
 
 void BayesRRtoy::runToyExample(int samples ){
-	std::vector<int> markerI;
-	int M;
-	int marker;
-	std::cout<<"running toy example ";
 
-	M=data.Z.cols();
-	std::cout<<"sampling " << M <<" snps\n";
+    std::vector<int> markerI;
+    int M;
+    int marker;
+    std::cout<<"running toy example ";
+
+    M=data.Z.cols();
+    std::cout << "Sampling " << M <<" snps\n";
 
     for (int i=0; i<M; ++i) {
-	   markerI.push_back(i);
-	}
-	int i;
-    for(i=0;  i<samples; i++){
-    	std::random_shuffle(markerI.begin(), markerI.end());
-    	for(int j=0; j < M; j++){
-    		marker= markerI[j];
-    		data.Z.col(marker);
-    		std::cout<<"column: " << std::to_string(marker)<< "mean: " <<data.Z.col(marker).mean() << "\n";
-    	}
-
+        markerI.push_back(i);
     }
-    std::cout<<"success";
 
+    for(int i=0;  i<samples; i++){
+
+        //EO
+        //std::random_shuffle(markerI.begin(), markerI.end());
+
+        for(int j=0; j < M; ++j) {
+
+            marker= markerI[j];
+
+            if(marker%100 == 0)
+                printf("  -> marker %6i has mean %13.6f on %d elements [%13.6f, %13.6f]  Sq. Norm = %13.6f\n", marker, data.Z.col(marker).mean(), data.Z.col(marker).size(), data.Z.col(marker).minCoeff(), data.Z.col(marker).maxCoeff(), data.ZPZdiag[marker]);
+        }
+    }
+
+    std::cout << "BayesRRtoy success" << endl;
 }

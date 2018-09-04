@@ -168,7 +168,9 @@ public:
     
     void readFamFile(const string &famFile);
     void readBimFile(const string &bimFile);
+    void readBedFile_noMPI(const string &bedFile);
     void readBedFile(const string &bedFile);
+    void getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint spnInd, VectorXf &snpData);
     void readPhenotypeFile(const string &phenFile, const unsigned mphen);
     void readCovariateFile(const string &covarFile);
     void readGwasSummaryFile(const string &gwasFile);

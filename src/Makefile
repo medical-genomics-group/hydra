@@ -18,7 +18,9 @@ CXX_UNIX = mpicxx   #g++
 CXXFLAGS = -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./
 
 # CXXFLAGS += -I../ -I../../  -I/usr/local/include -I/usr/local/include/Eigen -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ -DUNIX -m64 -ldl
- CXXFLAGS= -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl
+CXXFLAGS  = -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl
+CXXFLAGS += -fopenmp
+
 # LIB += -lz -lmpi -lm  -lc++
  LIB += -lz -lmpi -lm
  LDFLAGS+= -L/usr/local/opt/llvm/lib
@@ -30,7 +32,8 @@ HDR = gctb.hpp \
       gadgets.hpp \
       options.hpp \
       mympi.hpp \
-      BayesRRtoy.hpp
+      BayesRRtoy.hpp \
+      BayesRMmapToy.hpp
 
 SRC = gctb.cpp \
       data.cpp \
@@ -38,9 +41,10 @@ SRC = gctb.cpp \
       main.cpp \
       options.cpp \
       mympi.cpp \
-      BayesRRtoy.cpp
+      BayesRRtoy.cpp \
+      BayesRMmapToy.cpp
 
-	   
+
 OBJ = $(SRC:.cpp=.o)
 
 all : $(OUTPUT) 
