@@ -29,14 +29,13 @@ void BayesRRtoy::runToyExample(int samples ){
 
     for(int i=0;  i<samples; i++){
 
-        //EO
-        //std::random_shuffle(markerI.begin(), markerI.end());
+        std::random_shuffle(markerI.begin(), markerI.end());
 
         for(int j=0; j < M; ++j) {
 
             marker= markerI[j];
 
-            if(marker%100 == 0)
+            if (marker%100 == 0)
                 printf("  -> marker %6i has mean %13.6f on %d elements [%13.6f, %13.6f]  Sq. Norm = %13.6f\n", marker, data.Z.col(marker).mean(), data.Z.col(marker).size(), data.Z.col(marker).minCoeff(), data.Z.col(marker).maxCoeff(), data.ZPZdiag[marker]);
         }
     }

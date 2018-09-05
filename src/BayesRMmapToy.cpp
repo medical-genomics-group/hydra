@@ -31,10 +31,9 @@ void BayesRMmapToy::runToyExample(int samples ){
     markerI.push_back(i);
   }
 
-  for(int i=0; i<samples; ++i){
+  for(int i=0; i<samples; ++i) {
 
-    //EO
-    //std::random_shuffle(markerI.begin(), markerI.end());
+    std::random_shuffle(markerI.begin(), markerI.end());
 
     for(int j=0; j < data.numIncdSnps; ++j) {
 
@@ -47,6 +46,5 @@ void BayesRMmapToy::runToyExample(int samples ){
       }
     }
   }
-
   std::cout << "BayesRMmapToy success" << endl;
 }
