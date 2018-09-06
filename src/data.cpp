@@ -83,8 +83,9 @@ void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t sn
 
     struct stat sb;
 
+    snpData.resize(numKeptInds);
     ZPZdiag.resize(numIncdSnps);
-    
+
     //EO: check how this should be dealt with
     //
     // Early return if SNP is to be ignored
@@ -112,9 +113,6 @@ void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t sn
     if (addr == MAP_FAILED)
         handle_error("mmap failed");
   
-    // Index of first byte to read
-    unsigned ir = relOffset;
-
     int   nmiss = 0;
     float mean  = 0.f;
     int   sumi  = 0;
@@ -123,50 +121,94 @@ void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t sn
     //if (snpInd%100 == 0)
     //    cout << "Max number of frame N = " << N << endl;
     
-    vector<vector<int>> snpDataVec(N);
-
     int Nmax = numInds%4 ? numInds/4 + 1 : numInds/4;
     //printf("Nmax = %d\n", Nmax);
     if (Nmax < N)
-        omp_set_num_threads(Nmax);
+        N = Nmax;
+
+    omp_set_num_threads(N);
+
+    vector<int> tSizeVec(N);
 
 #pragma omp parallel
     {
         int id, i, Nthrds, istart, iend;
+
+        int itmiss = 0;
+        int itsum  = 0;
+        vector<float> tSnpData; 
+
         id = omp_get_thread_num();
         Nthrds = omp_get_num_threads();
         //if (snpInd%100 == 0 && id == 0)
         //    cout << "Will use N = " << N << " threads" << endl;
         istart =  id    * (numInds/4) / Nthrds * 4;
-        iend   = (id+1) * (numInds/4) / Nthrds * 4;
-        if (id == Nthrds-1) iend = numInds;
+        iend   = (id+1) * (numInds/4) / Nthrds * 4 - 1;
+        if (id == Nthrds-1) iend = numInds - 1;
+        //printf("thread %d [%6d. %6d]\n", id, istart, iend);
 
-        snpDataVec[id].reserve((iend-istart)*4+1);
+        tSnpData.resize(iend-istart+1);
 
         unsigned allele1=0, allele2=0;
         bitset<8> b;
-        uint tmiss = 0;
-        uint tsum  = 0;
+        int ii    = 0;
 
-        for(i=istart; i<iend; i+=4) {
+        for(i=istart; i<=iend; i+=4) {
             
             b = addr[relOffset + i/4];
 
-            for (uint k=0; k<4 && i+k<iend; ++k) {
+            for (int k=0; k<4 && i+k<=iend; ++k) {
 
                 if (indInfoVec[i+k]->kept) {
                     allele1 = (!b[2*k]);
                     allele2 = (!b[2*k+1]);
                     if (allele1 == 0 && allele2 == 1) {  // missing genotype
-                        snpDataVec[id].push_back(-9);
+                        tSnpData[ii] = -9;
+                        ++itmiss;
                     } else {
-                        snpDataVec[id].push_back(allele1 + allele2);
+                        tSnpData[ii] = allele1 + allele2;
+                        itsum += tSnpData[ii];
                     }
+                    ++ii;
                 }
             }
         }
-    }
 
+        tSnpData.resize(ii);
+        tSizeVec[id] = tSnpData.size();
+        
+
+        // Compute total sum and nmiss
+#pragma omp critical
+        {
+            sumi  += itsum;
+            nmiss += itmiss;
+        }
+
+#pragma omp barrier
+
+        // Then compute the mean
+#pragma omp single 
+        {
+            mean = float(sumi) / float(numKeptInds-nmiss);
+        }
+
+#pragma omp barrier
+
+        // Concatenate to output vector
+        int absi = 0;
+        for (int j=0; j<id; ++j)
+            absi += tSizeVec[j];
+
+        for ( auto &it : tSnpData ) {
+            if (nmiss && it == -9) {
+                snpData[absi] = mean;
+            } else {
+                snpData[absi] = it;
+            }
+            ++absi;
+        }
+    }
 
     if (munmap(addr, bytesToMap) == -1)
         handle_error("munmap");
@@ -174,49 +216,10 @@ void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t sn
     if (close(fd) == -1)
         handle_error("closing bedFile");
 
-#pragma omp parallel for reduction(+:sumi, nmiss)
-    for (int i=0; i<N; ++i) {
-        for ( auto &it : snpDataVec[i] ) {
-            if (it == -9) {
-                ++nmiss;
-            } else {
-                sumi += it;
-            }
-        }
-    }
-
-    mean = float(sumi) / float(numKeptInds-nmiss);
-
-    //if (snpInd%100 == 0)
-    //    printf("marker %6d mean = %12.7f computed with sumi = %6d on %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
-    
-    snpData.resize(numKeptInds);
-
-    float c2 = 0.f;
-
-#pragma omp parallel for reduction(+:c2) 
-    for (int i=0; i<N; ++i) {
-        
-        int absi = 0;
-        for (int j=0; j<i; ++j)
-            absi += snpDataVec[j].size();
-
-        for ( auto &it : snpDataVec[i] ) {
-
-            if (nmiss && it == -9) {
-                snpData(absi) = mean;
-            } else {
-                snpData(absi) = it;
-            }
-
-            c2 += snpData(absi);
-            ++absi;
-        }
-    }
-
-    
-    //if (snpInd%100 == 0)
-    //    printf("mean vs mean %13.7f %13.7f sum = %20.7f %13.7f nmiss=%d\n", mean, snpData.mean(), c2, c2/float(numKeptInds), nmiss);
+    /*
+    if (snpInd%100 == 0)
+        printf("MARKER %6d mean = %12.7f computed on %6d with %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
+    */
 
     snpData.array() -= snpData.mean();
     ZPZdiag[snpInd]  = snpData.squaredNorm();
@@ -279,9 +282,11 @@ void Data::readBedFile_noMPI(const string &bedFile){
         mean /= float(numKeptInds-nmiss);
 
     
-        //if (j%100 == 0)
-        //    printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n", j, mean, sum, numKeptInds-nmiss, numKeptInds, nmiss);
-
+        if (j%100 == 0) {
+            printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n", j, mean, sum, numKeptInds-nmiss, numKeptInds, nmiss);
+            fflush(stdout);
+        }
+        
         if (nmiss) {
             for (i=0; i<numKeptInds; ++i) {
                 if (Z(i,snp) == -9) Z(i,snp) = mean;

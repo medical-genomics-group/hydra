@@ -23,6 +23,7 @@ CXXFLAGS  = -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl
 CXXFLAGS += -fopenmp
 #CXXFLAGS += -mavx512f -mavx512cd -fopt-info-vec-all
 #CXXFLAGS += -g
+#CXXFLAGS += -Wall
 CXXFLAGS += -march=native
 
 # LIB += -lz -lmpi -lm  -lc++
