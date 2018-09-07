@@ -36,7 +36,7 @@ void BayesRRtoy::runToyExample(int samples ){
             marker= markerI[j];
 
             if (marker%100 == 0)
-                printf("  -> marker %6i has mean %13.6f on %d elements [%13.6f, %13.6f]  Sq. Norm = %13.6f\n", marker, data.Z.col(marker).mean(), data.Z.col(marker).size(), data.Z.col(marker).minCoeff(), data.Z.col(marker).maxCoeff(), data.ZPZdiag[marker]);
+                printf("  -> marker %6i has mean %13.6f on %d elements [%13.6f, %13.6f]  Sq. Norm = %13.6f, Var = %9.7f\n", marker, data.Z.col(marker).mean(), data.Z.col(marker).size(), data.Z.col(marker).minCoeff(), data.Z.col(marker).maxCoeff(), data.ZPZdiag[marker], data.Z.col(marker).squaredNorm()/data.Z.col(marker).size());
         }
     }
 

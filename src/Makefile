@@ -25,6 +25,7 @@ CXXFLAGS += -fopenmp
 #CXXFLAGS += -g
 #CXXFLAGS += -Wall
 CXXFLAGS += -march=native
+#CXXFLAGS += -S
 
 # LIB += -lz -lmpi -lm  -lc++
 LIB     += -lz -lmpi -lm

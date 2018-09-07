@@ -79,7 +79,7 @@ void Data::readBimFile(const string &bimFile) {
 
 //EO: Method to get a specific SNP data from a bed file using mmap
 //----------------------------------------------------------------
-void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint snpInd, VectorXf &snpData) {
+void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint snpInd, VectorXf &snpData) {
 
     struct stat sb;
 
@@ -220,9 +220,108 @@ void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t sn
     if (snpInd%100 == 0)
         printf("MARKER %6d mean = %12.7f computed on %6d with %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
     */
+ 
+    snpData.array() -= mean;
 
-    snpData.array() -= snpData.mean();
-    ZPZdiag[snpInd]  = snpData.squaredNorm();
+    float sqn = snpData.squaredNorm();
+    float std_ = 1.f / (sqrt(sqn / float(numKeptInds))); // assume full pop.
+    snpData.array() *= std_;
+
+    ZPZdiag[snpInd]  = sqn;
+}
+
+void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint snpInd, VectorXf &snpData) {
+
+    struct stat sb;
+
+    snpData.resize(numKeptInds);
+    ZPZdiag.resize(numIncdSnps);
+
+    //EO: check how this should be dealt with
+    //
+    // Early return if SNP is to be ignored
+    if (!snpInfoVec[snpInd]->included)
+        return;
+
+    int fd = open(bedFile.c_str(), O_RDONLY);
+    if (fd == -1)
+        handle_error("opening bedFile");
+
+    if (fstat(fd, &sb) == -1)
+        handle_error("fstat");
+    
+    if (!S_ISREG(sb.st_mode))
+        handle_error("Not a regular file");
+  
+    off_t offset    = 3 + snpInd * snpLenByt;
+    off_t pa_offset = offset & ~(memPageSize - 1);
+
+    size_t relOffset  = offset - pa_offset;
+    size_t bytesToMap = relOffset + snpLenByt;
+
+
+    char  *addr = static_cast<char*>(mmap(0, bytesToMap, PROT_READ, MAP_PRIVATE, fd, pa_offset));  
+    if (addr == MAP_FAILED)
+        handle_error("mmap failed");
+  
+    int   nmiss = 0;
+    float mean  = 0.f;
+    int   sumi  = 0;
+
+    unsigned allele1=0, allele2=0;
+    bitset<8> b;
+    int ii    = 0;
+
+    for(int i=0; i<numInds; i+=4) {
+        
+        b = addr[relOffset + i/4];
+
+        for (int k=0; k<4 && i+k<numInds; ++k) {
+
+            if (indInfoVec[i+k]->kept) {
+                allele1 = (!b[2*k]);
+                allele2 = (!b[2*k+1]);
+                if (allele1 == 0 && allele2 == 1) {  // missing genotype
+                    snpData[ii] = -9;
+                    ++nmiss;
+                } else {
+                    snpData[ii] = allele1 + allele2;
+                    sumi += snpData[ii];
+                }
+                ++ii;
+            }
+        }
+    }
+
+    mean = float(sumi) / float(numKeptInds-nmiss);
+    
+    if (nmiss) {
+        for (int i=0; i<numKeptInds; ++i) {
+            if (snpData[i] == -9) {
+                snpData[i] = mean;
+            }
+        }
+    }
+
+
+    if (munmap(addr, bytesToMap) == -1)
+        handle_error("munmap");
+    
+    if (close(fd) == -1)
+        handle_error("closing bedFile");
+
+    /*
+    if (snpInd%100 == 0)
+        printf("MARKER %6d mean = %12.7f computed on %6d with %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
+    */
+
+    snpData.array() -= mean;
+
+    float sqn = snpData.squaredNorm();
+    float std_ = 1.f / (sqrt(sqn / float(numKeptInds))); // assume full pop.
+    snpData.array() *= std_;
+
+    ZPZdiag[snpInd]  = sqn;
 }
 
 
@@ -248,6 +347,7 @@ void Data::readBedFile_noMPI(const string &bedFile){
     unsigned snp = 0, ind = 0;
     unsigned nmiss = 0;
     float mean = 0.0;
+
     for (j = 0, snp = 0; j < numSnps; j++) { // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
         snpInfo = snpInfoVec[j];
         mean = 0.0;
@@ -281,21 +381,23 @@ void Data::readBedFile_noMPI(const string &bedFile){
         float sum = mean;
         mean /= float(numKeptInds-nmiss);
 
-    
+        /*
         if (j%100 == 0) {
             printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n", j, mean, sum, numKeptInds-nmiss, numKeptInds, nmiss);
             fflush(stdout);
         }
-        
+        */
+
         if (nmiss) {
             for (i=0; i<numKeptInds; ++i) {
                 if (Z(i,snp) == -9) Z(i,snp) = mean;
             }
         }
         
-        //if (j%100 == 0)
-        //    printf("mean vs mean %13.7f %13.7f sum = %20.7f nmiss=%d\n", mean, Z.col(j).mean(), Z.col(j).sum(), nmiss);
-
+        /*
+        if (j%100 == 0)
+            printf("mean vs mean %13.7f %13.7f sum = %20.7f nmiss=%d\n", mean, Z.col(j).mean(), Z.col(j).sum(), nmiss);
+        */
 
 
         // compute allele frequency
@@ -304,21 +406,32 @@ void Data::readBedFile_noMPI(const string &bedFile){
 
         //cout << "snp " << snp << "     " << Z.col(snp).sum() << endl;
 
+        // standardize genotypes
+        Z.col(j).array() -= mean;
+
+        float sqn = Z.col(j).squaredNorm();
+        float std_ = 1.f / (sqrt(sqn / float(numKeptInds)));
+        Z.col(j).array() *= std_;
+
+        ZPZdiag[j] = sqn;
+
         if (++snp == numIncdSnps) break;
     }
+
     BIT.clear();
     BIT.close();
     
-    
+    /*
     // standardize genotypes
     for (i=0; i<numIncdSnps; ++i) {
         Z.col(i).array() -= Z.col(i).mean();
         //if (i%10 == 0)
         //  printf("marker %2d new mean = %13.6E computed with %d elements (%d - %d)\n", i, Z.col(i).mean(), Z.col(i).size());
-        //Z.col(i).array() /= sqrtf(gadgets::calcVariance(Z.col(i))*numKeptInds);
+        //Z.col(i).array() /= sqrtf(Gadget::calcVariance(Z.col(i))*numKeptInds);
         ZPZdiag[i] = Z.col(i).squaredNorm();
     }
-    
+    */
+
     //cout << "Z" << endl << Z << endl;
     
     cout << "Genotype data for " << numKeptInds << " individuals and " << numIncdSnps << " SNPs are included from [" + bedFile + "]." << endl;

@@ -21,6 +21,7 @@ public:
   virtual ~BayesRMmapToy();
   
   void runToyExample(int samples);
+  void runToyExample2(int samples);
 };
 
 #endif /* BAYESRRTOY_HPP_ */

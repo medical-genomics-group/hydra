@@ -84,7 +84,7 @@ int main(int argc, const char * argv[]) {
 	    
       //gctb.clearGenotypes(data);
 
-    } else if (opt.analysisType == "Bayes" && opt.bayesType == "bayesMmap") {
+    } else if (opt.analysisType == "Bayes" && (opt.bayesType == "bayesMmap" || (opt.bayesType == "bayesMmap2"))) {
 
       clock_t start = clock();
 
@@ -95,7 +95,12 @@ int main(int argc, const char * argv[]) {
 			opt.includeChr, readGenotypes);
 
       BayesRMmapToy mmapToy(data, opt.bedFile+".bed", sysconf(_SC_PAGE_SIZE));
-      mmapToy.runToyExample(1);
+
+      if (opt.bayesType == "bayesMmap") {
+          mmapToy.runToyExample(1);
+      } else if (opt.bayesType == "bayesMmap2") {
+          mmapToy.runToyExample2(1);
+      }
 
       clock_t end   = clock();
       printf("OVERALL read+compute time = %.3f sec.\n", (float)(end - start) / CLOCKS_PER_SEC);
