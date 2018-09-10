@@ -1,7 +1,7 @@
 
 # -----------------------------------------------------------------
-#   Makefile for testing repo 
-#   
+#   Makefile for testing repo
+#
 #   Supported platforms
 #       Unix / Linux                UNIX
 #       MacOS                       MAC
@@ -40,7 +40,8 @@ HDR = gctb.hpp \
       options.hpp \
       mympi.hpp \
       BayesRRtoy.hpp \
-      BayesRMmapToy.hpp
+      BayesRMmapToy.hpp \
+			BayesPPToy.hpp
 
 SRC = gctb.cpp \
       data.cpp \
@@ -49,19 +50,20 @@ SRC = gctb.cpp \
       options.cpp \
       mympi.cpp \
       BayesRRtoy.cpp \
-      BayesRMmapToy.cpp
+      BayesRMmapToy.cpp \
+			BayesPPToy.cpp
 
 
 OBJ = $(SRC:.cpp=.o)
 
-all : $(OUTPUT) 
+all : $(OUTPUT)
 
 $(OUTPUT) :
-	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJ) $(LIB) 
+	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJ) $(LIB)
 
 $(OBJ) : $(HDR)
 
-.cpp.o : 
+.cpp.o :
 	$(CXX) $(CXXFLAGS) -c $*.cpp
 
 .SUFFIXES : .cpp .c .o $(SUFFIXES)

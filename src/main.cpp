@@ -9,6 +9,7 @@
 
 #include <iostream>
 #include "gctb.hpp"
+#include "BayesPPToy.hpp"
 #include "BayesRRtoy.hpp"
 #include "BayesRMmapToy.hpp"
 #include <mpi.h>
@@ -129,7 +130,9 @@ int main(int argc, const char * argv[]) {
         printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
         cout << endl;
 
-        // TODO: Run analysis using mapped data files
+        // Run analysis using mapped data files
+        BayesPPToy toy(data);
+        toy.runToyExample(1000);
 
         data.unmapPreprocessedBedFile();
         end = clock();
