@@ -23,6 +23,11 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bayesType = argv[++i];
             ss << "--bayes " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--ppbayes")) {
+            analysisType = "PPBayes";
+            bayesType = argv[++i];
+            ss << "--ppbayes " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--sbayes")) {
             analysisType = "SBayes";
             bayesType = argv[++i];

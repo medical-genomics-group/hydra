@@ -18,6 +18,16 @@
 #define handle_error(msg)                               \
     do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
+Data::Data()
+    : ppBedFd(-1)
+    , sqNormFd(-1)
+    , ppBedMap(nullptr)
+    , sqNormMap(nullptr)
+    , mappedZ(nullptr, 1, 1)
+    , mappedZPZDiag(nullptr, 1)
+{
+}
+
 void Data::preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &sqNormFile)
 {
     cout << "Preprocessing bed file: " << bedFile << endl;
@@ -126,6 +136,52 @@ void Data::preprocessBedFile(const string &bedFile, const string &preprocessedBe
     BIT.close();
 
     cout << "Genotype data for " << numKeptInds << " individuals and " << numIncdSnps << " SNPs are included from [" + bedFile + "]." << endl;
+}
+
+void Data::mapPreprocessBedFile(const string &preprocessedBedFile, const string &sqNormFile)
+{
+    // Calculate the expected file sizes
+    const auto ppBedSize = numInds * numIncdSnps * sizeof(float);
+    const auto sqNormSize = numIncdSnps * sizeof(float);
+
+    // Open and mmap the preprocessed bed file
+    ppBedFd = open(preprocessedBedFile.c_str(), O_RDONLY);
+    if (ppBedFd == -1)
+        throw("Error: Failed to open preprocessed bed file [" + preprocessedBedFile + "]");
+
+    ppBedMap = reinterpret_cast<float *>(mmap(nullptr, ppBedSize, PROT_READ, MAP_SHARED, ppBedFd, 0));
+    if (ppBedMap == MAP_FAILED)
+        throw("Error: Failed to mmap preprocessed bed file");
+
+    // Open and mmap the sqNorm file
+    sqNormFd = open(sqNormFile.c_str(), O_RDONLY);
+    if (sqNormFd == -1)
+        throw("Error: Failed to open preprocessed square norm file [" + sqNormFile + "]");
+
+    sqNormMap = reinterpret_cast<float *>(mmap(nullptr, sqNormSize, PROT_READ, MAP_SHARED, sqNormFd, 0));
+    if (sqNormMap == MAP_FAILED)
+        throw("Error: Failed to mmap preprocessed square norm file");
+
+    // Now that the raw data is available, wrap it into the mapped Eigen types using the
+    // placement new operator.
+    // See https://eigen.tuxfamily.org/dox/group__TutorialMapClass.html#TutorialMapPlacementNew
+    new (&mappedZ) Map<MatrixXf>(ppBedMap, numInds, numIncdSnps);
+    new (&mappedZPZDiag) Map<VectorXf>(sqNormMap, numIncdSnps);
+}
+
+void Data::unmapPreprocessedBedFile()
+{
+    // Unmap the data from the Eigen accessors
+    new (&ppBedMap) Map<MatrixXf>(nullptr, 1, 1);
+    new (&sqNormMap) Map<VectorXf>(nullptr, 1);
+
+    const auto ppBedSize = numInds * numIncdSnps * sizeof(float);
+    const auto sqNormSize = numIncdSnps * sizeof(float);
+    munmap(ppBedMap, ppBedSize);
+    munmap(sqNormMap, sqNormSize);
+
+    close(ppBedFd);
+    close(sqNormFd);
 }
 
 bool SnpInfo::isProximal(const SnpInfo &snp2, const float genWindow) const {

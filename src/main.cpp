@@ -113,6 +113,27 @@ int main(int argc, const char * argv[]) {
         clock_t end = clock();
         printf("Finished preprocessing the bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
         cout << endl;
+    } else if (opt.analysisType == "PPBayes") {
+        clock_t start = clock();
+
+        readGenotypes = false;
+        gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
+                          opt.mphen, opt.covariateFile);
+        gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
+                          opt.includeChr, readGenotypes);
+
+        cout << "Start reading preprocessed bed file: " << opt.bedFile + ".ppbed" << endl;
+        clock_t start_bed = clock();
+        data.mapPreprocessBedFile(opt.bedFile + ".ppbed", opt.bedFile + ".sqnorm");
+        clock_t end = clock();
+        printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
+        cout << endl;
+
+        // TODO: Run analysis using mapped data files
+
+        data.unmapPreprocessedBedFile();
+        end = clock();
+        printf("OVERALL read+compute time = %.3f sec.\n", double(end - start) / double(CLOCKS_PER_SEC));
     } else {
       throw(" Error: Wrong analysis type: " + opt.analysisType);
     }

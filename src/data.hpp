@@ -110,6 +110,17 @@ public:
 
 class Data {
 public:
+    Data();
+
+    // mmap related data
+    int ppBedFd;
+    int sqNormFd;
+    float *ppBedMap;
+    float *sqNormMap;
+    Map<MatrixXf> mappedZ;
+    Map<VectorXf> mappedZPZDiag;
+
+    // Original data
     MatrixXf X;              // coefficient matrix for fixed effects
     MatrixXf Z;              // coefficient matrix for SNP effects
     VectorXf D;              // 2pqn
@@ -167,6 +178,8 @@ public:
     unsigned numChroms;
 
     void preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &sqNormFile);
+    void mapPreprocessBedFile(const string &preprocessedBedFile, const string &sqNormFile);
+    void unmapPreprocessedBedFile();
 
     void readFamFile(const string &famFile);
     void readBimFile(const string &bimFile);
