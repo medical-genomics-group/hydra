@@ -28,6 +28,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bayesType = argv[++i];
             ss << "--sbayes " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--preprocess")) {
+            analysisType = "Preprocess";
+            ss << "--preprocess " << "\n";
+        }
         else if (!strcmp(argv[i], "--make-ldm")) {
             analysisType = "LDmatrix";
             ss << "--make-ldm " << "\n";
@@ -176,12 +180,12 @@ void Options::inputOptions(const int argc, const char* argv[]){
             throw (errmsg.str());
         }
     }
-    
+
     MPI_Comm_rank(MPI_COMM_WORLD, &myMPI::rank);
     if(myMPI::rank==0) cout << ss.str() << endl;
-    
+
     //if (bayesType == "Cap" || bayesType == "Sap") myMPI::partition = "bycol";
-    
+
 
 
 }
@@ -192,10 +196,10 @@ void Options::readFile(const string &file){  // input options from file
     ss << "\nOptions:\n\n";
     ss << boost::format("%20s %-1s %-20s\n") %"optionFile" %":" %file;
     makeTitle();
-    
+
     ifstream in(file.c_str());
     if (!in) throw ("Error: can not open the file [" + file + "] to read.");
-    
+
     string key, value;
     while (in >> key >> value) {
         if (key == "bedFile") {
@@ -283,12 +287,12 @@ void Options::readFile(const string &file){  // input options from file
         ss << boost::format("%20s %-1s %-20s\n") %key %":" %value;
     }
     in.close();
-    
+
     MPI_Comm_rank(MPI_COMM_WORLD, &myMPI::rank);
     if(myMPI::rank==0) cout << ss.str() << endl;
-    
+
     //if (bayesType == "Cap" || bayesType == "Sap") myMPI::partition = "bycol";
-    
+
 
 }
 
