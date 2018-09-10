@@ -19,7 +19,7 @@ CXX_UNIX = mpicxx   #g++
 #CXXFLAGS = -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./
 # CXXFLAGS += -I../ -I../../  -I/usr/local/include -I/usr/local/include/Eigen -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ -DUNIX -m64 -ldl
 
-CXXFLAGS  = -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl -O3
+CXXFLAGS  = -I/usr/include/eigen3 -I/usr/include/boost -DUNIX -m64 -ldl -O3
 CXXFLAGS += -fopenmp
 #CXXFLAGS += -mavx512f -mavx512cd -fopt-info-vec-all
 #CXXFLAGS += -g
