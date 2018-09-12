@@ -17,5 +17,5 @@ out=$dataset.pp
 echo Running preprocessing solution on dataset $dataset. Output in $out
 
 ./brr --preprocess  --bfile ../test/data/$dataset --pheno ../test/data/test.phen > $out
-./brr --ppbayes  bayes --bfile /Users/admin/repo/ctggroup/BayesMap/test/data/$dataset --pheno /Users/admin/repo/ctggroup/BayesMap/test/data/test.phen>>$out
+./brr --ppbayes  bayes --bfile ../test/data/$dataset --pheno ../test/data/test.phen>>$out
 echo done
