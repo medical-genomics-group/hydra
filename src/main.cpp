@@ -9,13 +9,11 @@
 
 #include <iostream>
 #include "gctb.hpp"
-#include "BayesPPToy.hpp"
-#include "BayesRRtoy.hpp"
 #include "BayesRMmapToy.hpp"
 #include <mpi.h>
 #include <string>
 #include "BayesRRm.h"
-
+#include "BayesRRpp.h"
 using namespace std;
 
 
@@ -77,10 +75,8 @@ int main(int argc, const char * argv[]) {
       printf("Finished reading the bed file in %.3f sec.\n", (float)(end - start_bed) / CLOCKS_PER_SEC);
       cout << endl;
 
-      //gctb.inputSnpInfo already called data.readbedfiles
-      BayesRRtoy toy(data);
-      //EO 10 -> 1
-      toy.runToyExample(1);
+      //TODO non memory mapped version here
+
       end = clock();
       printf("OVERALL read+compute time = %.3f sec.\n", (float)(end - start) / CLOCKS_PER_SEC);
 
@@ -137,8 +133,8 @@ int main(int argc, const char * argv[]) {
         cout << endl;
 
         // Run analysis using mapped data files
-        BayesPPToy toy(data);
-        toy.runToyExample(1000);
+        BayesRRpp toy(data);
+        toy.runGibbs();
 
         data.unmapPreprocessedBedFile();
         end = clock();
