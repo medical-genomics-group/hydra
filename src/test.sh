@@ -11,7 +11,7 @@ out=$dataset.mmap
 
 echo Running mmap solution on dataset $dataset. Output in $out
 
-./brr --bayes bayes --bfile ../test/data/$dataset --pheno ../test/data/test.phen > $out
+./brr --bayes bayesMmap --bfile ../test/data/$dataset --pheno ../test/data/test.phen > $out
 
 out=$dataset.pp
 echo Running preprocessing solution on dataset $dataset. Output in $out

@@ -16,7 +16,7 @@ class BayesRRm {
   const string  outputFile="bayesOutput.csv";
   const int     seed=1;
   const int 	max_iterations=10;
-  const int		burn_in=5;
+  const int		burn_in=2;
   const int 	thinning=1;
   const double	sigma0=0.0001;
   const double	v0E=0.0001;
