@@ -13,6 +13,7 @@
 #include "BayesRMmapToy.hpp"
 #include <mpi.h>
 #include <string>
+#include "BayesRRm.h"
 
 using namespace std;
 
@@ -94,12 +95,12 @@ int main(int argc, const char * argv[]) {
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
 			opt.includeChr, readGenotypes);
 
-      BayesRMmapToy mmapToy(data, opt.bedFile+".bed", sysconf(_SC_PAGE_SIZE));
+      BayesRRm mmapToy(data, opt.bedFile+".bed", sysconf(_SC_PAGE_SIZE));
 
       if (opt.bayesType == "bayesMmap") {
-          mmapToy.runToyExample(1);
+          mmapToy.runGibbs();
       } else if (opt.bayesType == "bayesMmap2") {
-          mmapToy.runToyExample2(1);
+          mmapToy.runGibbs();
       }
 
       clock_t end   = clock();
