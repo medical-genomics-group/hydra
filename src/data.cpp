@@ -11,13 +11,178 @@
 #include <mpi.h>
 #include <Eigen/Eigen>
 #include <sys/mman.h>
-#include <sys/stat.h> 
+#include <sys/stat.h>
 #include <fcntl.h>
 
 
 #define handle_error(msg)                               \
     do { perror(msg); exit(EXIT_FAILURE); } while (0)
 
+Data::Data()
+    : ppBedFd(-1)
+    , sqNormFd(-1)
+    , ppBedMap(nullptr)
+    , sqNormMap(nullptr)
+    , mappedZ(nullptr, 1, 1)
+    , mappedZPZDiag(nullptr, 1)
+{
+}
+
+void Data::preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &sqNormFile)
+{
+    cout << "Preprocessing bed file: " << bedFile << endl;
+    if (numIncdSnps == 0)
+        throw ("Error: No SNP is retained for analysis.");
+    if (numKeptInds == 0)
+        throw ("Error: No individual is retained for analysis.");
+
+    ifstream BIT(bedFile.c_str(), ios::binary);
+    if (!BIT)
+        throw ("Error: can not open the file [" + bedFile + "] to read.");
+
+    ofstream ppBedOutput(preprocessedBedFile.c_str(), ios::binary);
+    if (!ppBedOutput)
+        throw("Error: Unable to open the preprocessed bed file [" + preprocessedBedFile + "] for writing.");
+    ofstream sqNormOutput(sqNormFile.c_str(), ios::binary);
+    if (!sqNormOutput)
+        throw("Error: Unable to open the preprocessed square norm file [" + sqNormFile + "] for writing.");
+
+    cout << "Reading PLINK BED file from [" + bedFile + "] in SNP-major format ..." << endl;
+    char header[3];
+    BIT.read(header, 3);
+    if (!BIT || header[0] != 0x6c || header[1] != 0x1b || header[2] != 0x01)
+        throw ("Error: Incorrect first three bytes of bed file: " + bedFile);
+
+    // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
+    for (unsigned int j = 0, snp = 0; j < numSnps; j++) {
+        SnpInfo *snpInfo = snpInfoVec[j];
+        double sum = 0.0;
+        unsigned int nmiss = 0;
+
+        // Create some scratch space to preprocess the raw data
+        VectorXf snpData(numKeptInds);
+        float sqNorm = 0.0f;
+
+        // Make a note of which individuals have a missing genotype
+        vector<long> missingIndices;
+
+        const unsigned int size = (numInds + 3) >> 2;
+        if (!snpInfo->included) {
+            BIT.ignore(size);
+            continue;
+        }
+
+        for (unsigned int i = 0, ind = 0; i < numInds;) {
+            char ch;
+            BIT.read(&ch, 1);
+            if (!BIT)
+                throw ("Error: problem with the BED file ... has the FAM/BIM file been changed?");
+
+            bitset<8> b = ch;
+            unsigned int k = 0;
+
+            while (k < 7 && i < numInds) {
+                if (!indInfoVec[i]->kept) {
+                    k += 2;
+                } else {
+                    const unsigned int allele1 = (!b[k++]);
+                    const unsigned int allele2 = (!b[k++]);
+
+                    if (allele1 == 0 && allele2 == 1) {  // missing genotype
+                        // Don't store a marker value like this as it requires floating point comparisons later
+                        // which are not done properly. Instead, store the index of the individual in a vector and simply
+                        // iterate over the collected indices. Also means iterating over far fewer elements which may
+                        // make a noticeable difference as this scales up.
+                        missingIndices.push_back(ind++);
+                        ++nmiss;
+                    } else {
+                        const auto value = allele1 + allele2;
+                        snpData[ind++] = value;
+                        sum += value;
+                    }
+                }
+                i++;
+            }
+        }
+
+        // Fill missing values with the mean
+        const double mean = sum / double(numKeptInds - nmiss);
+        if (j % 100 == 0) {
+            printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n",
+                   j, mean, sum, numKeptInds-nmiss, numKeptInds, nmiss);
+            fflush(stdout);
+        }
+        if (nmiss) {
+            for (const auto index : missingIndices)
+                snpData[index] = float(mean);
+        }
+
+        // Standardize genotypes
+        snpData.array() -= snpData.mean();
+        sqNorm = snpData.squaredNorm();
+
+        // Write out the preprocessed data
+        ppBedOutput.write(reinterpret_cast<char *>(&snpData[0]), numInds * sizeof(float));
+        sqNormOutput.write(reinterpret_cast<char *>(&sqNorm), sizeof(float));
+
+        // Compute allele frequency and any other required data and write out to file
+        //snpInfo->af = 0.5f * float(mean);
+        //snp2pq[snp] = 2.0f * snpInfo->af * (1.0f - snpInfo->af);
+
+        if (++snp == numIncdSnps)
+            break;
+    }
+    BIT.clear();
+    BIT.close();
+
+    cout << "Genotype data for " << numKeptInds << " individuals and " << numIncdSnps << " SNPs are included from [" + bedFile + "]." << endl;
+}
+
+void Data::mapPreprocessBedFile(const string &preprocessedBedFile, const string &sqNormFile)
+{
+    // Calculate the expected file sizes
+    const auto ppBedSize = numInds * numIncdSnps * sizeof(float);
+    const auto sqNormSize = numIncdSnps * sizeof(float);
+
+    // Open and mmap the preprocessed bed file
+    ppBedFd = open(preprocessedBedFile.c_str(), O_RDONLY);
+    if (ppBedFd == -1)
+        throw("Error: Failed to open preprocessed bed file [" + preprocessedBedFile + "]");
+
+    ppBedMap = reinterpret_cast<float *>(mmap(nullptr, ppBedSize, PROT_READ, MAP_SHARED, ppBedFd, 0));
+    if (ppBedMap == MAP_FAILED)
+        throw("Error: Failed to mmap preprocessed bed file");
+
+    // Open and mmap the sqNorm file
+    sqNormFd = open(sqNormFile.c_str(), O_RDONLY);
+    if (sqNormFd == -1)
+        throw("Error: Failed to open preprocessed square norm file [" + sqNormFile + "]");
+
+    sqNormMap = reinterpret_cast<float *>(mmap(nullptr, sqNormSize, PROT_READ, MAP_SHARED, sqNormFd, 0));
+    if (sqNormMap == MAP_FAILED)
+        throw("Error: Failed to mmap preprocessed square norm file");
+
+    // Now that the raw data is available, wrap it into the mapped Eigen types using the
+    // placement new operator.
+    // See https://eigen.tuxfamily.org/dox/group__TutorialMapClass.html#TutorialMapPlacementNew
+    new (&mappedZ) Map<MatrixXf>(ppBedMap, numInds, numIncdSnps);
+    new (&mappedZPZDiag) Map<VectorXf>(sqNormMap, numIncdSnps);
+}
+
+void Data::unmapPreprocessedBedFile()
+{
+    // Unmap the data from the Eigen accessors
+    new (&ppBedMap) Map<MatrixXf>(nullptr, 1, 1);
+    new (&sqNormMap) Map<VectorXf>(nullptr, 1);
+
+    const auto ppBedSize = numInds * numIncdSnps * sizeof(float);
+    const auto sqNormSize = numIncdSnps * sizeof(float);
+    munmap(ppBedMap, ppBedSize);
+    munmap(sqNormMap, sqNormSize);
+
+    close(ppBedFd);
+    close(sqNormFd);
+}
 
 bool SnpInfo::isProximal(const SnpInfo &snp2, const float genWindow) const {
     return chrom == snp2.chrom && fabs(genPos - snp2.genPos) < genWindow;
@@ -98,10 +263,10 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
 
     if (fstat(fd, &sb) == -1)
         handle_error("fstat");
-    
+
     if (!S_ISREG(sb.st_mode))
         handle_error("Not a regular file");
-  
+
     off_t offset    = 3 + snpInd * snpLenByt;
     off_t pa_offset = offset & ~(memPageSize - 1);
 
@@ -109,10 +274,10 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
     size_t bytesToMap = relOffset + snpLenByt;
 
 
-    char  *addr = static_cast<char*>(mmap(0, bytesToMap, PROT_READ, MAP_PRIVATE, fd, pa_offset));  
+    char  *addr = static_cast<char*>(mmap(0, bytesToMap, PROT_READ, MAP_PRIVATE, fd, pa_offset));
     if (addr == MAP_FAILED)
         handle_error("mmap failed");
-  
+
     int   nmiss = 0;
     float mean  = 0.f;
     int   sumi  = 0;
@@ -120,7 +285,7 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
     int N = omp_get_max_threads();
     //if (snpInd%100 == 0)
     //    cout << "Max number of frame N = " << N << endl;
-    
+
     int Nmax = numInds%4 ? numInds/4 + 1 : numInds/4;
     //printf("Nmax = %d\n", Nmax);
     if (Nmax < N)
@@ -136,7 +301,7 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
 
         int itmiss = 0;
         int itsum  = 0;
-        vector<float> tSnpData; 
+        vector<float> tSnpData;
 
         id = omp_get_thread_num();
         Nthrds = omp_get_num_threads();
@@ -154,7 +319,7 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
         int ii    = 0;
 
         for(i=istart; i<=iend; i+=4) {
-            
+
             b = addr[relOffset + i/4];
 
             for (int k=0; k<4 && i+k<=iend; ++k) {
@@ -176,7 +341,7 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
 
         tSnpData.resize(ii);
         tSizeVec[id] = tSnpData.size();
-        
+
 
         // Compute total sum and nmiss
 #pragma omp critical
@@ -188,7 +353,7 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
 #pragma omp barrier
 
         // Then compute the mean
-#pragma omp single 
+#pragma omp single
         {
             mean = float(sumi) / float(numKeptInds-nmiss);
         }
@@ -212,7 +377,7 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
 
     if (munmap(addr, bytesToMap) == -1)
         handle_error("munmap");
-    
+
     if (close(fd) == -1)
         handle_error("closing bedFile");
 
@@ -327,14 +492,14 @@ void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t sn
 
 void Data::readBedFile_noMPI(const string &bedFile){
     unsigned i = 0, j = 0, k = 0;
-    
+
     if (numIncdSnps == 0) throw ("Error: No SNP is retained for analysis.");
     if (numKeptInds == 0) throw ("Error: No individual is retained for analysis.");
-    
+
     Z.resize(numKeptInds, numIncdSnps);
     ZPZdiag.resize(numIncdSnps);
     snp2pq.resize(numIncdSnps);
-    
+
     // Read bed file
     char ch[1];
     bitset<8> b;
@@ -381,23 +546,37 @@ void Data::readBedFile_noMPI(const string &bedFile){
         float sum = mean;
         mean /= float(numKeptInds-nmiss);
 
+<<<<<<< HEAD
         /*
+=======
+
+>>>>>>> refs/heads/kdab
         if (j%100 == 0) {
             printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n", j, mean, sum, numKeptInds-nmiss, numKeptInds, nmiss);
             fflush(stdout);
         }
+<<<<<<< HEAD
         */
+=======
+>>>>>>> refs/heads/kdab
 
         if (nmiss) {
             for (i=0; i<numKeptInds; ++i) {
                 if (Z(i,snp) == -9) Z(i,snp) = mean;
             }
         }
+<<<<<<< HEAD
         
         /*
         if (j%100 == 0)
             printf("mean vs mean %13.7f %13.7f sum = %20.7f nmiss=%d\n", mean, Z.col(j).mean(), Z.col(j).sum(), nmiss);
         */
+=======
+
+        //if (j%100 == 0)
+        //    printf("mean vs mean %13.7f %13.7f sum = %20.7f nmiss=%d\n", mean, Z.col(j).mean(), Z.col(j).sum(), nmiss);
+
+>>>>>>> refs/heads/kdab
 
 
         // compute allele frequency
@@ -420,8 +599,13 @@ void Data::readBedFile_noMPI(const string &bedFile){
 
     BIT.clear();
     BIT.close();
+<<<<<<< HEAD
     
     /*
+=======
+
+
+>>>>>>> refs/heads/kdab
     // standardize genotypes
     for (i=0; i<numIncdSnps; ++i) {
         Z.col(i).array() -= Z.col(i).mean();
@@ -430,23 +614,26 @@ void Data::readBedFile_noMPI(const string &bedFile){
         //Z.col(i).array() /= sqrtf(Gadget::calcVariance(Z.col(i))*numKeptInds);
         ZPZdiag[i] = Z.col(i).squaredNorm();
     }
+<<<<<<< HEAD
     */
+=======
+>>>>>>> refs/heads/kdab
 
     //cout << "Z" << endl << Z << endl;
-    
+
     cout << "Genotype data for " << numKeptInds << " individuals and " << numIncdSnps << " SNPs are included from [" + bedFile + "]." << endl;
 }
 
 void Data::readBedFile(const string &bedFile){
     unsigned i = 0, j = 0;
-    
+
     if (numIncdSnps == 0) throw ("Error: No SNP is retained for analysis.");
     if (numKeptInds == 0) throw ("Error: No individual is retained for analysis.");
-    
+
     Z.resize(numKeptInds, numIncdSnps);
     ZPZdiag.resize(numIncdSnps);
     snp2pq.resize(numIncdSnps);
-    
+
     // Read bed file
     ifstream in(bedFile.c_str(), ios::binary);
     if (!in) throw ("Error: can not open the file [" + bedFile + "] to read.");
@@ -461,7 +648,7 @@ void Data::readBedFile(const string &bedFile){
 
     unsigned numKeptInds_all;
     MPI_Allreduce(&numKeptInds, &numKeptInds_all, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-    
+
     // Read genotypes
     SnpInfo *snpInfo = NULL;
     IndInfo *indInfo = NULL;
@@ -474,14 +661,14 @@ void Data::readBedFile(const string &bedFile){
         snpInfo = snpInfoVec[j];
         sum = 0.0;
         nmiss = 0;
-        
+
         unsigned size = (numInds+3)>>2;
-        
+
         if (!snpInfo->included) {
             in.ignore(size);
             continue;
         }
- 
+
         char *bedLineIn = new char[size];
         in.read((char *)bedLineIn, size);
 
@@ -489,16 +676,16 @@ void Data::readBedFile(const string &bedFile){
             indInfo = indInfoVec[i];
             if (!indInfo->kept) continue;
             genoValue = bedToGeno[(bedLineIn[i>>2]>>((i&3)<<1))&3];
-            
+
             Z(indInfo->index, snp) = genoValue;
             if (genoValue == -9) ++nmiss;   // missing genotype
             else sum += genoValue;
         }
         delete[] bedLineIn;
-        
+
         MPI_Allreduce(&sum, &sum_all, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
         MPI_Allreduce(&nmiss, &nmiss_all, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-        
+
         // fill missing values with the mean
         mean_all = sum_all/float(numKeptInds_all - nmiss_all);
         if (nmiss) {
@@ -506,29 +693,29 @@ void Data::readBedFile(const string &bedFile){
                 if (Z(i,snp) == -9) Z(i,snp) = mean_all;
             }
         }
-        
+
         // compute allele frequency
         snpInfo->af = 0.5f*mean_all;
         snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
-        
+
         //cout << "snp " << snp << "     " << Z.col(snp).sum() << endl;
 
         if (++snp == numIncdSnps) break;
     }
     in.close();
 
-    
+
     // standardize genotypes
     VectorXf colsums = Z.colwise().sum();
     VectorXf colsums_all(numIncdSnps);
 
     MPI_Allreduce(&colsums[0], &colsums_all[0], numIncdSnps, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-    
+
     Z.rowwise() -= colsums_all.transpose()/numKeptInds_all;  // center
     VectorXf my_ZPZdiag = Z.colwise().squaredNorm();
-    
+
     MPI_Allreduce(&my_ZPZdiag[0], &ZPZdiag[0], numIncdSnps, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-    
+
     if (myMPI::rank==0)
         cout << "Genotype data for " << numKeptInds_all << " individuals and " << numIncdSnps << " SNPs are included from [" + bedFile + "]." << endl;
 }
@@ -575,7 +762,7 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
                 keep.push_back(ind->catID);
         }
     }
-    
+
     if (!keepIndFile.empty()) {
         ifstream in(keepIndFile.c_str());
         if (!in) throw ("Error: can not open the file [" + keepIndFile + "] to read.");
@@ -586,7 +773,7 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
         }
         in.close();
     }
-    
+
     unsigned numKeptInds_all = 0;
 
     if (myMPI::partition == "byrow") {
@@ -595,14 +782,14 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
         unsigned my_start = myMPI::rank*batch_size;
         unsigned my_end = (myMPI::rank+1)==myMPI::clusterSize ? total_size : my_start + batch_size;
         unsigned my_size = my_end - my_start;
-                
+
         myMPI::iStart = my_start;
         myMPI::iSize  = my_size;
-        
+
         vector<string>::const_iterator first = keep.begin() + my_start;
         vector<string>::const_iterator last  = keep.begin() + my_end;
         vector<string> my_keep(first, last);
-        
+
         for (unsigned i=0; i<my_size; ++i) {
             it = indInfoMap.find(my_keep[i]);
             if (it == end) {
@@ -618,25 +805,25 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
                 }
             }
         }
-        
+
         keptIndInfoVec = makeKeptIndInfoVec(indInfoVec);
         numKeptInds =  (unsigned) keptIndInfoVec.size();
-        
+
         y.setZero(numKeptInds);
         for (unsigned i=0; i<numKeptInds; ++i) {
             y[i] = keptIndInfoVec[i]->phenotype;
         }
-        
+
         float my_ypy = ((y.array()-y.mean()).square()).sum();
 
         MPI_Allreduce(&my_ypy, &ypy, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-        
+
         MPI_Allreduce(&numKeptInds, &numKeptInds_all, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-        
+
         if (myMPI::rank==0) {
             cout << numKeptInds_all << " matched individuals are kept." << endl;
         }
-        
+
         MPI_Barrier(MPI_COMM_WORLD);
         printf("%d individuals assigned to processor %s at rank %d.\n", numKeptInds, myMPI::processorName, myMPI::rank);
         //cout << numKeptInds << " individuals assigned to processor " << myMPI::processorName << " at rank " << myMPI::rank << "." << endl;
@@ -657,17 +844,17 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
                 }
             }
         }
-        
+
         keptIndInfoVec = makeKeptIndInfoVec(indInfoVec);
         numKeptInds =  (unsigned) keptIndInfoVec.size();
         numKeptInds_all = numKeptInds;
-        
+
         y.setZero(numKeptInds);
         for (unsigned i=0; i<numKeptInds; ++i) {
             y[i] = keptIndInfoVec[i]->phenotype;
         }
         ypy = (y.array()-y.mean()).square().sum();
-        
+
         if (myMPI::rank==0) {
             cout << numKeptInds << " matched individuals are kept." << endl;
         }
@@ -723,10 +910,10 @@ void Data::readCovariateFile(const string &covarFile){
             }
         }
         in.close();
-        
+
         if (myMPI::rank==0)
             cout << "Read " << numCovariates << " covariates from [" + covarFile + "]." << endl;
-        
+
         X.resize(numKeptInds, numFixedEffects);
         for (unsigned i=0; i<numKeptInds; ++i) {
             X.row(i) = keptIndInfoVec[i]->covariates;
@@ -743,14 +930,14 @@ void Data::readCovariateFile(const string &covarFile){
         XPX.resize(1,1);
         XPXdiag.resize(1);
         XPy.resize(1);
-        
+
         if (myMPI::partition == "byrow") {
             unsigned numKeptInds_all;
             MPI_Allreduce(&numKeptInds, &numKeptInds_all, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-            
+
             XPX << numKeptInds_all;
             XPXdiag << numKeptInds_all;
-            
+
             float sum = y.sum();
             unsigned sum_all;
             MPI_Allreduce(&sum, &sum_all, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
@@ -819,8 +1006,8 @@ void Data::includeMatchedSnp(){
     reindexSnp(snpInfoVec);  // reindex for MPI purpose in terms of full snplist
     fullSnpFlag.resize(numSnps);
     for (int i=0; i<numSnps; ++i) fullSnpFlag[i] = snpInfoVec[i]->included; // for output purpose
-    
-    
+
+
     if (myMPI::partition == "bycol") {  // MPI by chromosome
         vector<int> chromVec;
         for (set<int>::iterator it=chromosomes.begin(); it!=chromosomes.end(); ++it) {
@@ -837,25 +1024,25 @@ void Data::includeMatchedSnp(){
                 if (snp->chrom < chromVec[myMPI::rank]) snp->included = false;
             }
         }
-        
+
         incdSnpInfoVec = makeIncdSnpInfoVec(snpInfoVec);
         numIncdSnps = (unsigned) incdSnpInfoVec.size();
         snp2pq.resize(numIncdSnps);
-        
+
         // setup MPI for collecting SNP info
         myMPI::iSize = numIncdSnps;
         myMPI::iStart = incdSnpInfoVec[0]->index;
         myMPI::srcounts.resize(myMPI::clusterSize);
         myMPI::displs.resize(myMPI::clusterSize);
-        
+
         MPI_Allgather(&myMPI::iSize, 1, MPI_INT, &myMPI::srcounts[0], 1, MPI_INT, MPI_COMM_WORLD);
         MPI_Allgather(&myMPI::iStart, 1, MPI_INT, &myMPI::displs[0], 1, MPI_INT, MPI_COMM_WORLD);
 
-        
+
         reindexSnp(incdSnpInfoVec);  // reindex based on the snplist for each core
 
         //cout << "rank " << myMPI::rank << " " << myMPI::iStart << " " << myMPI::iSize << endl;
-        
+
         unsigned numIncdSnps_all;
         MPI_Reduce(&numIncdSnps, &numIncdSnps_all, 1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
         if (myMPI::rank==0) cout << numIncdSnps_all << " SNPs are included." << endl;
@@ -869,7 +1056,7 @@ void Data::includeMatchedSnp(){
         reindexSnp(incdSnpInfoVec);
         snp2pq.resize(numIncdSnps);
     }
-    
+
     map<int, vector<SnpInfo*> > chrmap;
     map<int, vector<SnpInfo*> >::iterator it;
     for (unsigned i=0; i<numIncdSnps; ++i) {
@@ -983,7 +1170,7 @@ void Data::getNonoverlapWindowInfo(const unsigned windowWidth){
         }
         snp->window = window;
     }
-    
+
     long numberWindows = windStartVec.size();
 
     windStart = VectorXi::Map(&windStartVec[0], numberWindows);
@@ -995,7 +1182,7 @@ void Data::getNonoverlapWindowInfo(const unsigned windowWidth){
         else
             windSize[i] = numIncdSnps - windStart[i];
     }
-    
+
     if (myMPI::rank==0)
         cout << "Created " << numberWindows << " non-overlapping " << windowWidth/1e3 << "kb windows with average size of " << windSize.sum()/float(numberWindows) << " SNPs." << endl;
 }
@@ -1049,7 +1236,7 @@ void Data::readGwasSummaryFile(const string &gwasFile){
     if (!in) throw ("Error: can not open the GWAS summary data file [" + gwasFile + "] to read.");
     if (myMPI::rank==0)
         cout << "Reading GWAS summary data from [" + gwasFile + "]." << endl;
-    
+
     SnpInfo *snp;
     map<string, SnpInfo*>::iterator it;
     string id, allele1, allele2, freq, b, se, pval, n;
@@ -1074,7 +1261,7 @@ void Data::readGwasSummaryFile(const string &gwasFile){
         ++match;
     }
     in.close();
-    
+
     for (unsigned i=0; i<numSnps; ++i) {
         snp = snpInfoVec[i];
         if (!snp->included) continue;
@@ -1136,15 +1323,15 @@ void Data::readLDmatrixInfoFile(const string &ldmatrixFile, vector<SnpInfo*> &ve
 }
 
 void Data::readLDmatrixBinFile(const string &ldmatrixFile){
-    
+
     VectorXi windStartLDM(numSnps);
     VectorXi windSizeLDM(numSnps);
-    
+
     windStart.resize(numIncdSnps);
     windSize.resize(numIncdSnps);
-    
+
     SnpInfo *snpi, *snpj;
-    
+
     for (unsigned i=0, inci=0; i<numSnps; ++i) {
         SnpInfo *snpi = snpInfoVec[i];
         windStartLDM[i] = snpi->windStart;
@@ -1167,7 +1354,7 @@ void Data::readLDmatrixBinFile(const string &ldmatrixFile){
         //            snpi->windSize  = 0;
         //        }
     }
-    
+
     //    cout << "windStartLDM " << windStartLDM.transpose() << endl;
     //    cout << "windSizeLDM " << windSizeLDM.transpose() << endl;
     //    cout << "windStart " << windStart.transpose() << endl;
@@ -1179,13 +1366,13 @@ void Data::readLDmatrixBinFile(const string &ldmatrixFile){
     }
     float windowWidth;
     fread(&windowWidth, sizeof(float), 1, in);
-    
+
     getWindowInfo(incdSnpInfoVec, windowWidth*1e6, windStart, windSize);
-    
+
     if (numIncdSnps == 0) throw ("Error: No SNP is retained for analysis.");
-    
+
     cout << "Reading LD matrix from [" + ldmatrixFile + "]..." << endl;
-    
+
     ZPZ.resize(numIncdSnps);
     for (unsigned i=0; i<numIncdSnps; ++i) {
         ZPZ[i].resize(windSize[i]);
@@ -1193,17 +1380,17 @@ void Data::readLDmatrixBinFile(const string &ldmatrixFile){
 
     Gadget::Timer timer;
     timer.setTime();
-    
+
     for (unsigned i = 0, inci = 0; i < numSnps; i++) {
         snpi = snpInfoVec[i];
-        
+
         float v[windSizeLDM[i]];
-        
+
         if (!snpi->included) {
             fseek(in, sizeof(v), SEEK_CUR);
             continue;
         }
-        
+
         fread(v, sizeof(v), 1, in);
 
         for (unsigned j = 0, incj = 0; j<windSizeLDM[i]; ++j) {
@@ -1214,14 +1401,14 @@ void Data::readLDmatrixBinFile(const string &ldmatrixFile){
                 ZPZ[inci][incj++] = v[j];
             }
         }
-        
+
         if (inci++ == numIncdSnps) break;
     }
-    
+
     fclose(in);
-    
+
     timer.getTime();
-    
+
     cout << "Window width " << windowWidth << " Mb." << endl;
     cout << "Average window size " << windSize.sum()/numIncdSnps << "." << endl;
     cout << "Read LD matrix for " << numIncdSnps << " SNPs (time used: " << timer.format(timer.getElapse()) << ")." << endl;
@@ -1247,7 +1434,7 @@ void Data::buildSparseMME(){
         se[i]= snp->gwas_se;
         tss[i] = D[i]*(n[i]*se[i]*se[i] + b[i]*b[i]);
     }
-    
+
     for (unsigned i=0; i<numIncdSnps; ++i) {
         snp = incdSnpInfoVec[i];
         for (unsigned j=0; j<snp->windSize; ++j) {
@@ -1256,28 +1443,28 @@ void Data::buildSparseMME(){
         //ZPZdiag[i] = ZPZ[i][i-snp->windStart];
     }
     ZPZdiag = D;
-    
+
     //b.array() -= b.mean();
     ZPy.array() = D.array()*b.array();
-    
+
     //    cout << "ZPZdiag " << ZPZdiag.transpose() << endl;
     //    cout << "ZPZ.back() " << ZPZ.back().transpose() << endl;
     //    cout << "ZPZ.front() " << ZPZ.front().transpose() << endl;
     //    cout << "ZPy " << ZPy.head(100).transpose() << endl;
     //    cout << "b.mean() " << b.mean() << endl;
-    
+
     // estimate ypy
     ypy = (D.array()*(n.array()*se.array().square()+b.array().square())).mean();
     numKeptInds = n.mean();
-    
+
     //cout << ZPZ.size() << " " << ZPy.size() << " " << ypy << endl;
     //    cout << ZPy << endl;
     //    for (unsigned i=0; i<numIncdSnps; ++i) {
     //        cout << D[i] << "\t" << ZPZdiag[i] << endl;
     //    }
-    //    
+    //
     //    cout << ZPZ << endl;
-    
+
     // no fixed effects
     numFixedEffects = 0;
     fixedEffectNames.resize(0);
@@ -1290,7 +1477,7 @@ void Data::readMultiLDmatInfoFile(const string &mldmatFile){
     ifstream in(mldmatFile.c_str());
     if (!in) throw ("Error: can not open the file [" + mldmatFile + "] to read.");
     cout << "Reading SNP info from [" + mldmatFile + "]..." << endl;
-    
+
     string inputStr;
     while (getline(in, inputStr)) {
         vector<SnpInfo*> vec;
@@ -1305,19 +1492,19 @@ void Data::readMultiLDmatInfoFile(const string &mldmatFile){
 //    ifstream in1(mldmatFile.c_str());
 //    if (!in1) throw ("Error: can not open the file [" + mldmatFile + "] to read.");
 //    cout << "Reading LD matrices from [" + mldmatFile + "]..." << endl;
-//    
+//
 //    VectorXi windStartLDM(numSnps);
 //    VectorXi windSizeLDM(numSnps);
-//    
+//
 //    for (unsigned i=0; i<numSnps; ++i) {
 //        SnpInfo *snp = snpInfoVec[i];
 //        windStartLDM[i] = snp->windStart;
 //        windSizeLDM[i] = snp->windSize;
 //    }
-//    
+//
 //    Gadget::Timer timer;
 //    timer.setTime();
-//    
+//
 //    string filename;
 //    float windowWidth=0;
 //    unsigned i=0, incj=0;
@@ -1343,18 +1530,18 @@ void Data::readMultiLDmatInfoFile(const string &mldmatFile){
 //                      + "Mb) than others (" + to_string(static_cast<long long>(windowWidth/1e6)) + "Mb)");
 //            }
 //        }
-//        
+//
 //        SnpInfo *snpj = NULL;
 //        SnpInfo *snpk = NULL;
 //        unsigned start = 0;
 //        if (i>0) start = numSnpMldVec[i-1];
-//        
+//
 //        for (unsigned j = start; j < numSnpMldVec[i]; j++) {
 //            snpj = snpInfoVec[j];
-//            
+//
 //            float v[windSizeLDM[j]];
 //            fread(v, sizeof(v), 1, in2);
-//            
+//
 //            if (!snpj->included) continue;
 //
 ////            cout << windStartLDM[j] << " " << j << " " << snpInfoVec[j]->included << endl;
@@ -1368,17 +1555,16 @@ void Data::readMultiLDmatInfoFile(const string &mldmatFile){
 //            }
 //            ++incj;
 //        }
-//        
+//
 //        fclose(in2);
 //        cout << "Read LD matrix for " << numSnpMldVec[i] - start << " SNPs from [" << filename << "]." << endl;
 //        ++i;
 //    }
-//    
+//
 //    timer.getTime();
-//    
+//
 //    cout << "Window width " << windowWidth << " Mb." << endl;
 //    cout << "Average window size " << windSize.sum()/numIncdSnps << "." << endl;
 //    cout << "Read LD matrix for " << numIncdSnps << " SNPs (time used: " << timer.format(timer.getElapse()) << ")." << endl;
-//    
+//
 //}
-

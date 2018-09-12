@@ -1,7 +1,7 @@
 
 # -----------------------------------------------------------------
-#   Makefile for testing repo 
-#   
+#   Makefile for testing repo
+#
 #   Supported platforms
 #       Unix / Linux                UNIX
 #       MacOS                       MAC
@@ -17,8 +17,15 @@ CXX_UNIX = "/usr/local/opt/llvm/bin/clang"  #g++
 # Any other compiler flags here ( -Wall, -g, etc)
 CXXFLAGS = -w -O3  -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./
 #CXXFLAGS = -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./
+<<<<<<< HEAD
  CXXFLAGS += -I../ -I../../ -I/usr/local/include/boost   -ldl -idirafter /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
 #CXXFLAGS  = -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl -O3
+=======
+#CXXFLAGS = -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./
+# CXXFLAGS += -I../ -I../../  -I/usr/local/include -I/usr/local/include/Eigen -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ -DUNIX -m64 -ldl
+
+CXXFLAGS  = -I/usr/include/eigen3 -I/usr/include/boost -DUNIX -m64 -ldl -O3
+>>>>>>> refs/heads/kdab
 CXXFLAGS += -fopenmp
 #CXXFLAGS += -mavx512f -mavx512cd -fopt-info-vec-all
 #CXXFLAGS += -g
@@ -41,8 +48,12 @@ HDR = data.hpp \
       mympi.hpp \
       BayesRRtoy.hpp \
       BayesRMmapToy.hpp \
+<<<<<<< HEAD
       BayesRRm.h \
       distributions_boost.hpp
+=======
+			BayesPPToy.hpp
+>>>>>>> refs/heads/kdab
 
 SRC = data.cpp \
       gctb.cpp \
@@ -52,19 +63,28 @@ SRC = data.cpp \
       mympi.cpp \
       BayesRRtoy.cpp \
       BayesRMmapToy.cpp \
+<<<<<<< HEAD
       BayesRRm.cpp \
       distributions_boost.cpp
+=======
+			BayesPPToy.cpp
+
+>>>>>>> refs/heads/kdab
 
 OBJ = $(SRC:.cpp=.o)
 
-all : $(OUTPUT) 
+all : $(OUTPUT)
 
 $(OUTPUT) :
+<<<<<<< HEAD
 	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJ) $(LDFLAGS) $(LIB) 
+=======
+	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJ) $(LIB)
+>>>>>>> refs/heads/kdab
 
 $(OBJ) : $(HDR)
 
-.cpp.o : 
+.cpp.o :
 	$(CXX) $(CXXFLAGS) -c $*.cpp
 
 .SUFFIXES : .cpp .c .o $(SUFFIXES)
