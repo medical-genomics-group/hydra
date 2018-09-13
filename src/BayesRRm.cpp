@@ -37,10 +37,12 @@ int BayesRRm::runGibbs(){
 			  // Compute the SNP data length in bytes
      size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
 
+        omp_set_num_threads(10);
+    omp_set_nested(1); // 1 - enables nested parallelism; 0 - disables nested parallelism.
 
 
 
-#pragma omp parallel num_threads(2) shared(flag,q,M,N)
+#pragma omp parallel shared(flag,q,M,N)
 {
 #pragma omp sections
 {
@@ -125,7 +127,7 @@ int BayesRRm::runGibbs(){
 			       for(int j=0; j < M; j++){
 
 			         marker= markerI[j];
-			         data.getSnpDataFromBedFileUsingMmap(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
+			         data.getSnpDataFromBedFileUsingMmap_openmp(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
 			         Cx=normedSnpData.cast<double>();
 
 			         y_tilde= epsilon.array()+(Cx*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old

@@ -38,9 +38,10 @@ int BayesRRpp::runGibbs(){
      size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
 
 
+omp_set_num_threads(10);
+    omp_set_nested(1); 
 
-
-#pragma omp parallel num_threads(2) shared(flag,q,M,N)
+#pragma omp parallel  shared(flag,q,M,N)
 {
 #pragma omp sections
 {
