@@ -32,14 +32,16 @@ int BayesRRpp::runGibbs(){
 	flag=0;
 
 
-	std::cout<<"running toy example ";
+	std::cout<<"Running Gibbs sampling";
 
 			  // Compute the SNP data length in bytes
      size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
 
 
-omp_set_num_threads(10);
-    omp_set_nested(1); 
+
+     omp_set_nested(1); // 1 - enables nested parallelism; 0 - disables nested parallelism.
+
+
 
 #pragma omp parallel  shared(flag,q,M,N)
 {
@@ -102,10 +104,10 @@ omp_set_num_threads(10);
 
 			     components.setZero();
 			     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-			     y=data.y.cast<double>();
-			     epsilon= (y).array() - mu;
-			     sigmaE=epsilon.squaredNorm()/N*0.5;
 
+			     epsilon= (data.y.cast<double>()).array() - mu;
+			     sigmaE=epsilon.squaredNorm()/N*0.5;
+                 //THIS FOR MUST NOT BE PARALLELIZED, its the markov chain
 			     for(int iteration=0; iteration < max_iterations; iteration++){
 
 			       if(iteration>0)
@@ -121,9 +123,12 @@ omp_set_num_threads(10);
 
 			       m0=0;
 			       v.setZero();
+
+			       //THIS FOR should not be parallelized, resulting chain is not ergodic, but it may converge to result sometimes if parallelized
 			       for(int j=0; j < M; j++){
 
 			         marker= markerI[j];
+			         //TODO mappedZ column should be scaled, that is, column=(column-mean(column))/sd(column), maybe that can be done in preprocess
 			         Cx=data.mappedZ.col(marker).cast<double>();
 
 			         y_tilde= epsilon.array()+(Cx*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
@@ -132,7 +137,6 @@ omp_set_num_threads(10);
 
 			         muk[0]=0.0;//muk for the zeroth component=0
 
-			        // std::cout<< muk;
 			         //we compute the denominator in the variance expression to save computations
 			         denom=(double)data.ZPZdiag[marker]+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
 			         //we compute the dot product to save computations
@@ -178,7 +182,7 @@ omp_set_num_threads(10);
 			             }
 			           }
 			         }
-			        epsilon=y_tilde-Cx*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
+			        epsilon=y_tilde-(Cx)*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
 
 			       }
 
@@ -213,6 +217,7 @@ omp_set_num_threads(10);
   #pragma omp section
   {
     bool queueFull;
+    unsigned int i;
     queueFull=0;
     std::ofstream outFile;
     outFile.open(outputFile);
@@ -227,9 +232,10 @@ omp_set_num_threads(10);
     for(unsigned int i = 0; i < M; ++i){
       outFile << "comp[" << (i+1) << "],";
     }
-    for(unsigned int i = 0; i < N; ++i){
+    for(i = 0; i < (N-1); ++i){
       outFile << "epsilon[" << (i+1) << "],";
     }
+    outFile << "epsilon[" << (i+1) << "]";
     outFile<<"\n";
 
     while(!flag ){

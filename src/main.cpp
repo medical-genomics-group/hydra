@@ -27,13 +27,13 @@ int main(int argc, const char * argv[]) {
 
   if (myMPI::rank==0) {
     cout << "***********************************************\n";
-    cout << "* GCTB 1.9                                    *\n";
-    cout << "* Genome-wide Complex Trait Bayesian analysis *\n";
-    cout << "* Author: Jian Zeng                           *\n";
+    cout << "* BayesRRcmd                                  *\n";
+    cout << "* Complex Trait Genetics group UNIL            *\n";
+    cout << "*                                             *\n";
     cout << "* MIT License                                 *\n";
     cout << "***********************************************\n";
     if (myMPI::clusterSize > 1)
-      cout << "\nGCTB is using MPI with " << myMPI::clusterSize << " processors" << endl;
+      cout << "\nBayesRRcmd is using MPI with " << myMPI::clusterSize << " processors" << endl;
   }
 
 

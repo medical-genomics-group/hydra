@@ -20,7 +20,7 @@ BayesRRm::~BayesRRm() {}
 
 int BayesRRm::runGibbs(){
 	int flag;
-	moodycamel::ConcurrentQueue<Eigen::VectorXd> q;
+	moodycamel::ConcurrentQueue<Eigen::VectorXd> q;//lock-free queue
 	unsigned int M(data.numIncdSnps);
 	unsigned int N(data.numKeptInds);
 	std::vector<int> markerI;
@@ -32,13 +32,12 @@ int BayesRRm::runGibbs(){
 	flag=0;
 
 
-	std::cout<<"running toy example ";
+	std::cout<<"Running Gibbs sampling";
 
 			  // Compute the SNP data length in bytes
      size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
 
-        omp_set_num_threads(10);
-    omp_set_nested(1); // 1 - enables nested parallelism; 0 - disables nested parallelism.
+     omp_set_nested(1); // 1 - enables nested parallelism; 0 - disables nested parallelism.
 
 
 
@@ -109,6 +108,7 @@ int BayesRRm::runGibbs(){
 			     epsilon= (y).array() - mu;
 			     sigmaE=epsilon.squaredNorm()/N*0.5;
 
+			     //This for MUST NOT BE PARALLELIZED, IT IS THE MARKOV CHAIN
 			     for(int iteration=0; iteration < max_iterations; iteration++){
 
 			       if(iteration>0)
@@ -124,10 +124,12 @@ int BayesRRm::runGibbs(){
 
 			       m0=0;
 			       v.setZero();
+			       //This for should not be parallelized, resulting chain would not be ergodic, still, some times it may converge to the correct solution
 			       for(int j=0; j < M; j++){
 
 			         marker= markerI[j];
 			         data.getSnpDataFromBedFileUsingMmap_openmp(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
+			         //I use a temporal variable to do the cast, there should be better ways to do this.
 			         Cx=normedSnpData.cast<double>();
 
 			         y_tilde= epsilon.array()+(Cx*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
@@ -136,7 +138,6 @@ int BayesRRm::runGibbs(){
 
 			         muk[0]=0.0;//muk for the zeroth component=0
 
-			        // std::cout<< muk;
 			         //we compute the denominator in the variance expression to save computations
 			         denom=(double)data.ZPZdiag[marker]+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
 			         //we compute the dot product to save computations
@@ -214,6 +215,7 @@ int BayesRRm::runGibbs(){
 			     flag=1;
 
   }
+  //this thread saves in the output file using the lock-free queue
   #pragma omp section
   {
     bool queueFull;
@@ -231,9 +233,11 @@ int BayesRRm::runGibbs(){
     for(unsigned int i = 0; i < M; ++i){
       outFile << "comp[" << (i+1) << "],";
     }
-    for(unsigned int i = 0; i < N; ++i){
+    unsigned int i;
+    for( i= 0; i < (N-1); ++i){
       outFile << "epsilon[" << (i+1) << "],";
     }
+    outFile << "epsilon[" << (i+1) << "]";
     outFile<<"\n";
 
     while(!flag ){
