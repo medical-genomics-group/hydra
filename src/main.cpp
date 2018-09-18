@@ -92,7 +92,7 @@ int main(int argc, const char * argv[]) {
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
 			opt.includeChr, readGenotypes);
 
-      BayesRRm mmapToy(data, opt.bedFile+".bed", sysconf(_SC_PAGE_SIZE));
+      BayesRRm mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
 
       if (opt.bayesType == "bayesMmap") {
           mmapToy.runGibbs();

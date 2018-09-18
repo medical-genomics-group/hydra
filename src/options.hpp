@@ -72,15 +72,15 @@ public:
     string ldmatrixFile;
     
     Options(){
-        chainLength             = 21000;
-        burnin                  = 1000;
+        chainLength             = 10000;
+        burnin                  = 5000;
         outputFreq              = 100;
         seed                    = 0;
         numThread               = 1;
         mphen                   = 1;
         keepIndMax              = UINT_MAX;
         snpFittedPerWindow      = 2;
-        thin                    = 10;
+        thin                    = 5;
         includeChr              = 0;
                 
         windowWidth             = Megabase;
@@ -89,16 +89,17 @@ public:
 //        varGenotypic            = 1.0;
 //        varResidual             = 1.0;
         varS                    = 1.0;
-        S.resize(1);
-        S[0]                    = 0.0;
-        
+        S.resize(3);
+        S[0]                    = 0.01;
+        S[1]                    = 0.001;
+        S[2]                    = 0.0001;
         estimatePi              = true;
         estimateScale           = false;
         writeBinPosterior       = true;
         outputResults           = true;
         multiLDmat              = false;
         
-        title                   = "gctb";
+        title                   = "brr";
         analysisType            = "Bayes";
         bayesType               = "C";
         algorithm               = "";
@@ -111,7 +112,7 @@ public:
         excludeSnpFile          = "";
         keepIndFile             = "";
         snpResFile              = "";
-        mcmcSampleFile          = "";
+        mcmcSampleFile          = "bayesOutput.csv";
         gwasSummaryFile         = "";
         ldmatrixFile            = "";
     }
