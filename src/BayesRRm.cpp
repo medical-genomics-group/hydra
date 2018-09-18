@@ -5,20 +5,22 @@
  *      Author: admin
  */
 
-#include "BayesRRm.h"
 #include "data.hpp"
 #include <Eigen/Core>
 #include <random>
 #include "distributions_boost.hpp"
 #include "concurrentqueue.h"
-BayesRRm::BayesRRm(Data &data, const string bedFile, const long memPageSize):data(data), bedFile(bedFile), memPageSize(memPageSize) {
-	 cva=Eigen::Vector3d();
-	 cva<<0.01,0.001,0.0001;
+#include "Options.hpp"
+#include "BayesRRm.h"
+BayesRRm::BayesRRm(Data &data,Options &opt, const long memPageSize):seed(1),data(data),opt(opt),memPageSize(memPageSize),max_iterations(opt.chainLength),thinning(opt.thin),burn_in(opt.burnin),outputFile(opt.mcmcSampleFile),bedFile(opt.bedFile + ".bed") {
+    float* ptr =(float*)&opt.S[0];
+	cva=(Eigen::Map<Eigen::VectorXf>(ptr,opt.S.size())).cast<double>();
 }
 
 BayesRRm::~BayesRRm() {}
 
 int BayesRRm::runGibbs(){
+
 	int flag;
 	moodycamel::ConcurrentQueue<Eigen::VectorXd> q;//lock-free queue
 	unsigned int M(data.numIncdSnps);
@@ -104,7 +106,9 @@ int BayesRRm::runGibbs(){
 
 			     components.setZero();
 			     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
-			     y=data.y.cast<double>();
+			     y=(data.y.cast<double>().array()-data.y.cast<double>().mean());
+			     y/=(y.squaredNorm()/(double)N);
+
 			     epsilon= (y).array() - mu;
 			     sigmaE=epsilon.squaredNorm()/N*0.5;
 
@@ -188,7 +192,9 @@ int BayesRRm::runGibbs(){
 			       }
 
 			       m0=M-v[0];
-			       cout<< "inv scaled parameters "<< v0G+m0 << "__"<<(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0);
+			      // cout<< "inv scaled parameters "<< v0G+m0 << "__"<<(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0);
+			       //cout<< "num components"<< opt.S.size();
+			       //cout<< "\nMixture components : "<<cva[0]<<""<<cva[1]<<" "<<cva[2]<<"\n";
 			       sigmaG=inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
 
 
