@@ -9,7 +9,7 @@
 #define SRC_BAYESRRM_H_
 #include "data.hpp"
 #include <Eigen/Eigen>
-#include "Options.hpp"
+#include "options.hpp"
 class BayesRRm {
   Data          &data;//data matrices
   Options       &opt;
