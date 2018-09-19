@@ -10,7 +10,7 @@
 #include <random>
 #include "distributions_boost.hpp"
 #include "concurrentqueue.h"
-#include "Options.hpp"
+#include "options.hpp"
 #include "BayesRRm.h"
 BayesRRm::BayesRRm(Data &data,Options &opt, const long memPageSize):seed(1),data(data),opt(opt),memPageSize(memPageSize),max_iterations(opt.chainLength),thinning(opt.thin),burn_in(opt.burnin),outputFile(opt.mcmcSampleFile),bedFile(opt.bedFile + ".bed") {
     float* ptr =(float*)&opt.S[0];
