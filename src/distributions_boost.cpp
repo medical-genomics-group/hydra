@@ -14,8 +14,8 @@
 #include <boost/random/beta_distribution.hpp>
 #include <boost/random/uniform_01.hpp>
 
-Distributions_boost::Distributions_boost(unsigned int seed){
-	rng=boost::mt19937(seed);
+Distributions_boost::Distributions_boost(unsigned int pseed):seed(pseed){
+	rng=boost::mt19937(pseed);
 }
 Distributions_boost::~Distributions_boost(){
 }
@@ -58,8 +58,8 @@ double Distributions_boost::norm_rng(double mean,double sigma2){
   return var_nor();
 }
 
-inline double runif(){
-	boost::mt19937 rng;
+inline double runif(unsigned int seed){
+	boost::mt19937 rng(seed);
 	static boost::uniform_01<boost::mt19937> zeroone(rng);
 	return zeroone();
 }
@@ -67,7 +67,7 @@ inline double runif(){
 double Distributions_boost::component_probs(double b2,Eigen::VectorXd pi){
   double sum;
   double p;
-  p=runif();
+  p=runif(seed);
   sum= pi[0]*exp((-0.5*b2)/(5e-2))/sqrt(5e-2)+pi[1]*exp((-0.5*b2));
   if(p<=(pi[0]*exp((-0.5*b2)/(5e-2))/sqrt(5e-2))/sum)
     return 5e-2;
@@ -77,15 +77,6 @@ double Distributions_boost::component_probs(double b2,Eigen::VectorXd pi){
 
 
 
-
-inline double bernoulli_rng(double probs0,double probs1,double cats0,double cats1){
-  double p;
-  p=runif();
-  if(p<= probs0/(probs0+probs1))
-    return cats0;
-  else
-    return cats1;
-}
 
 double Distributions_boost::beta_rng(double a,double b){
     boost::random::beta_distribution<double> mybeta(a, b);

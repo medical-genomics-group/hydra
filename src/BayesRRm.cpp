@@ -12,7 +12,7 @@
 #include "concurrentqueue.h"
 #include "options.hpp"
 #include "BayesRRm.h"
-BayesRRm::BayesRRm(Data &data,Options &opt, const long memPageSize):seed(static_cast<unsigned int>(std::time(0))),data(data),opt(opt),memPageSize(memPageSize),max_iterations(opt.chainLength),thinning(opt.thin),burn_in(opt.burnin),outputFile(opt.mcmcSampleFile),bedFile(opt.bedFile + ".bed"),dist(static_cast<unsigned int>(std::time(0))) {
+BayesRRm::BayesRRm(Data &data,Options &opt, const long memPageSize):seed(opt.seed),data(data),opt(opt),memPageSize(memPageSize),max_iterations(opt.chainLength),thinning(opt.thin),burn_in(opt.burnin),outputFile(opt.mcmcSampleFile),bedFile(opt.bedFile + ".bed"),dist(opt.seed) {
     float* ptr =(float*)&opt.S[0];
 	cva=(Eigen::Map<Eigen::VectorXf>(ptr,opt.S.size())).cast<double>();
 }
@@ -107,7 +107,7 @@ int BayesRRm::runGibbs(){
 			     components.setZero();
 			     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 			     y=(data.y.cast<double>().array()-data.y.cast<double>().mean());
-			     y/=sqrt(y.squaredNorm())/(double)N;
+			     y/=sqrt(y.squaredNorm())/((double)N-1.0);
 
 			     epsilon= (y).array() - mu;
 			     sigmaE=epsilon.squaredNorm()/N*0.5;
@@ -196,7 +196,7 @@ int BayesRRm::runGibbs(){
 			       //cout<< "num components"<< opt.S.size();
 			       //cout<< "\nMixture components : "<<cva[0]<<""<<cva[1]<<" "<<cva[2]<<"\n";
 			       sigmaG=dist.inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
-			      // cout<<"sigmaG: "<<sigmaG<<"\n";
+			       cout<<"sigmaG: "<<sigmaG<<"\n";
 			       //cout<<"y mean: "<<y.mean()<<"\n";
 			       //cout<<"y sd: "<< sqrt(y.squaredNorm())/(double)N<< "\n";
 

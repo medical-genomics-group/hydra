@@ -75,7 +75,7 @@ public:
         chainLength             = 10000;
         burnin                  = 5000;
         outputFreq              = 100;
-        seed                    = 0;
+        seed                    = static_cast<unsigned int>(std::time(0));
         numThread               = 1;
         mphen                   = 1;
         keepIndMax              = UINT_MAX;

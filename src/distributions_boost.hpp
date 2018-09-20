@@ -15,6 +15,7 @@
 #include "boost/generator_iterator.hpp"
 class Distributions_boost{
 	 boost::mt19937 rng;
+	 unsigned int seed;
 public:
 	Distributions_boost(unsigned int seed);
 	virtual ~Distributions_boost();

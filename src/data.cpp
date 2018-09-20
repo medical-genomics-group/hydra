@@ -389,12 +389,12 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
     snpData.array() -= mean;
 
     float sqn = snpData.squaredNorm();
-    float std_ = 1.f / (sqrt(sqn / float(numKeptInds))); // assume full pop.
+    float std_ = 1.f / (sqrt(sqn / (float(numKeptInds)-1.0)));
     snpData.array() *= std_;
 
     //ZPZdiag[snpInd]  = sqn;
     //We are using the squared norm of the already centered and scaled column
-    ZPZdiag[snpInd]  = (float)numKeptInds;
+    ZPZdiag[snpInd]  = (float(numKeptInds)-1.0);
 }
 
 void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint snpInd, VectorXf &snpData) {
