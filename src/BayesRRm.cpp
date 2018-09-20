@@ -196,7 +196,7 @@ int BayesRRm::runGibbs(){
 			       //cout<< "num components"<< opt.S.size();
 			       //cout<< "\nMixture components : "<<cva[0]<<""<<cva[1]<<" "<<cva[2]<<"\n";
 			       sigmaG=dist.inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
-			       cout<<"sigmaG: "<<sigmaG<<"\n";
+			       //cout<<"sigmaG: "<<sigmaG<<"\n";
 			       //cout<<"y mean: "<<y.mean()<<"\n";
 			       //cout<<"y sd: "<< sqrt(y.squaredNorm())/(double)N<< "\n";
 
