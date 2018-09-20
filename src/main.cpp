@@ -133,8 +133,8 @@ int main(int argc, const char * argv[]) {
         cout << endl;
 
         // Run analysis using mapped data files
-        BayesRRpp toy(data);
-        toy.runGibbs();
+// BayesRRpp toy(data);
+  //      toy.runGibbs();
 
         data.unmapPreprocessedBedFile();
         end = clock();

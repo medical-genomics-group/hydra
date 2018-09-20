@@ -5,17 +5,13 @@
 #
 # Run reference solution
 
-dataset=ukb_imp_v3_UKB_EST_clumpLD09_chr22
+dataset=uk10k_chr1_1mb
 
 out=$dataset.mmap
 
 echo Running mmap solution on dataset $dataset. Output in $out
 
-<<<<<<< HEAD
 ./brr --bayes bayesMmap --bfile ../test/data/$dataset --pheno ../test/data/test.phen --chain-length 10 --burn-in 5 --thin 2 --mcmc-samples ./bayesOutput.csv --S 0.01,0.001,0.0001 > $out
-=======
-./brr --bayes bayesMmap --bfile ../../../etienne/$dataset --pheno ../../../etienne/$dataset.phen --chain-length 10 --burn-in 5 --thin 2 --mcmc-samples ./bayesOutput.csv --S 0.01,0.001,0.0001 > $out
->>>>>>> branch 'master' of https://github.com/ctggroup/BayesRRcmd
 
 out=$dataset.pp
 echo Running preprocessing solution on dataset $dataset. Output in $out

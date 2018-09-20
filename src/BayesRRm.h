@@ -10,6 +10,7 @@
 #include "data.hpp"
 #include <Eigen/Eigen>
 #include "options.hpp"
+#include "distributions_boost.hpp"
 class BayesRRm {
   Data          &data;//data matrices
   Options       &opt;
@@ -26,6 +27,7 @@ class BayesRRm {
   const double  v0G=0.0001;
   const double  s02G=0.0001;
   Eigen::VectorXd cva;
+  Distributions_boost dist;
 
 public:
 	BayesRRm(Data &data, Options &opt, const long memPageSize);

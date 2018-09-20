@@ -12,7 +12,7 @@
 #include "concurrentqueue.h"
 #include "options.hpp"
 #include "BayesRRm.h"
-BayesRRm::BayesRRm(Data &data,Options &opt, const long memPageSize):seed(1),data(data),opt(opt),memPageSize(memPageSize),max_iterations(opt.chainLength),thinning(opt.thin),burn_in(opt.burnin),outputFile(opt.mcmcSampleFile),bedFile(opt.bedFile + ".bed") {
+BayesRRm::BayesRRm(Data &data,Options &opt, const long memPageSize):seed(static_cast<unsigned int>(std::time(0))),data(data),opt(opt),memPageSize(memPageSize),max_iterations(opt.chainLength),thinning(opt.thin),burn_in(opt.burnin),outputFile(opt.mcmcSampleFile),bedFile(opt.bedFile + ".bed"),dist(static_cast<unsigned int>(std::time(0))) {
     float* ptr =(float*)&opt.S[0];
 	cva=(Eigen::Map<Eigen::VectorXf>(ptr,opt.S.size())).cast<double>();
 }
@@ -100,7 +100,7 @@ int BayesRRm::runGibbs(){
 
 			     mu=0;
 
-			     sigmaG=beta_rng(1,1);
+			     sigmaG=dist.beta_rng(1,1);
 
 			     pi=priorPi;
 
@@ -120,7 +120,7 @@ int BayesRRm::runGibbs(){
 			        std::cout << "iteration: "<<iteration <<"\n";
 
 			       epsilon= epsilon.array()+mu;//  we substract previous value
-			       mu = norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N); //update mu
+			       mu = dist.norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N); //update mu
 			       epsilon= epsilon.array()-mu;// we substract again now epsilon =Y-mu-X*beta
 
 
@@ -157,7 +157,7 @@ int BayesRRm::runGibbs(){
 			         //update the log likelihood for each component
 			         logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(data.ZPZdiag[marker]))*cVa.segment(1,(K-1)).array() + 1).array().log()) + 0.5*( muk.segment(1,(K-1)).array()*num)/sigmaE;
 
-			         double p(beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
+			         double p(dist.beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
 
 			         if(((logL.segment(1,(K-1)).array()-logL[0]).abs().array() >700 ).any() ){
@@ -172,7 +172,7 @@ int BayesRRm::runGibbs(){
 			             if(k==0){
 			               beta(marker,0)=0;
 			             }else{
-			               beta(marker,0)=norm_rng(muk[k],sigmaE/denom[k-1]);
+			               beta(marker,0)=dist.norm_rng(muk[k],sigmaE/denom[k-1]);
 			             }
 			             v[k]+=1.0;
 			             components[marker]=k;
@@ -195,17 +195,17 @@ int BayesRRm::runGibbs(){
 			       //cout<< "inv scaled parameters "<< v0G+m0 << "__"<<(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0);
 			       //cout<< "num components"<< opt.S.size();
 			       //cout<< "\nMixture components : "<<cva[0]<<""<<cva[1]<<" "<<cva[2]<<"\n";
-			       sigmaG=inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
-			       //cout<<"sigmaG: "<<sigmaG<<"\n";
+			       sigmaG=dist.inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
+			      // cout<<"sigmaG: "<<sigmaG<<"\n";
 			       //cout<<"y mean: "<<y.mean()<<"\n";
 			       //cout<<"y sd: "<< sqrt(y.squaredNorm())/(double)N<< "\n";
 
 
-			       sigmaE=inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
+			       sigmaE=dist.inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
 
 
 
-			       pi=dirichilet_rng(v.array() + 1.0);
+			       pi=dist.dirichilet_rng(v.array() + 1.0);
 
 			       if(iteration >= burn_in)
 			       {
