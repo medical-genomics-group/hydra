@@ -11,14 +11,14 @@
 OUTPUT = brr
 
 # Put C++ compiler here
-CXX_UNIX = "/usr/local/opt/llvm/bin/clang"  #g++
-#CXX_MAC = gcc   #g++
+CXX_UNIX= mpicc #g++
+#CXX_MAC = ""/usr/local/opt/llvm/bin/clang"   #g++
 
- CXXFLAGS = -I../ -I../../ -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/   -ldl -idirafter /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
-#CXXFLAGS  = -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl -O3
+# CXXFLAGS = -I../ -I../../ -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/   -ldl -idirafter /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
+CXXFLAGS  = -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl -O3
 CXXFLAGS += -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./
 # CXXFLAGS += -I../ -I../../  -I/usr/local/include -I/usr/local/include/Eigen -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ -DUNIX -m64 -ldl
-
+#CXXFLAGS += -I/software/include/mpich-x86_64
 CXXFLAGS += -fopenmp
 #CXXFLAGS += -mavx512f -mavx512cd -fopt-info-vec-all
 #CXXFLAGS += -g
@@ -27,9 +27,12 @@ CXXFLAGS += -march=native
 #CXXFLAGS += -S
 
 # LIB += -lz -lmpi -lm  -lc++
-LIB     += -lz -lmpi -lm -lc++
+LIB     += -lz -lmpi -lm  
 
-LDFLAGS = -L/usr/local/opt/llvm/lib
+#LDFLAGS = -L/usr/local/opt/llvm/lib
+LDFLAGS= -Wl,--rpath=/software/lib64/  -Wl,--dynamic-linker=/software/lib64/ld-linux-x86-64.so.2 -L/lib/
+#LDFLAGS+= -L/software/lib64/openmpi/lib/
+#LDFLAGS+= -L/software/lib64/
 
 CXX = $(CXX_UNIX)
 
