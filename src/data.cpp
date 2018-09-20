@@ -395,6 +395,7 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
     //ZPZdiag[snpInd]  = sqn;
     //We are using the squared norm of the already centered and scaled column
     ZPZdiag[snpInd]  = (float(numKeptInds)-1.0);
+    //ZPZdiag[snpInd]  =snpData.squaredNorm() ;
 }
 
 void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint snpInd, VectorXf &snpData) {

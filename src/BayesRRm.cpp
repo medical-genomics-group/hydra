@@ -107,7 +107,7 @@ int BayesRRm::runGibbs(){
 			     components.setZero();
 			     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 			     y=(data.y.cast<double>().array()-data.y.cast<double>().mean());
-			     y/=sqrt(y.squaredNorm())/((double)N-1.0);
+			     y/=sqrt(y.squaredNorm()/((double)N-1.0));
 
 			     epsilon= (y).array() - mu;
 			     sigmaE=epsilon.squaredNorm()/N*0.5;
@@ -198,7 +198,10 @@ int BayesRRm::runGibbs(){
 			       sigmaG=dist.inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
 			       //cout<<"sigmaG: "<<sigmaG<<"\n";
 			       //cout<<"y mean: "<<y.mean()<<"\n";
-			       //cout<<"y sd: "<< sqrt(y.squaredNorm())/(double)N<< "\n";
+			      // cout<<"y sd: "<< sqrt(y.squaredNorm()/((double)N-1.0))<< "\n";
+			       //cout<<"x mean "<<Cx.mean()<<"\n";
+			       //cout<<"x sd "<<sqrt(Cx.squaredNorm()/((double)N-1.0))<<"\n";
+
 
 
 			       sigmaE=dist.inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
