@@ -37,8 +37,7 @@ int BayesRRpp::runGibbs()
     unsigned int M(data.numIncdSnps);
     unsigned int N(data.numKeptInds);
     std::vector<int> markerI;
-    int marker;
-    int K(int(cva.size()) + 1);
+    const int K(int(cva.size()) + 1);
     VectorXd components(M);
     VectorXf normedSnpData(data.numKeptInds);
 
@@ -88,13 +87,16 @@ int BayesRRpp::runGibbs()
                 VectorXd Cx;
                 priorPi[0] = 0.5;
 
-                cVa.segment(1, (K - 1)) = cva;
-                priorPi.segment(1, (K - 1)) = priorPi[0] * cVa.segment(1, (K - 1)).array() / cVa.segment(1, (K - 1)).sum();
+                // Just do this once
+                const int km1 = K - 1;
+
+                cVa.segment(1, km1) = cva;
+                priorPi.segment(1, km1) = priorPi[0] * cVa.segment(1, km1).array() / cVa.segment(1, km1).sum();
                 y_tilde.setZero();
                 cVa[0] = 0;
 
                 cVaI[0] = 0;
-                cVaI.segment(1, (K - 1))=cVa.segment(1, (K - 1)).cwiseInverse();
+                cVaI.segment(1, km1) = cVa.segment(1, km1).cwiseInverse();
 
                 beta.setZero();
                 mu = 0;
@@ -137,21 +139,21 @@ int BayesRRpp::runGibbs()
                         muk[0] = 0.0; // muk for the zeroth component=0
 
                         // We compute the denominator in the variance expression to save computations
-                        denom = (double(N) - 1.0) + (sigmaE / sigmaG) * cVaI.segment(1, (K - 1)).array();
+                        denom = (double(N) - 1.0) + (sigmaE / sigmaG) * cVaI.segment(1, km1).array();
 
                         // We compute the dot product to save computations
                         num = (Cx.cwiseProduct(y_tilde)).sum();
 
                         // muk for the other components is computed according to equaitons
-                        muk.segment(1, (K - 1)) = num / denom.array();
+                        muk.segment(1, km1) = num / denom.array();
 
                         logL = pi.array().log(); // First component probabilities remain unchanged
 
                         // Update the log likelihood for each component
-                        logL.segment(1, (K - 1)) = logL.segment(1, (K - 1)).array() - 0.5 * ((((sigmaG / sigmaE) * ((double(N) - 1.0))) * cVa.segment(1, (K - 1)).array() + 1).array().log()) + 0.5 * (muk.segment(1, (K - 1)).array() * num) / sigmaE;
+                        logL.segment(1, km1) = logL.segment(1, km1).array() - 0.5 * ((((sigmaG / sigmaE) * ((double(N) - 1.0))) * cVa.segment(1, km1).array() + 1).array().log()) + 0.5 * (muk.segment(1, km1).array() * num) / sigmaE;
                         double p(dist.beta_rng(1, 1)); // I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
-                        if (((logL.segment(1, (K - 1)).array() - logL[0]).abs().array() > 700 ).any()) {
+                        if (((logL.segment(1, km1).array() - logL[0]).abs().array() > 700 ).any()) {
                             acum = 0.0;
                         } else {
                             acum = 1.0 / ((logL.array() - logL[0]).exp().sum());
@@ -170,7 +172,7 @@ int BayesRRpp::runGibbs()
                                 break;
                             } else {
                                 // If too big or too small
-                                if (((logL.segment(1, (K - 1)).array() - logL[k + 1]).abs().array() > 700 ).any()) {
+                                if (((logL.segment(1, km1).array() - logL[k + 1]).abs().array() > 700 ).any()) {
                                     acum += 0;
                                 } else {
                                     acum += 1.0 / ((logL.array() - logL[k + 1]).exp().sum());
