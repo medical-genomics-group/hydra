@@ -14,15 +14,12 @@
 
 class BayesRRpp
 {
-    Data            &data;//data matrices
-    Options         &opt;
-    const string    bedFile;//bed file
-    const long      memPageSize;//size of memory
-    const string    outputFile;
-    const int       seed;
-    const int       max_iterations;
-    const int		burn_in;
-    const int       thinning;
+    Data            &data; // Data matrices
+    const string    outputFile = "bayesOutput.csv";
+    const int       seed = 1;
+    const int       max_iterations = 10;
+    const int		burn_in = 5;
+    const int       thinning = 1;
     const double	sigma0 = 0.0001;
     const double	v0E = 0.0001;
     const double    s02E = 0.0001;
@@ -34,7 +31,7 @@ class BayesRRpp
 public:
     BayesRRpp(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRpp();
-    int runGibbs(); //where we run Gibbs sampling over the parametrised model
+    int runGibbs(); // Where we run Gibbs sampling over the paramaterised model
 };
 
 #endif /* SRC_BAYESRRM_H_ */
