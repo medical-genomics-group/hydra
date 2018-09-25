@@ -137,9 +137,11 @@ int BayesRRpp::runGibbs()
                         muk[0] = 0.0; // muk for the zeroth component=0
 
                         // We compute the denominator in the variance expression to save computations
-                        denom =(double(N) - 1.0) + (sigmaE / sigmaG) * cVaI.segment(1, (K - 1)).array();
+                        denom = (double(N) - 1.0) + (sigmaE / sigmaG) * cVaI.segment(1, (K - 1)).array();
+
                         // We compute the dot product to save computations
                         num = (Cx.cwiseProduct(y_tilde)).sum();
+
                         // muk for the other components is computed according to equaitons
                         muk.segment(1, (K - 1)) = num / denom.array();
 
@@ -147,11 +149,10 @@ int BayesRRpp::runGibbs()
 
                         // Update the log likelihood for each component
                         logL.segment(1, (K - 1)) = logL.segment(1, (K - 1)).array() - 0.5 * ((((sigmaG / sigmaE) * ((double(N) - 1.0))) * cVa.segment(1, (K - 1)).array() + 1).array().log()) + 0.5 * (muk.segment(1, (K - 1)).array() * num) / sigmaE;
-
                         double p(dist.beta_rng(1, 1)); // I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
                         if (((logL.segment(1, (K - 1)).array() - logL[0]).abs().array() > 700 ).any()) {
-                            acum = 0;
+                            acum = 0.0;
                         } else {
                             acum = 1.0 / ((logL.array() - logL[0]).exp().sum());
                         }
