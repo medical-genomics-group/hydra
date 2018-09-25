@@ -64,9 +64,9 @@ int main(int argc, const char * argv[]) {
 
       readGenotypes = false;
       gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
-			opt.mphen, opt.covariateFile);
+            opt.mphen, opt.covariateFile);
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
-			opt.includeChr, readGenotypes);
+            opt.includeChr, readGenotypes);
 
       cout << "Start reading " << opt.bedFile+".bed" << endl;
       clock_t start_bed = clock();
@@ -89,9 +89,9 @@ int main(int argc, const char * argv[]) {
 
       readGenotypes = false;
       gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
-			opt.mphen, opt.covariateFile);
+            opt.mphen, opt.covariateFile);
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
-			opt.includeChr, readGenotypes);
+            opt.includeChr, readGenotypes);
 
 
 
@@ -136,8 +136,8 @@ int main(int argc, const char * argv[]) {
         cout << endl;
 
         // Run analysis using mapped data files
-         BayesRRm toy(data, opt, sysconf(_SC_PAGE_SIZE));
-          toy.runGibbs();
+        BayesRRm toy(data, opt, sysconf(_SC_PAGE_SIZE));
+        toy.runGibbs();
 
         data.unmapPreprocessedBedFile();
         end = clock();
