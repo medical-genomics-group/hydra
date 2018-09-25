@@ -2,3 +2,6 @@
 *.o
 CMakeLists.txt.user
 gctb
+*.ppbed
+*.sqnorm
+*.csv
