@@ -20,6 +20,7 @@
 #include <boost/format.hpp>
 #include "mympi.hpp"
 #include "gadgets.hpp"
+#include <Eigen/Eigen>
 
 using namespace std;
 using namespace boost;
@@ -48,12 +49,20 @@ public:
     float varS; // prior variance of S in BayesS and BayesNS
     vector<float> S;    // starting value of S in BayesS and BayesNS
     
+
+
     bool estimatePi;
     bool estimateScale;
     bool writeBinPosterior;
     bool outputResults;
     bool multiLDmat;
     
+
+    unsigned int numGroups;
+    Eigen::MatrixXd mS;
+    string groupFile;
+
+
     string title;
     string analysisType;
     string bayesType;
@@ -115,6 +124,7 @@ public:
         mcmcSampleFile          = "bayesOutput.csv";
         gwasSummaryFile         = "";
         ldmatrixFile            = "";
+        numGroups				=2;
     }
     
     void inputOptions(const int argc, const char* argv[]);

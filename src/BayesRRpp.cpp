@@ -11,9 +11,9 @@
 #include <random>
 #include "distributions_boost.hpp"
 #include "concurrentqueue.h"
-BayesRRpp::BayesRRpp(Data &data):data(data) {
-	 cva=Eigen::Vector3d();
-	 cva<<0.01,0.001,0.0001;
+BayesRRpp::BayesRRpp(Data &data,Options &opt, const long memPageSize):seed(opt.seed),data(data),opt(opt),memPageSize(memPageSize),max_iterations(opt.chainLength),thinning(opt.thin),burn_in(opt.burnin),outputFile(opt.mcmcSampleFile),bedFile(opt.bedFile + ".bed"),dist(opt.seed) {
+    float* ptr =(float*)&opt.S[0];
+	cva=(Eigen::Map<Eigen::VectorXf>(ptr,opt.S.size())).cast<double>();
 }
 
 BayesRRpp::~BayesRRpp() {}
@@ -85,11 +85,11 @@ int BayesRRpp::runGibbs(){
 			     priorPi[0]=0.5;
 
 
-
-			     priorPi.segment(1,(K-1))=priorPi[0]*cVa.segment(1,(K-1)).segment(1,(K-1)).array()/cVa.segment(1,(K-1)).segment(1,(K-1)).sum();
+			     cVa.segment(1,(K-1))=cva;
+			     priorPi.segment(1,(K-1))=priorPi[0]*cVa.segment(1,(K-1)).array()/cVa.segment(1,(K-1)).sum();
 			     y_tilde.setZero();
 			     cVa[0] = 0;
-			     cVa.segment(1,(K-1))=cva;
+
 
 			     cVaI[0] = 0;
 			     cVaI.segment(1,(K-1))=cVa.segment(1,(K-1)).cwiseInverse();
@@ -98,14 +98,17 @@ int BayesRRpp::runGibbs(){
 
 			     mu=0;
 
-			     sigmaG=beta_rng(1,1);
+			     sigmaG=dist.beta_rng(1,1);
 
 			     pi=priorPi;
 
 			     components.setZero();
 			     std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
 
-			     epsilon= (data.y.cast<double>()).array() - mu;
+			     y=(data.y.cast<double>().array()-data.y.cast<double>().mean());
+			     y/=sqrt(y.squaredNorm()/((double)N-1.0));
+
+			     epsilon= y;
 			     sigmaE=epsilon.squaredNorm()/N*0.5;
                  //THIS FOR MUST NOT BE PARALLELIZED, its the markov chain
 			     for(int iteration=0; iteration < max_iterations; iteration++){
@@ -115,7 +118,7 @@ int BayesRRpp::runGibbs(){
 			        std::cout << "iteration: "<<iteration <<"\n";
 
 			       epsilon= epsilon.array()+mu;//  we substract previous value
-			       mu = norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N); //update mu
+			       mu = dist.norm_rng(epsilon.sum()/(double)N, sigmaE/(double)N); //update mu
 			       epsilon= epsilon.array()-mu;// we substract again now epsilon =Y-mu-X*beta
 
 
@@ -138,7 +141,7 @@ int BayesRRpp::runGibbs(){
 			         muk[0]=0.0;//muk for the zeroth component=0
 
 			         //we compute the denominator in the variance expression to save computations
-			         denom=(double)data.ZPZdiag[marker]+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
+			         denom=(double(N)-1.0)+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
 			         //we compute the dot product to save computations
 			         num=(Cx.cwiseProduct(y_tilde)).sum();
 			         //muk for the other components is computed according to equaitons
@@ -150,9 +153,9 @@ int BayesRRpp::runGibbs(){
 
 
 			         //update the log likelihood for each component
-			         logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(data.ZPZdiag[marker]))*cVa.segment(1,(K-1)).array() + 1).array().log()) + 0.5*( muk.segment(1,(K-1)).array()*num)/sigmaE;
+			         logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*((double(N)-1.0)))*cVa.segment(1,(K-1)).array() + 1).array().log()) + 0.5*( muk.segment(1,(K-1)).array()*num)/sigmaE;
 
-			         double p(beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
+			         double p(dist.beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
 
 			         if(((logL.segment(1,(K-1)).array()-logL[0]).abs().array() >700 ).any() ){
@@ -167,7 +170,7 @@ int BayesRRpp::runGibbs(){
 			             if(k==0){
 			               beta(marker,0)=0;
 			             }else{
-			               beta(marker,0)=norm_rng(muk[k],sigmaE/denom[k-1]);
+			               beta(marker,0)=dist.norm_rng(muk[k],sigmaE/denom[k-1]);
 			             }
 			             v[k]+=1.0;
 			             components[marker]=k;
@@ -187,15 +190,18 @@ int BayesRRpp::runGibbs(){
 			       }
 
 			       m0=M-v[0];
-			       cout<< "inv scaled parameters "<< v0G+m0 << "__"<<(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0);
-			       sigmaG=inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
-
-
-			       sigmaE=inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
+			       //cout<< "inv scaled parameters "<< v0G+m0 << "__"<<(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0);
+			       sigmaG=dist.inv_scaled_chisq_rng(v0G+m0,(beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
 
 
 
-			       pi=dirichilet_rng(v.array() + 1.0);
+			       sigmaE=dist.inv_scaled_chisq_rng(v0E+N,((epsilon).squaredNorm()+v0E*s02E)/(v0E+N));
+
+			      // cout<< "sigmaE "<< sigmaE <<"\n";
+			      // cout<< "sigmaG "<< sigmaG <<"\n";
+			      // cout<< "mu "<< mu <<"\n";
+
+			       pi=dist.dirichilet_rng(v.array() + 1.0);
 
 			       if(iteration >= burn_in)
 			       {

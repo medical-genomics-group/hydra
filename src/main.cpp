@@ -13,6 +13,7 @@
 #include <mpi.h>
 #include <string>
 #include "BayesRRm.h"
+#include "BayesRRhp.h"
 #include "BayesRRpp.h"
 using namespace std;
 
@@ -82,7 +83,7 @@ int main(int argc, const char * argv[]) {
 
       //gctb.clearGenotypes(data);
 
-    } else if (opt.analysisType == "Bayes" && (opt.bayesType == "bayesMmap" || (opt.bayesType == "bayesMmap2"))) {
+    } else if (opt.analysisType == "Bayes" && (opt.bayesType == "bayesMmap" || (opt.bayesType == "horseshoe"))) {
 
       clock_t start = clock();
 
@@ -92,11 +93,13 @@ int main(int argc, const char * argv[]) {
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
 			opt.includeChr, readGenotypes);
 
-      BayesRRm mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
+
 
       if (opt.bayesType == "bayesMmap") {
+    	  BayesRRm mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
           mmapToy.runGibbs();
-      } else if (opt.bayesType == "bayesMmap2") {
+      } else if (opt.bayesType == "horseshoe") {
+    	  BayesRRhp mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
           mmapToy.runGibbs();
       }
 
@@ -133,8 +136,8 @@ int main(int argc, const char * argv[]) {
         cout << endl;
 
         // Run analysis using mapped data files
-// BayesRRpp toy(data);
-  //      toy.runGibbs();
+         BayesRRpp toy(data, opt, sysconf(_SC_PAGE_SIZE));
+          toy.runGibbs();
 
         data.unmapPreprocessedBedFile();
         end = clock();

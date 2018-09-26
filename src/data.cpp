@@ -119,8 +119,10 @@ void Data::preprocessBedFile(const string &bedFile, const string &preprocessedBe
 
         // Standardize genotypes
         snpData.array() -= snpData.mean();
-        sqNorm = snpData.squaredNorm();
-
+        //sqNorm = snpData.squaredNorm();
+        float sqn = snpData.squaredNorm();
+        float std_ = 1.f / (sqrt(sqn / (float(numKeptInds)-1.0)));
+        snpData.array() *= std_;
         // Write out the preprocessed data
         ppBedOutput.write(reinterpret_cast<char *>(&snpData[0]), numInds * sizeof(float));
         sqNormOutput.write(reinterpret_cast<char *>(&sqNorm), sizeof(float));
@@ -1465,6 +1467,24 @@ void Data::readMultiLDmatInfoFile(const string &mldmatFile){
         //        numSnpMldVec.push_back(numSnps);
         mldmVec.push_back(vec);
     }
+}
+
+
+//TODO Finish function to read the group file
+void Data::readGroupFile(const string &groupFile) {
+    // NA: missing phenotype
+    ifstream in(groupFile.c_str());
+    if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read.");
+    if (myMPI::rank==0)
+        cout << "Reading groups from [" + groupFile + "]." << endl;
+
+    std::istream_iterator<double> start(in), end;
+    std::vector<int> numbers(start, end);
+    int* ptr =(int*)&numbers[0];
+    G=(Eigen::Map<Eigen::VectorXi>(ptr,numbers.size()));
+
+    if (myMPI::rank==0)
+        cout << "Groups read from file" << endl;
 }
 
 

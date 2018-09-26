@@ -41,7 +41,7 @@ int BayesRRm::runGibbs(){
 
      omp_set_nested(1); // 1 - enables nested parallelism; 0 - disables nested parallelism.
 
-
+     //Eigen::initParallel();
 
 #pragma omp parallel shared(flag,q,M,N)
 {
@@ -88,7 +88,7 @@ int BayesRRm::runGibbs(){
 
 
 
-			     priorPi.segment(1,(K-1))=priorPi[0]*cVa.segment(1,(K-1)).segment(1,(K-1)).array()/cVa.segment(1,(K-1)).segment(1,(K-1)).sum();
+			     priorPi.segment(1,(K-1))=priorPi[0]*cVa.segment(1,(K-1)).array()/cVa.segment(1,(K-1)).sum();
 			     y_tilde.setZero();
 			     cVa[0] = 0;
 			     cVa.segment(1,(K-1))=cva;
