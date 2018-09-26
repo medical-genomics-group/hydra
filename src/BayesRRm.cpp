@@ -219,7 +219,7 @@ int BayesRRm::runGibbs(){
 			       if(iteration >= burn_in)
 			       {
 			         if(iteration % thinning == 0){
-			           sample<< iteration,mu,beta,sigmaE,sigmaG,components,epsilon;
+			           sample<< iteration,mu,beta.col(0),sigmaE,sigmaG,components,epsilon;
 			           q.enqueue(sample);
 			         }
 
