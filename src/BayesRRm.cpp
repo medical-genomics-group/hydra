@@ -132,9 +132,15 @@ int BayesRRm::runGibbs(){
 			       for(int j=0; j < M; j++){
 
 			         marker= markerI[j];
-			         data.getSnpDataFromBedFileUsingMmap_openmp(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
-			         //I use a temporal variable to do the cast, there should be better ways to do this.
-			         Cx=normedSnpData.cast<double>();
+			         // again, there may be more efficient ways to chose between pre process and no preprocess on the algorithm
+			         if(opt.analysisType!="PPBayes"){
+			            data.getSnpDataFromBedFileUsingMmap_openmp(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
+			            //I use a temporal variable to do the cast, there should be better ways to do this.
+			            Cx=normedSnpData.cast<double>();
+			         }
+			         else{
+			        	 Cx=data.mappedZ.col(marker).cast<double>();
+			         }
 
 			         y_tilde= epsilon.array()+(Cx*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
 
@@ -143,7 +149,7 @@ int BayesRRm::runGibbs(){
 			         muk[0]=0.0;//muk for the zeroth component=0
 
 			         //we compute the denominator in the variance expression to save computations
-			         denom=(double)data.ZPZdiag[marker]+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
+			         denom=((double)N-1)+(sigmaE/sigmaG)*cVaI.segment(1,(K-1)).array();
 			         //we compute the dot product to save computations
 			         num=(Cx.cwiseProduct(y_tilde)).sum();
 			         //muk for the other components is computed according to equaitons
@@ -155,7 +161,7 @@ int BayesRRm::runGibbs(){
 
 
 			         //update the log likelihood for each component
-			         logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(data.ZPZdiag[marker]))*cVa.segment(1,(K-1)).array() + 1).array().log()) + 0.5*( muk.segment(1,(K-1)).array()*num)/sigmaE;
+			         logL.segment(1,(K-1))=logL.segment(1,(K-1)).array() - 0.5*((((sigmaG/sigmaE)*(((double)N-1)))*cVa.segment(1,(K-1)).array() + 1).array().log()) + 0.5*( muk.segment(1,(K-1)).array()*num)/sigmaE;
 
 			         double p(dist.beta_rng(1,1));//I use beta(1,1) because I cant be bothered in using the std::random or create my own uniform distribution, I will change it later
 
