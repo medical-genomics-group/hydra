@@ -67,7 +67,7 @@ int BayesRRm::runGibbs(){
 			     VectorXd cVaI(K);// inverse of the component variances
 
 			     //linear model variables
-			     MatrixXd beta(M,1); // effect sizes
+			     VectorXd beta(M); // effect sizes
 			     VectorXd y_tilde(N); // variable containing the adjusted residuals to exclude the effects of a given marker
 			     VectorXd epsilon(N); // variable containing the residuals
 
@@ -139,10 +139,10 @@ int BayesRRm::runGibbs(){
 			            Cx=normedSnpData.cast<double>();
 			         }
 			         else{
-			        	 Cx=data.mappedZ.col(marker).cast<double>();
+			        	 Cx=VectorXd(data.mappedZ.col(marker).cast<double>());
 			         }
 
-			         y_tilde= epsilon.array()+(Cx*beta(marker,0)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
+			         y_tilde= epsilon.array()+(Cx*beta(marker)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
 
 
 
@@ -176,9 +176,9 @@ int BayesRRm::runGibbs(){
 			           if(p<=acum){
 			             //if zeroth component
 			             if(k==0){
-			               beta(marker,0)=0;
+			               beta(marker)=0;
 			             }else{
-			               beta(marker,0)=dist.norm_rng(muk[k],sigmaE/denom[k-1]);
+			               beta(marker)=dist.norm_rng(muk[k],sigmaE/denom[k-1]);
 			             }
 			             v[k]+=1.0;
 			             components[marker]=k;
@@ -193,7 +193,7 @@ int BayesRRm::runGibbs(){
 			             }
 			           }
 			         }
-			        epsilon=y_tilde-Cx*beta(marker,0);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
+			        epsilon=y_tilde-Cx*beta(marker);//now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
 
 			       }
 
@@ -219,7 +219,7 @@ int BayesRRm::runGibbs(){
 			       if(iteration >= burn_in)
 			       {
 			         if(iteration % thinning == 0){
-			           sample<< iteration,mu,beta.col(0),sigmaE,sigmaG,components,epsilon;
+			           sample<< iteration,mu,beta,sigmaE,sigmaG,components,epsilon;
 			           q.enqueue(sample);
 			         }
 
