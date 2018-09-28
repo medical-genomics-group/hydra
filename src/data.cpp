@@ -175,8 +175,8 @@ void Data::mapPreprocessBedFile(const string &preprocessedBedFile, const string 
 void Data::unmapPreprocessedBedFile()
 {
     // Unmap the data from the Eigen accessors
-    new (&ppBedMap) Map<MatrixXf>(nullptr, 1, 1);
-    new (&sqNormMap) Map<VectorXf>(nullptr, 1);
+    new (&mappedZ) Map<MatrixXf>(nullptr, 1, 1);
+    new (&mappedZPZDiag) Map<VectorXf>(nullptr, 1);
 
     const auto ppBedSize = numInds * numIncdSnps * sizeof(float);
     const auto sqNormSize = numIncdSnps * sizeof(float);
