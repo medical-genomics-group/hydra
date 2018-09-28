@@ -10,11 +10,10 @@
 #include "distributions_boost.hpp"
 #include "concurrentqueue.h"
 
-BayesRRpp::BayesRRpp(Data &data,Options &opt, const long memPageSize)
+BayesRRpp::BayesRRpp(Data &data,Options &opt)
     : seed(opt.seed)
     , data(data)
     , opt(opt)
-    , memPageSize(memPageSize)
     , max_iterations(opt.chainLength)
     , thinning(opt.thin)
     , burn_in(opt.burnin)

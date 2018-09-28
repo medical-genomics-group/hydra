@@ -17,7 +17,6 @@ class BayesRRpp
     Data            &data; // Data matrices
     Options         &opt;
     const string    bedFile;//bed file
-    const long      memPageSize;//size of memory
     const string    outputFile;
     const int       seed;
     const int       max_iterations;
@@ -32,7 +31,7 @@ class BayesRRpp
     Distributions_boost dist;
 
 public:
-    BayesRRpp(Data &data, Options &opt, const long memPageSize);
+    BayesRRpp(Data &data, Options &opt);
     virtual ~BayesRRpp();
     int runGibbs(); // Where we run Gibbs sampling over the paramaterised model
 };
