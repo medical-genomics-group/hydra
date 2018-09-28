@@ -210,7 +210,6 @@ int BayesRRpp::runGibbs()
 #pragma omp section
             {
                 bool queueFull;
-                unsigned int i;
                 queueFull = 0;
                 std::ofstream outFile;
                 outFile.open(outputFile);
@@ -225,10 +224,14 @@ int BayesRRpp::runGibbs()
                     outFile << "comp[" << (i+1) << "],";
                 }
 
+                unsigned int i;
+                for (i = 0; i < (N-1); ++i) {
+                  outFile << "epsilon[" << (i+1) << "],";
+                }
                 outFile << "epsilon[" << (i+1) << "]";
                 outFile<<"\n";
 
-                while(!flag) {
+                while (!flag) {
                     if (q.try_dequeue(sampleq))
                         outFile << sampleq.transpose().format(CommaInitFmt) << "\n";
                 }
