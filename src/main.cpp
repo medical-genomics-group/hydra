@@ -136,7 +136,7 @@ int main(int argc, const char * argv[]) {
         cout << endl;
 
         // Run analysis using mapped data files
-        BayesRRm toy(data, opt, sysconf(_SC_PAGE_SIZE));
+        BayesRRpp toy(data, opt, sysconf(_SC_PAGE_SIZE));
         toy.runGibbs();
 
         data.unmapPreprocessedBedFile();

@@ -42,7 +42,8 @@ int BayesRRpp::runGibbs()
     VectorXf normedSnpData(data.numKeptInds);
 
     flag = 0;
-    std::cout << "Running Gibbs sampling";
+    std::cout << "Running Gibbs sampling" << std::endl;
+    std::cout << "Performing " << max_iterations << " iterations" << std::endl;
 
     // Compute the SNP data length in bytes
     size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
@@ -116,7 +117,7 @@ int BayesRRpp::runGibbs()
                 for (int iteration = 0; iteration < max_iterations; iteration++) {
                     if (iteration > 0) {
                         if (iteration % int(std::ceil(max_iterations / 10)) == 0)
-                            std::cout << "iteration: "<<iteration <<"\n";
+                            std::cout << "iteration: " << iteration << std::endl;
                     }
 
                     epsilon = epsilon.array() + mu; // We substract previous value
