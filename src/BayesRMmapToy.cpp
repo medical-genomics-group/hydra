@@ -48,8 +48,15 @@ void BayesRMmapToy::runToyExample(int samples ) {
         VectorXf normedSnpData(data.numKeptInds);
         data.getSnpDataFromBedFileUsingMmap(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
 
-        if(marker%100 == 0) {
-            printf("  -> marker %6i has mean %13.6f on %d elements [%13.6f, %13.6f]  Sq. Norm = %13.6f, Var = %9.7f\n", marker, normedSnpData.mean(), normedSnpData.size(), normedSnpData.minCoeff(), normedSnpData.maxCoeff(), data.ZPZdiag[marker], normedSnpData.squaredNorm()/normedSnpData.size());
+        if (marker%100 == 0) {
+            printf("  -> marker %6i has mean %13.6f on %ld elements [%13.6f, %13.6f]  Sq. Norm = %13.6f, Var = %9.7f\n",
+                   marker,
+                   double(normedSnpData.mean()),
+                   normedSnpData.size(),
+                   double(normedSnpData.minCoeff()),
+                   double(normedSnpData.maxCoeff()),
+                   double(data.ZPZdiag[marker]),
+                   double(normedSnpData.squaredNorm()) / double(normedSnpData.size()));
             fflush(stdout);
         }
     }
@@ -84,8 +91,15 @@ void BayesRMmapToy::runToyExample2(int samples) {
         VectorXf normedSnpData(data.numKeptInds);
         data.getSnpDataFromBedFileUsingMmap_openmp(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
 
-        if(marker%100 == 0) {
-            printf("  -> marker %6i has mean %13.6f on %d elements [%13.6f, %13.6f]  Sq. Norm = %13.6f, Var = %9.7f\n", marker, normedSnpData.mean(), normedSnpData.size(), normedSnpData.minCoeff(), normedSnpData.maxCoeff(), data.ZPZdiag[marker], normedSnpData.squaredNorm()/normedSnpData.size());
+        if (marker % 100 == 0) {
+            printf("  -> marker %6i has mean %13.6f on %ld elements [%13.6f, %13.6f]  Sq. Norm = %13.6f, Var = %9.7f\n",
+                   marker,
+                   double(normedSnpData.mean()),
+                   normedSnpData.size(),
+                   double(normedSnpData.minCoeff()),
+                   double(normedSnpData.maxCoeff()),
+                   double(data.ZPZdiag[marker]),
+                   double(normedSnpData.squaredNorm()) / double(normedSnpData.size()));
             fflush(stdout);
         }
     }
