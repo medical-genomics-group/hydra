@@ -42,6 +42,7 @@ int BayesRRpp::runGibbs()
 
     flag = 0;
     std::cout << "Running Gibbs sampling" << std::endl;
+    std::cout << "Writing output to " << outputFile << std::endl;
     std::cout << "Performing " << max_iterations << " iterations" << std::endl;
 
     // Compute the SNP data length in bytes
