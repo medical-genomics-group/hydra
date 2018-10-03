@@ -139,7 +139,7 @@ int BayesRRm::runGibbs(){
 			            Cx=normedSnpData.cast<double>();
 			         }
 			         else{
-			        	 Cx=VectorXd(data.mappedZ.col(marker).cast<double>());
+			        	 Cx=data.mappedZ.col(marker).cast<double>();
 			         }
 
 			         y_tilde= epsilon.array()+(Cx*beta(marker)).array();//now y_tilde= Y-mu-X*beta+ X.col(marker)*beta(marker)_old
