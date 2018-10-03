@@ -40,7 +40,6 @@ int BayesRRm::runGibbs()
     unsigned int M(data.numIncdSnps);
     unsigned int N(data.numKeptInds);
     std::vector<int> markerI;
-    int marker;
     int K(cva.size()+1);
     VectorXd components(M);
     VectorXf normedSnpData(data.numKeptInds);
