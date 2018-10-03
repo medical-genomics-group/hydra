@@ -13,6 +13,8 @@
 #include "options.hpp"
 #include "BayesRRm.h"
 
+#include <numeric>
+
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
     : seed(opt.seed)
     , data(data)
@@ -87,9 +89,7 @@ int BayesRRm::runGibbs()
                 //sampler variables
                 VectorXd sample(2*M+4+N); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
                 std::vector<int> markerI;
-                for (int i = 0; i < M; ++i) {
-                    markerI.push_back(i);
-                }
+                std::iota(markerI.begin(), markerI.end(), 0);
 
                 int marker;
                 double acum;
