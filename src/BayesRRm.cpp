@@ -6,14 +6,13 @@
  */
 
 #include "data.hpp"
-#include <Eigen/Core>
-#include <random>
 #include "distributions_boost.hpp"
 #include "concurrentqueue.h"
 #include "options.hpp"
 #include "BayesRRm.h"
 
 #include <numeric>
+#include <random>
 
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
     : seed(opt.seed)
