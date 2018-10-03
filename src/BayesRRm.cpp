@@ -37,8 +37,8 @@ int BayesRRm::runGibbs()
 {
     int flag;
     moodycamel::ConcurrentQueue<Eigen::VectorXd> q;//lock-free queue
-    unsigned int M(data.numIncdSnps);
-    unsigned int N(data.numKeptInds);
+    const unsigned int M(data.numIncdSnps);
+    const unsigned int N(data.numKeptInds);
     std::vector<int> markerI;
     const int K(int(cva.size()) + 1);
     const int km1 = K - 1;
@@ -56,7 +56,7 @@ int BayesRRm::runGibbs()
 
     //Eigen::initParallel();
 
-#pragma omp parallel shared(flag,q,M,N)
+#pragma omp parallel shared(flag,q)
     {
 #pragma omp sections
         {
