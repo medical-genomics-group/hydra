@@ -45,6 +45,7 @@ int BayesRRm::runGibbs()
     const int km1 = K - 1;
     VectorXd components(M);
     VectorXf normedSnpData(data.numKeptInds);
+    const bool usePreprocessedData = (opt.analysisType == "PPBayes");
 
     flag = 0;
 
@@ -139,8 +140,7 @@ int BayesRRm::runGibbs()
                     for (int j = 0; j < M; j++) {
                         marker = markerI[j];
 
-                        // again, there may be more efficient ways to chose between pre process and no preprocess on the algorithm
-                        if (opt.analysisType != "PPBayes") {
+                        if (!usePreprocessedData) {
                             data.getSnpDataFromBedFileUsingMmap_openmp(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
                             //I use a temporal variable to do the cast, there should be better ways to do this.
                             Cx = normedSnpData.cast<double>();
