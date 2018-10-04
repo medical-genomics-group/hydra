@@ -143,9 +143,10 @@ void Data::preprocessBedFile(const string &bedFile, const string &preprocessedBe
 
 void Data::mapPreprocessBedFile(const string &preprocessedBedFile, const string &sqNormFile)
 {
-    // Calculate the expected file sizes
-    const auto ppBedSize = numInds * numIncdSnps * sizeof(float);
-    const auto sqNormSize = numIncdSnps * sizeof(float);
+    // Calculate the expected file sizes - cast to size_t so that we don't overflow the unsigned int's
+    // that we would otherwise get as intermediate variables!
+    const size_t ppBedSize = size_t(numInds) * size_t(numIncdSnps) * sizeof(float);
+    const size_t sqNormSize = size_t(numIncdSnps) * sizeof(float);
 
     // Open and mmap the preprocessed bed file
     ppBedFd = open(preprocessedBedFile.c_str(), O_RDONLY);
