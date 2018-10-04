@@ -40,7 +40,6 @@ int BayesRRm::runGibbs()
     moodycamel::ConcurrentQueue<Eigen::VectorXd> q;//lock-free queue
     const unsigned int M(data.numIncdSnps);
     const unsigned int N(data.numKeptInds);
-    std::vector<int> markerI;
     const int K(int(cva.size()) + 1);
     const int km1 = K - 1;
     VectorXd components(M);
@@ -88,7 +87,7 @@ int BayesRRm::runGibbs()
 
                 //sampler variables
                 VectorXd sample(2*M+4+N); // varible containg a sambple of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
-                std::vector<int> markerI;
+                std::vector<int> markerI(M);
                 std::iota(markerI.begin(), markerI.end(), 0);
 
                 int marker;
