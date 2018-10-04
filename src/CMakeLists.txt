@@ -7,9 +7,17 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 find_package(Eigen3)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+include(CheckCXXCompilerFlag)
+
+# Check for -march=native support in the compiler
+CHECK_CXX_COMPILER_FLAG("-march=native" COMPILER_SUPPORTS_MARCH_NATIVE)
+if(COMPILER_SUPPORTS_MARCH_NATIVE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+endif()
+
 # Silence some annoying warnings form Eigen with gcc >= 6.1
 SET(GCC_EIGEN_COMPILE_FLAGS "-Wno-ignored-attributes -Wno-deprecated-declarations -DEIGEN_NO_DEBUG")
-SET(CMAKE_CXX_FLAGS "-O3 -march=native  -msse2 ${CMAKE_CXX_FLAGS} ${GCC_EIGEN_COMPILE_FLAGS}")
+SET(CMAKE_CXX_FLAGS "-msse2 ${CMAKE_CXX_FLAGS} ${GCC_EIGEN_COMPILE_FLAGS}")
 
 find_package(MPI REQUIRED)
 
