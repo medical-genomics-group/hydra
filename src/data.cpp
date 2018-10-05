@@ -741,10 +741,11 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
     for (unsigned i=0; i<numInds; ++i) {
         ind = indInfoVec[i];
         ind->kept = false;
-        if (ind->phenotype!=-9) {
+        //We get rid of this misterious -9 condition
+        //if (ind->phenotype!=-9) {
             if (keepIndMax > cnt++)
                 keep.push_back(ind->catID);
-        }
+        //}
     }
     
     if (!keepIndFile.empty()) {
