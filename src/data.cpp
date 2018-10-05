@@ -783,11 +783,11 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
                 throw("Error: Individual " + token[0] + " " + token[1] + " from file [" + keepIndFile + "] does not exist!");
             } else {
                 ind = it->second;
-                if (ind->phenotype != -9) {
+                //if (ind->phenotype != -9) {
                     ind->kept = true;
-                } else {
-                    throw("Error: Individual " + ind->famID + " " + ind->indID + " from file [" + keepIndFile + "] does not have phenotype!");
-                }
+                //} else {
+                  //  throw("Error: Individual " + ind->famID + " " + ind->indID + " from file [" + keepIndFile + "] does not have phenotype!");
+                //}
             }
         }
         
