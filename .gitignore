@@ -2,6 +2,10 @@
 *.o
 CMakeLists.txt.user
 gctb
+brr
 *.ppbed
 *.sqnorm
 *.csv
+*~
+*.optrpt
+/MR_ADV/

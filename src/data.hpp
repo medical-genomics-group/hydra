@@ -188,6 +188,8 @@ public:
     void readBedFile(const string &bedFile);
     void getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint spnInd, VectorXf &snpData);
     void getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint spnInd, VectorXf &snpData);
+    void getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, double   *snpDat);
+    void getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, VectorXd &snpDat);
     void readPhenotypeFile(const string &phenFile, const unsigned mphen);
     void readCovariateFile(const string &covarFile);
     void readGwasSummaryFile(const string &gwasFile);

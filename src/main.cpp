@@ -15,6 +15,8 @@
 #include "BayesRRm.h"
 #include "BayesRRhp.h"
 #include "BayesRRpp.h"
+#include "BayesRRm_eo.h"
+
 using namespace std;
 
 
@@ -26,6 +28,7 @@ int main(int argc, const char * argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &myMPI::rank);
   MPI_Get_processor_name(myMPI::processorName, &myMPI::processorNameLength);
 
+  /*
   if (myMPI::rank==0) {
     cout << "***********************************************\n";
     cout << "* BayesRRcmd                                  *\n";
@@ -36,11 +39,11 @@ int main(int argc, const char * argv[]) {
     if (myMPI::clusterSize > 1)
       cout << "\nBayesRRcmd is using MPI with " << myMPI::clusterSize << " processors" << endl;
   }
-
+  */
 
   Gadget::Timer timer;
   timer.setTime();
-  if (myMPI::rank==0) cout << "\nAnalysis started: " << timer.getDate();
+  //if (myMPI::rank==0) cout << "\nAnalysis started: " << timer.getDate();
 
   if (argc < 2){
     if (myMPI::rank==0) cerr << " \nDid you forget to give the input parameters?\n" << endl;
@@ -83,9 +86,9 @@ int main(int argc, const char * argv[]) {
 
       //gctb.clearGenotypes(data);
 
-    } else if (opt.analysisType == "Bayes" && (opt.bayesType == "bayesMmap" || (opt.bayesType == "horseshoe"))) {
+    } else if (opt.analysisType == "Bayes" && (opt.bayesType == "bayesMmap"   || opt.bayesType == "bayesMmap_eo_ref" || opt.bayesType == "bayesMmap_eo" || opt.bayesType == "horseshoe")) {
 
-      clock_t start = clock();
+        //clock_t start = clock();
 
       readGenotypes = false;
       gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
@@ -93,18 +96,34 @@ int main(int argc, const char * argv[]) {
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
             opt.includeChr, readGenotypes);
 
-
-
       if (opt.bayesType == "bayesMmap") {
     	  BayesRRm mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
           mmapToy.runGibbs();
+
+      } else if (opt.bayesType == "bayesMmap_eo_ref") {
+    	  BayesRRm_eo mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
+          mmapToy.runGibbs();
+
+      } else if (opt.bayesType == "bayesMmap_eo") {
+          
+          //EO: methods assume that all individuals are kept
+          assert(data.numInds == data.numKeptInds);
+
+          size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
+
+          BayesRRm_eo mmapToy2(data, opt, sysconf(_SC_PAGE_SIZE));
+          mmapToy2.runTest(data.numKeptInds, snpLenByt);
+          
+          BayesRRm_eo mmapToy3(data, opt, sysconf(_SC_PAGE_SIZE));
+          mmapToy3.runTest_moody(data.numKeptInds, snpLenByt);
+
       } else if (opt.bayesType == "horseshoe") {
     	  BayesRRhp mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
           mmapToy.runGibbs();
       }
 
-      clock_t end   = clock();
-      printf("OVERALL read+compute time = %.3f sec.\n", (float)(end - start) / CLOCKS_PER_SEC);
+      //clock_t end   = clock();
+      //printf("OVERALL read+compute time = %.3f sec.\n", (float)(end - start) / CLOCKS_PER_SEC);
 
     } else if (opt.analysisType == "Preprocess") {
         readGenotypes = false;

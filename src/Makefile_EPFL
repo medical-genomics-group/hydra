@@ -1,0 +1,93 @@
+
+# -----------------------------------------------------------------
+#   Makefile for testing repo
+#
+#   Supported platforms
+#       Unix / Linux                UNIX
+#       MacOS                       MAC
+# ---------------------------------------------------------------------
+
+# Set this variable to either LINUX, MAC or WIN
+OUTPUT = brr
+
+# Put C++ compiler here
+CXX_UNIX = mpiicpc
+
+# Any other compiler flags here ( -Wall, -g, etc)
+#CXXFLAGS  = -w -O3 -m64 -DEIGEN_NO_DEBUG -std=c++11 -I./
+#CXXFLAGS  = -w -O3 -m64 -std=c++11 -I./
+#CXXFLAGS  = -Wall -O3 -std=c++11 -I./
+
+CXXFLAGS  = -O3 -std=c++11 -I./
+#CXXFLAGS  = -Ofast -std=c++11 -I./
+
+#CXXFLAGS += -DEIGEN_FAST_MATH=0
+
+CXXFLAGS += -g
+
+CXXFLAGS += -fopenmp
+#CXXFLAGS += -march=native
+#CXXFLAGS += -xCORE-AVX2
+CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
+
+CXXFLAGS += -I$(EIGEN_ROOT)/include/eigen3
+CXXFLAGS += -I$(BOOST_ROOT)/include
+#CXXFLAGS += -qopt-report=5 -qopenmp -simd -vec
+#CXXFLAGS += -S -o $(OUTPUT).s
+CXXFLAGS += -qopenmp-simd
+#CXXFLAGS += -qopt-report=1 -qopt-report-phase=vec
+
+CXXFLAGS += -qopt-report:5
+
+#EO: to allow a strict comparison between Eigen based and Eigen-free
+#CXXFLAGS += -fp-model precise -fp-model source
+# -DEIGEN_DONT_VECTORIZE
+
+LIB += -lz -lmpi -lm
+
+CXX = $(CXX_UNIX)
+
+HDR = gctb.hpp \
+      gadgets.hpp \
+      options.hpp \
+      mympi.hpp \
+      BayesRRtoy.hpp \
+      BayesRMmapToy.hpp \
+      BayesRRm.h \
+      distributions_boost.hpp \
+      data.hpp \
+      BayesRRpp.h \
+      BayesRRhp.h \
+      BayesRRm_eo.h
+
+SRC = gctb.cpp \
+      gadgets.cpp \
+      main.cpp \
+      options.cpp \
+      mympi.cpp \
+      BayesRRm.cpp \
+      distributions_boost.cpp \
+      data.cpp \
+      BayesRRpp.cpp \
+      BayesRRhp.cpp \
+      BayesRRm_eo.cpp   
+
+OBJ = $(SRC:.cpp=.o)
+
+all : $(OUTPUT) 
+
+$(OUTPUT) :
+	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJ) $(LIB) 
+
+$(OBJ) : $(HDR)
+
+.cpp.o : 
+	$(CXX) $(CXXFLAGS) -c $*.cpp
+.SUFFIXES : .cpp .c .o $(SUFFIXES)
+
+$(OUTPUT) : $(OBJ)
+
+FORCE:
+
+clean:
+	rm -f *.o *~

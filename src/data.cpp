@@ -1572,3 +1572,161 @@ void Data::readGroupFile(const string &groupFile) {
 //    
 //}
 
+void Data::getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, double * __restrict__ snpDat) {
+
+    struct stat sb;
+
+    // Early return if SNP is to be ignored
+    if (!snpInfoVec[snpInd]->included) return;
+
+    off_t  offset     = 3 + snpInd * nb;
+    off_t  pa_offset  = offset & ~(memPageSize - 1);
+    size_t relOffset  = offset - pa_offset;
+    size_t bytesToMap = relOffset + nb;
+
+    char  *addr = static_cast<char*>(mmap(0, bytesToMap, PROT_READ, MAP_SHARED, fd, pa_offset));  
+    if (addr == MAP_FAILED)
+        handle_error("mmap failed");
+
+  
+    int  nmiss = 0;
+    int  sum   = 0;
+    char *addr2 = &addr[relOffset];
+
+    int8_t *data = (int8_t*)_mm_malloc(nb * 4 * sizeof(char), 64);
+
+    for (int i=0; i<nb; ++i) {
+        for (int ii=0; ii<4; ++ii) {
+            data[i*4+ii] = (addr2[i] >> 2*ii) & 0b11;
+        }
+    }
+
+    for (int i=0; i<numInds; ++i) {
+        if (data[i] == 1) {
+            data[i] = -1;
+        } else {
+            data[i] = 2 - ((data[i] & 0b1) + ((data[i] >> 1) & 0b1));
+        }
+    }
+
+#pragma omp simd reduction(+:sum) reduction(+:nmiss)
+    for (int i=0; i<numInds; ++i) {
+        if (data[i] < 0) {
+            nmiss += data[i];
+        } else {
+            sum += data[i];
+        }
+    }
+    //printf("sum = %d, N = %d, nmiss = %d\n", sum, numKeptInds, nmiss);
+    double mean = double(sum) / double(numKeptInds + nmiss); //EO: nmiss is neg
+    //printf("mean = %20.15f\n", mean);
+
+
+    for (int i=0; i<numKeptInds; ++i) {
+        if (data[i] < 0) {
+            snpDat[i] = 0.0d;
+        } else {
+            snpDat[i] = double(data[i]) - mean;
+        }
+    }
+
+    double sqn  = 0.0d;
+    for (int i=0; i<numKeptInds; ++i) {
+        sqn  += snpDat[i] * snpDat[i];
+    }
+
+    double std_ = sqrt(double(numKeptInds -1) / sqn);
+ 
+    for (int i=0; i<numKeptInds; ++i) {
+        snpDat[i] *= std_;
+    }
+
+    if (munmap(addr, bytesToMap) == -1)
+        handle_error("munmap");
+    
+    _mm_free(data);
+
+    //ZPZdiag[snpInd]  = sqn;
+    //EO: sp -> dp?
+    ZPZdiag[snpInd]  = (float(numKeptInds)-1.0);
+}
+
+
+// Overloaded function
+void Data::getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, VectorXd &snpDat) {
+
+    struct stat sb;
+
+    // Early return if SNP is to be ignored
+    if (!snpInfoVec[snpInd]->included) return;
+
+    off_t  offset     = 3 + snpInd * nb;
+    off_t  pa_offset  = offset & ~(memPageSize - 1);
+    size_t relOffset  = offset - pa_offset;
+    size_t bytesToMap = relOffset + nb;
+
+    char  *addr = static_cast<char*>(mmap(0, bytesToMap, PROT_READ, MAP_SHARED, fd, pa_offset));  
+    if (addr == MAP_FAILED)
+        handle_error("mmap failed");
+
+  
+    int  nmiss = 0;
+    int  sum   = 0;
+    char *addr2 = &addr[relOffset];
+
+    int8_t *data = (int8_t*)_mm_malloc(nb * 4 * sizeof(char), 64);
+
+    for (int i=0; i<nb; ++i) {
+        for (int ii=0; ii<4; ++ii) {
+            data[i*4+ii] = (addr2[i] >> 2*ii) & 0b11;
+        }
+    }
+
+    for (int i=0; i<numInds; ++i) {
+        if (data[i] == 1) {
+            data[i] = -1;
+        } else {
+            data[i] = 2 - ((data[i] & 0b1) + ((data[i] >> 1) & 0b1));
+        }
+    }
+
+#pragma omp simd reduction(+:sum) reduction(+:nmiss)
+    for (int i=0; i<numInds; ++i) {
+        if (data[i] < 0) {
+            nmiss += data[i];
+        } else {
+            sum += data[i];
+        }
+    }
+    //printf("sum = %d, N = %d, nmiss = %d\n", sum, numKeptInds, nmiss);
+    double mean = double(sum) / double(numKeptInds + nmiss); //EO: nmiss is neg
+    //printf("mean = %20.15f\n", mean);
+
+    for (int i=0; i<numKeptInds; ++i) {
+        if (data[i] < 0) {
+            snpDat[i] = 0.0d;
+        } else {
+            snpDat[i] = double(data[i]) - mean;
+        }
+    }
+
+    double sqn  = 0.0d;
+    for (int i=0; i<numKeptInds; ++i) {
+        sqn  += snpDat[i] * snpDat[i];
+    }
+
+    double std_ = sqrt(double(numKeptInds - 1) / sqn);
+ 
+    for (int i=0; i<numKeptInds; ++i) {
+        snpDat[i] *= std_;
+    }
+
+    if (munmap(addr, bytesToMap) == -1)
+        handle_error("munmap");
+
+    _mm_free(data);
+
+    //ZPZdiag[snpInd]  = sqn;
+    //EO: sp -> dp?
+    ZPZdiag[snpInd]  = (float(numKeptInds)-1.0);
+}
