@@ -66,6 +66,8 @@ public:
     string mcmcSampleFile;
 
 
+    bool compress = false;
+
     Options(){
         chainLength             = 10000;
         burnin                  = 5000;

@@ -95,24 +95,30 @@ public:
     }
 };
 
+// An entry for the index to the compressed preprocessed bed file
+struct IndexEntry {
+    long pos;
+    long size;
+};
+
+using PpBedIndex = std::vector<IndexEntry>;
+
 class Data {
 public:
     Data();
 
     // mmap related data
     int ppBedFd;
-    int sqNormFd;
-    float *ppBedMap;
-    float *sqNormMap;
-    Map<MatrixXf> mappedZ;
-    Map<VectorXf> mappedZPZDiag;
+    double *ppBedMap;
+    Map<MatrixXd> mappedZ;
+    PpBedIndex ppbedIndex;
 
     // Original data
     MatrixXf X;              // coefficient matrix for fixed effects
     MatrixXf Z;              // coefficient matrix for SNP effects
     VectorXf D;              // 2pqn
     VectorXf y;              // phenotypes
-    VectorXi G; 			 //groups
+    VectorXi G; // groups
 
     //SparseMatrix<float> ZPZ; // sparse Z'Z because LE is assumed for distant SNPs
     vector<VectorXf> ZPZ;
@@ -160,9 +166,10 @@ public:
     unsigned numKeptInds;
     unsigned numChroms;
 
-    void preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &sqNormFile);
-    void mapPreprocessBedFile(const string &preprocessedBedFile, const string &sqNormFile);
+    void preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &preprocessedBedIndexFile, bool compress);
+    void mapPreprocessBedFile(const string &preprocessedBedFile);
     void unmapPreprocessedBedFile();
+
 
     void readFamFile(const string &famFile);
     void readBimFile(const string &bimFile);

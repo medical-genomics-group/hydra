@@ -9,12 +9,10 @@
 
 #include <iostream>
 #include "gctb.hpp"
-#include "BayesRMmapToy.hpp"
 #include <mpi.h>
 #include <string>
 #include "BayesRRm.h"
-#include "BayesRRhp.h"
-#include "BayesRRpp.h"
+
 
 using namespace std;
 
@@ -92,14 +90,13 @@ int main(int argc, const char * argv[]) {
             opt.mphen, opt.covariateFile);
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
             opt.includeChr, readGenotypes);
-
+      data.readBedFile_noMPI(opt.bedFile+".bed");
       if (opt.bayesType == "bayesMmap") {
     	  BayesRRm mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
           mmapToy.runGibbs();
 
       } else if (opt.bayesType == "horseshoe") {
-    	  BayesRRhp mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
-          mmapToy.runGibbs();
+
       }
 
       //clock_t end   = clock();
@@ -114,7 +111,10 @@ int main(int argc, const char * argv[]) {
 
         cout << "Start preprocessing " << opt.bedFile + ".bed" << endl;
         clock_t start_bed = clock();
-        data.preprocessBedFile(opt.bedFile + ".bed", opt.bedFile + ".ppbed", opt.bedFile + ".sqnorm");
+        data.preprocessBedFile(opt.bedFile + ".bed",
+        		opt.bedFile + ".ppbed",
+				opt.bedFile + ".ppbedindex",
+				opt.compress);
         clock_t end = clock();
         printf("Finished preprocessing the bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
         cout << endl;
@@ -129,7 +129,7 @@ int main(int argc, const char * argv[]) {
 
         cout << "Start reading preprocessed bed file: " << opt.bedFile + ".ppbed" << endl;
         clock_t start_bed = clock();
-        data.mapPreprocessBedFile(opt.bedFile + ".ppbed", opt.bedFile + ".sqnorm");
+        data.mapPreprocessBedFile(opt.bedFile + ".ppbed");
         clock_t end = clock();
         printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
         cout << endl;

@@ -26,6 +26,13 @@ double Distributions_boost::rgamma(double shape, double scale){
 	return rand_gamma();
 }
 
+double Distributions_boost::unif_rng(){
+	boost::random::uniform_real_distribution<double> myU(0,1);
+	boost::random::variate_generator<boost::mt19937&, boost::random::uniform_real_distribution<> > real_variate_generator(rng, myU);
+		return real_variate_generator();
+
+}
+
 Eigen::VectorXd Distributions_boost::dirichilet_rng(Eigen::VectorXd alpha) {
   int len;
   len=alpha.size();
@@ -83,4 +90,3 @@ double Distributions_boost::beta_rng(double a,double b){
     boost::random::variate_generator<boost::mt19937&, boost::random::beta_distribution<> > rand_beta(rng, mybeta);
   return rand_beta();
 }
-

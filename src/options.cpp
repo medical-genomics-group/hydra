@@ -37,6 +37,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
 			analysisType = "Preprocess";
 			ss << "--preprocess " << "\n";
 		}
+		else if (!strcmp(argv[i], "--compress")) {
+			compress = true;
+			ss << "--compress " << "\n";
+		}
 		else if (!strcmp(argv[i], "--bfile")) {
 			bedFile = argv[++i];
 			ss << "--bfile " << argv[i] << "\n";

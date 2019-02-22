@@ -32,20 +32,27 @@ endif(OPENMP_FOUND)
 
 add_executable(${PROJECT_NAME}
     main.cpp
-    BayesRRhp.cpp
-    BayesRRpp.cpp
     BayesRRm.cpp
-    BayesRMmapToy.cpp
-    BayesRRtoy.cpp
     data.cpp
     distributions_boost.cpp
     gadgets.cpp
     gctb.cpp
     mympi.cpp
     options.cpp
+    samplewriter.cpp
+    compression.cpp
     
 )
 target_link_libraries(${PROJECT_NAME} ${MPI_LIBRARIES})
+
+
+find_package(ZLIB REQUIRED)
+if(ZLIB_FOUND)
+  include_directories(${ZLIB_INCLUDE_DIRS})
+  target_link_libraries(${PROJECT_NAME} ${ZLIB_LIBRARIES})
+  
+endif(ZLIB_FOUND)
+
 
 if(MPI_COMPILE_FLAGS)
   set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -58,4 +65,5 @@ if(MPI_LINK_FLAGS)
 endif()
 
 
-#target_link_libraries(${PROJECT_NAME} Qt5::Core)
+
+
