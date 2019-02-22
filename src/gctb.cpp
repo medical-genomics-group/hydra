@@ -23,28 +23,3 @@ void GCTB::inputSnpInfo(Data &data, const string &bedFile, const string &include
     data.includeMatchedSnp();
     if (readGenotypes) data.readBedFile(bedFile + ".bed");
 }
-
-void GCTB::inputSnpInfo(Data &data, const string &includeSnpFile, const string &excludeSnpFile, const string &gwasSummaryFile, const string &ldmatrixFile, const unsigned includeChr, const bool multiLDmat){
-    if (multiLDmat)
-        data.readMultiLDmatInfoFile(ldmatrixFile);
-    else
-        data.readLDmatrixInfoFile(ldmatrixFile + ".info");
-    if (!includeSnpFile.empty()) data.includeSnp(includeSnpFile);
-    if (!excludeSnpFile.empty()) data.excludeSnp(excludeSnpFile);
-    data.includeChr(includeChr);
-    data.readGwasSummaryFile(gwasSummaryFile);
-    data.includeMatchedSnp();
-    data.buildSparseMME();
-}
-
-void GCTB::inputSnpResults(Data &data, const string &snpResFile){
-    
-}
-
-void GCTB::predict(const Data &data, const string &filename){
-    
-}
-
-void GCTB::clearGenotypes(Data &data){
-    data.X.resize(0,0);
-}

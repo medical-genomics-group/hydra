@@ -45,14 +45,6 @@ public:
 
     VectorXf genotypes; // temporary storage of genotypes of individuals used for building sparse Z'Z
 
-    float effect;   // estimated effect
-
-    // GWAS summary statistics
-    float gwas_b;
-    float gwas_se;
-    float gwas_n;
-    float gwas_af;
-
     SnpInfo(const int idx, const string &id, const string &allele1, const string &allele2,
             const int chr, const float gpos, const int ppos)
     : ID(id), index(idx), a1(allele1), a2(allele2), chrom(chr), genPos(gpos), physPos(ppos) {
@@ -62,11 +54,6 @@ public:
         af = -1;
         included = true;
         isQTL = false;
-        effect = 0;
-        gwas_b  = -999;
-        gwas_se = -999;
-        gwas_n  = -999;
-        gwas_af = -999;
     };
 
     void resetWindow(void) {windStart = -1; windSize = 0;};
@@ -144,9 +131,6 @@ public:
     VectorXf b;              // beta from GWAS summary data
     VectorXf n;              // sample size for each SNP in GWAS
 
-    VectorXi windStart;      // leading snp position for each window
-    VectorXi windSize;       // number of snps in each window
-
     float ypy;               // y'y the total sum of squares adjusted for the mean
     float varGenotypic;
     float varResidual;
@@ -167,8 +151,6 @@ public:
     vector<ChromInfo*> chromInfoVec;
 
     vector<bool> fullSnpFlag;
-
-//    vector<unsigned> numSnpMldVec;
     vector<vector<SnpInfo*> > mldmVec;
 
     unsigned numFixedEffects;
@@ -186,37 +168,24 @@ public:
     void readBimFile(const string &bimFile);
     void readBedFile_noMPI(const string &bedFile);
     void readBedFile(const string &bedFile);
+
     void getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint spnInd, VectorXf &snpData);
     void getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint spnInd, VectorXf &snpData);
     void getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, double   *snpDat);
     void getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, VectorXd &snpDat);
+
     void readPhenotypeFile(const string &phenFile, const unsigned mphen);
     void readCovariateFile(const string &covarFile);
-    void readGwasSummaryFile(const string &gwasFile);
-    void readLDmatrixInfoFile(const string &ldmatrixFile);
-    void readLDmatrixInfoFile(const string &ldmatrixFile, vector<SnpInfo*> &vec);
-    void readLDmatrixBinFile(const string &ldmatrixFile);
     void keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax);
     void includeSnp(const string &includeSnpFile);
     void excludeSnp(const string &excludeSnpFile);
     void includeChr(const unsigned chr);
     void includeMatchedSnp(void);
+
     vector<SnpInfo*> makeIncdSnpInfoVec(const vector<SnpInfo*> &snpInfoVec);
     vector<IndInfo*> makeKeptIndInfoVec(const vector<IndInfo*> &indInfoVec);
-    void getWindowInfo(const vector<SnpInfo*> &incdSnpInfoVec, const unsigned windowWidth, VectorXi &windStart, VectorXi &windSize);
-    void getNonoverlapWindowInfo(const unsigned windowWidth);
-    void buildSparseMME(const string &bedFile, const unsigned windowWidth);
-    void makeLDmatrix(const string &bedFile, const unsigned windowWidth, const string &filename);
-    void computeAlleleFreq(const MatrixXf &Z, vector<SnpInfo*> &incdSnpInfoVec, VectorXf &snp2pq);
-    void reindexSnp(vector<SnpInfo*> snpInfoVec);
-    void initVariances(const float heritability);
 
-    void outputSnpResults(const VectorXf &posteriorMean, const VectorXf &posteriorSqrMean, const VectorXf &pip, const string &filename) const;
-    void outputFixedEffects(const MatrixXf &fixedEffects, const string &filename) const;
-    void outputWindowResults(const VectorXf &posteriorMean, const string &filename) const;
-    void summarizeSnpResults(const SparseMatrix<float> &snpEffects, const string &filename) const;
-    void buildSparseMME(void);
-    void readMultiLDmatInfoFile(const string &mldmatFile);
+    void reindexSnp(vector<SnpInfo*> snpInfoVec);
     void readGroupFile(const string &groupFile);
 };
 

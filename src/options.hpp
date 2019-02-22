@@ -36,27 +36,14 @@ public:
     unsigned seed;
     unsigned numThread;
     unsigned mphen; // triat order id in the phenotype file for analysis
-    unsigned windowWidth; // in mega-base unit
     unsigned keepIndMax;  // the maximum number of individuals kept for analysis
-    unsigned snpFittedPerWindow;    // for BayesN
     unsigned thin;  // save every this th sampled value in MCMC
     unsigned includeChr;  // chromosome to include
-    
-    float probFixed;
-    float heritability;
-//    float varGenotypic;
-//    float varResidual;
     float varS; // prior variance of S in BayesS and BayesNS
     vector<float> S;    // starting value of S in BayesS and BayesNS
-    
 
-
-    bool estimatePi;
-    bool estimateScale;
-    bool writeBinPosterior;
     bool outputResults;
-    bool multiLDmat;
-    
+
 
     unsigned int numGroups;
     Eigen::MatrixXd mS;
@@ -77,9 +64,8 @@ public:
     string keepIndFile;
     string snpResFile;
     string mcmcSampleFile;
-    string gwasSummaryFile;
-    string ldmatrixFile;
-    
+
+
     Options(){
         chainLength             = 10000;
         burnin                  = 5000;
@@ -88,26 +74,17 @@ public:
         numThread               = 1;
         mphen                   = 1;
         keepIndMax              = UINT_MAX;
-        snpFittedPerWindow      = 2;
         thin                    = 5;
         includeChr              = 0;
-                
-        windowWidth             = Megabase;
-        probFixed               = 0.05;
-        heritability            = 0.5;
-//        varGenotypic            = 1.0;
-//        varResidual             = 1.0;
+
         varS                    = 1.0;
         S.resize(3);
         S[0]                    = 0.01;
         S[1]                    = 0.001;
         S[2]                    = 0.0001;
-        estimatePi              = true;
-        estimateScale           = false;
-        writeBinPosterior       = true;
+
         outputResults           = true;
-        multiLDmat              = false;
-        
+
         title                   = "brr";
         analysisType            = "Bayes";
         bayesType               = "C";
@@ -120,15 +97,12 @@ public:
         includeSnpFile          = "";
         excludeSnpFile          = "";
         keepIndFile             = "";
-        snpResFile              = "";
         mcmcSampleFile          = "bayesOutput.csv";
-        gwasSummaryFile         = "";
-        ldmatrixFile            = "";
         numGroups				=2;
     }
-    
+
     void inputOptions(const int argc, const char* argv[]);
-    
+
 private:
     void readFile(const string &file);
     void makeTitle(void);

@@ -846,20 +846,6 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
     }
 }
 
-void Data::initVariances(const float heritability){
-    float varPhenotypic;
-    if (myMPI::partition == "byrow") {
-        unsigned numKeptInds_all = 0;
-        MPI_Allreduce(&numKeptInds, &numKeptInds_all, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-        varPhenotypic = ypy/numKeptInds_all;
-    } else {
-        varPhenotypic = ypy/numKeptInds;
-    }
-    varGenotypic = varPhenotypic * heritability;
-    varResidual  = varPhenotypic - varGenotypic;
-    //cout <<varPhenotypic<<" " <<varGenotypic << " " <<varResidual << endl;
-}
-
 void Data::readCovariateFile(const string &covarFile){
     if (!covarFile.empty()) {
         ifstream in(covarFile.c_str());
@@ -991,8 +977,8 @@ void Data::includeMatchedSnp(){
     reindexSnp(snpInfoVec);  // reindex for MPI purpose in terms of full snplist
     fullSnpFlag.resize(numSnps);
     for (int i=0; i<numSnps; ++i) fullSnpFlag[i] = snpInfoVec[i]->included; // for output purpose
-    
-    
+
+
     if (myMPI::partition == "bycol") {  // MPI by chromosome
         vector<int> chromVec;
         for (set<int>::iterator it=chromosomes.begin(); it!=chromosomes.end(); ++it) {
@@ -1009,25 +995,25 @@ void Data::includeMatchedSnp(){
                 if (snp->chrom < chromVec[myMPI::rank]) snp->included = false;
             }
         }
-        
+
         incdSnpInfoVec = makeIncdSnpInfoVec(snpInfoVec);
         numIncdSnps = (unsigned) incdSnpInfoVec.size();
         snp2pq.resize(numIncdSnps);
-        
+
         // setup MPI for collecting SNP info
         myMPI::iSize = numIncdSnps;
         myMPI::iStart = incdSnpInfoVec[0]->index;
         myMPI::srcounts.resize(myMPI::clusterSize);
         myMPI::displs.resize(myMPI::clusterSize);
-        
+
         MPI_Allgather(&myMPI::iSize, 1, MPI_INT, &myMPI::srcounts[0], 1, MPI_INT, MPI_COMM_WORLD);
         MPI_Allgather(&myMPI::iStart, 1, MPI_INT, &myMPI::displs[0], 1, MPI_INT, MPI_COMM_WORLD);
 
-        
+
         reindexSnp(incdSnpInfoVec);  // reindex based on the snplist for each core
 
         //cout << "rank " << myMPI::rank << " " << myMPI::iStart << " " << myMPI::iSize << endl;
-        
+
         unsigned numIncdSnps_all;
         MPI_Reduce(&numIncdSnps, &numIncdSnps_all, 1, MPI_UNSIGNED, MPI_SUM, 0, MPI_COMM_WORLD);
         if (myMPI::rank==0) cout << numIncdSnps_all << " SNPs are included." << endl;
@@ -1041,7 +1027,7 @@ void Data::includeMatchedSnp(){
         reindexSnp(incdSnpInfoVec);
         snp2pq.resize(numIncdSnps);
     }
-    
+
     map<int, vector<SnpInfo*> > chrmap;
     map<int, vector<SnpInfo*> >::iterator it;
     for (unsigned i=0; i<numIncdSnps; ++i) {
@@ -1079,7 +1065,6 @@ vector<SnpInfo*> Data::makeIncdSnpInfoVec(const vector<SnpInfo*> &snpInfoVec){
     }
     return includedSnps;
 }
-
 vector<IndInfo*> Data::makeKeptIndInfoVec(const vector<IndInfo*> &indInfoVec){
     vector<IndInfo*> keptInds;
     keptInds.reserve(numInds);
@@ -1093,385 +1078,6 @@ vector<IndInfo*> Data::makeKeptIndInfoVec(const vector<IndInfo*> &indInfoVec){
     }
     return keptInds;
 }
-
-void Data::computeAlleleFreq(const MatrixXf &Z, vector<SnpInfo*> &incdSnpInfoVec, VectorXf &snp2pq){
-    if (myMPI::rank==0)
-        cout << "Computing allele frequencies ..." << endl;
-    snp2pq.resize(numIncdSnps);
-    SnpInfo *snp = NULL;
-    for (unsigned i=0; i<numIncdSnps; ++i) {
-        snp = incdSnpInfoVec[i];
-        snp->af = 0.5f*Z.col(i).mean();
-        snp2pq[i] = 2.0f*snp->af*(1.0f-snp->af);
-    }
-}
-
-void Data::getWindowInfo(const vector<SnpInfo*> &incdSnpInfoVec, const unsigned windowWidth, VectorXi &windStart, VectorXi &windSize){
-    if (myMPI::rank==0)
-        cout << "Creating windows (window width: " + to_string(static_cast<long long>(windowWidth/1e6)) + "Mb) ..." << endl;
-    int i=0, j=0;
-    windStart.setZero(numIncdSnps);
-    windSize.setZero(numIncdSnps);
-    SnpInfo *snpi, *snpj;
-    for (i=0; i<numIncdSnps; ++i) {
-        snpi = incdSnpInfoVec[i];
-        snpi->resetWindow();
-        for (j=i; j>=0; --j) {
-            snpj = incdSnpInfoVec[j];
-            if (snpi->isProximal(*snpj, windowWidth/2)) {
-                snpi->windStart = snpj->index;
-                snpi->windSize++;
-            } else break;
-        }
-        for (j=i+1; j<numIncdSnps; ++j) {
-            snpj = incdSnpInfoVec[j];
-            if (snpi->isProximal(*snpj, windowWidth/2)) {
-                snpi->windSize++;
-            } else break;
-        }
-        if(!(i%10000) && myMPI::rank==0)
-            cout << "SNP " << i << " Window Size " << snpi->windSize << endl;
-        if (!snpi->windSize) {
-            throw("Error: SNP " + snpi->ID + " has zero SNPs in its window!");
-        }
-        windStart[i] = snpi->windStart;
-        windSize [i] = snpi->windSize;
-    }
-}
-
-void Data::getNonoverlapWindowInfo(const unsigned windowWidth){
-    unsigned window = 0;
-    unsigned currChr = incdSnpInfoVec[0]->chrom;
-    unsigned long startPos = incdSnpInfoVec[0]->physPos;
-    vector<int> windStartVec = {0};
-    SnpInfo *snp;
-    for (unsigned i=0; i<numIncdSnps; ++i) {
-        snp = incdSnpInfoVec[i];
-        if (snp->physPos - startPos > windowWidth || snp->chrom > currChr) {
-            currChr = snp->chrom;
-            startPos = snp->physPos;
-            windStartVec.push_back(i);
-            ++window;
-        }
-        snp->window = window;
-    }
-    
-    long numberWindows = windStartVec.size();
-
-    windStart = VectorXi::Map(&windStartVec[0], numberWindows);
-    windSize.setZero(numberWindows);
-
-    for (unsigned i=0; i<numberWindows; ++i) {
-        if (i != numberWindows-1)
-            windSize[i] = windStart[i+1] - windStart[i];
-        else
-            windSize[i] = numIncdSnps - windStart[i];
-    }
-    
-    if (myMPI::rank==0)
-        cout << "Created " << numberWindows << " non-overlapping " << windowWidth/1e3 << "kb windows with average size of " << windSize.sum()/float(numberWindows) << " SNPs." << endl;
-}
-
-void Data::outputSnpResults(const VectorXf &posteriorMean, const VectorXf &posteriorSqrMean, const VectorXf &pip, const string &filename) const {
-    if (myMPI::rank) return;
-    ofstream out(filename.c_str());
-    out << boost::format("%6s %20s %6s %12s %8s %12s %12s %8s %8s\n")
-        % "Id"
-        % "Name"
-        % "Chrom"
-        % "Position"
-        % "GeneFrq"
-        % "Effect"
-        % "SE"
-        % "PIP"
-        % "Window";
-    for (unsigned i=0, idx=0; i<numSnps; ++i) {
-        SnpInfo *snp = snpInfoVec[i];
-        if(!fullSnpFlag[i]) continue;
-        if(snp->isQTL) continue;
-        out << boost::format("%6s %20s %6s %12s %8.6f %12.6f %12.6f %8.3f %8s\n")
-            % (idx+1)
-            % snp->ID
-            % snp->chrom
-            % snp->physPos
-            % snp->af
-            % posteriorMean[idx]
-            % sqrt(posteriorSqrMean[idx]-posteriorMean[idx]*posteriorMean[idx])
-            % pip[idx]
-            % snp->window;
-        ++idx;
-    }
-    out.close();
-}
-
-void Data::outputWindowResults(const VectorXf &posteriorMean, const string &filename) const {
-    if (myMPI::rank) return;
-    ofstream out(filename.c_str());
-    out << boost::format("%6s %8s\n") %"Id" %"PIP";
-    for (unsigned i=0; i<posteriorMean.size(); ++i) {
-        out << boost::format("%6s %8.3f\n")
-            % (i+1)
-            % posteriorMean[i];
-    }
-    out.close();
-}
-
-void Data::readGwasSummaryFile(const string &gwasFile){
-    ifstream in(gwasFile.c_str());
-    if (!in) throw ("Error: can not open the GWAS summary data file [" + gwasFile + "] to read.");
-    if (myMPI::rank==0)
-        cout << "Reading GWAS summary data from [" + gwasFile + "]." << endl;
-    
-    SnpInfo *snp;
-    map<string, SnpInfo*>::iterator it;
-    string id, allele1, allele2, freq, b, se, pval, n;
-    unsigned line=0, match=0;
-    while (in >> id >> allele1 >> allele2 >> freq >> b >> se >> pval >> n) {
-        ++line;
-        it = snpInfoMap.find(id);
-        if (it == snpInfoMap.end()) continue;
-        snp = it->second;
-        if (!snp->included) continue;
-        if (allele1 == snp->a1 && allele2 == snp->a2) {
-            snp->gwas_b  = atof(b.c_str());
-            snp->gwas_af = atof(freq.c_str());
-        } else if (allele1 == snp->a2 && allele2 == snp->a1) {
-            snp->gwas_b  = -atof(b.c_str());
-            snp->gwas_af = 1.0-atof(freq.c_str());
-        } else {
-            throw("Error: SNP " + id + " has inconsistent allele coding in between the reference and GWAS samples.");
-        }
-        snp->gwas_se = atof(se.c_str());
-        snp->gwas_n  = atof(n.c_str());
-        ++match;
-    }
-    in.close();
-    
-    for (unsigned i=0; i<numSnps; ++i) {
-        snp = snpInfoVec[i];
-        if (!snp->included) continue;
-        if (snp->gwas_b == -999) {
-            snp->included = false;
-        }
-    }
-
-    if (myMPI::rank==0)
-        cout << match << " matched SNPs in the GWAS summary data (in total " << line << " SNPs)." << endl;
-
-}
-
-void Data::readLDmatrixInfoFile(const string &ldmatrixFile){
-    ifstream in(ldmatrixFile.c_str());
-    if (!in) throw ("Error: can not open the file [" + ldmatrixFile + "] to read.");
-    cout << "Reading SNP info from [" + ldmatrixFile + "]." << endl;
-    //snpInfoVec.clear();
-    //snpInfoMap.clear();
-    string id, allele1, allele2;
-    unsigned chr, physPos;
-    float genPos;
-    unsigned idx, windStart, windSize;
-    while (in >> chr >> id >> genPos >> physPos >> allele1 >> allele2 >> idx >> windStart >> windSize) {
-        SnpInfo *snp = new SnpInfo(idx, id, allele1, allele2, chr, genPos, physPos);
-        snp->windStart = windStart;
-        snp->windSize = windSize;
-        snpInfoVec.push_back(snp);
-        if (snpInfoMap.insert(pair<string, SnpInfo*>(id, snp)).second == false) {
-            throw ("Error: Duplicate SNP ID found: \"" + id + "\".");
-        }
-    }
-    in.close();
-    numSnps = (unsigned) snpInfoVec.size();
-    cout << numSnps << " SNPs to be included from [" + ldmatrixFile + "]." << endl;
-}
-
-void Data::readLDmatrixInfoFile(const string &ldmatrixFile, vector<SnpInfo*> &vec){
-    ifstream in(ldmatrixFile.c_str());
-    if (!in) throw ("Error: can not open the file [" + ldmatrixFile + "] to read.");
-    cout << "Reading SNP info from [" + ldmatrixFile + "]." << endl;
-    string id, allele1, allele2;
-    unsigned chr, physPos;
-    float genPos;
-    unsigned idx, windStart, windSize;
-    while (in >> chr >> id >> genPos >> physPos >> allele1 >> allele2 >> idx >> windStart >> windSize) {
-        SnpInfo *snp = new SnpInfo(idx, id, allele1, allele2, chr, genPos, physPos);
-        snp->windStart = windStart;
-        snp->windSize = windSize;
-        snpInfoVec.push_back(snp);
-        if (snpInfoMap.insert(pair<string, SnpInfo*>(id, snp)).second == false) {
-            throw ("Error: Duplicate SNP ID found: \"" + id + "\".");
-        }
-        vec.push_back(snp);
-    }
-    in.close();
-    numSnps = (unsigned) snpInfoVec.size();
-    cout << numSnps << " SNPs to be included from [" + ldmatrixFile + "]." << endl;
-}
-
-void Data::readLDmatrixBinFile(const string &ldmatrixFile){
-    
-    VectorXi windStartLDM(numSnps);
-    VectorXi windSizeLDM(numSnps);
-    
-    windStart.resize(numIncdSnps);
-    windSize.resize(numIncdSnps);
-    
-    SnpInfo *snpi, *snpj;
-    
-    for (unsigned i=0, inci=0; i<numSnps; ++i) {
-        SnpInfo *snpi = snpInfoVec[i];
-        windStartLDM[i] = snpi->windStart;
-        windSizeLDM[i]  = snpi->windSize;
-        //        if (snpi->included) {
-        //            int windStarti=0, windSizei=0;
-        //            for (unsigned j=0, incj=0; j<snpi->windSize; ++j) {
-        //                snpj = snpInfoVec[snpi->windStart+j];
-        //                if (snpj->included) {
-        //                    if (!incj) windStarti = snpj->index;
-        //                    ++incj;
-        //                    ++windSizei;
-        //                }
-        //            }
-        //            snpi->windStart = windStart[inci] = windStarti;
-        //            snpi->windSize  = windSize [inci] = windSizei;
-        //            ++inci;
-        //        } else {
-        //            snpi->windStart = -1;
-        //            snpi->windSize  = 0;
-        //        }
-    }
-    
-    //    cout << "windStartLDM " << windStartLDM.transpose() << endl;
-    //    cout << "windSizeLDM " << windSizeLDM.transpose() << endl;
-    //    cout << "windStart " << windStart.transpose() << endl;
-    //    cout << "windSize " << windSize.transpose() << endl;
-
-    FILE *in = fopen(ldmatrixFile.c_str(), "rb");
-    if (!in) {
-        throw("Error: cannot open LD matrix file " + ldmatrixFile);
-    }
-    float windowWidth;
-    fread(&windowWidth, sizeof(float), 1, in);
-    
-    getWindowInfo(incdSnpInfoVec, windowWidth*1e6, windStart, windSize);
-    
-    if (numIncdSnps == 0) throw ("Error: No SNP is retained for analysis.");
-    
-    cout << "Reading LD matrix from [" + ldmatrixFile + "]..." << endl;
-    
-    ZPZ.resize(numIncdSnps);
-    for (unsigned i=0; i<numIncdSnps; ++i) {
-        ZPZ[i].resize(windSize[i]);
-    }
-
-    Gadget::Timer timer;
-    timer.setTime();
-    
-    for (unsigned i = 0, inci = 0; i < numSnps; i++) {
-        snpi = snpInfoVec[i];
-        
-        float v[windSizeLDM[i]];
-        
-        if (!snpi->included) {
-            fseek(in, sizeof(v), SEEK_CUR);
-            continue;
-        }
-        
-        fread(v, sizeof(v), 1, in);
-
-        for (unsigned j = 0, incj = 0; j<windSizeLDM[i]; ++j) {
-            snpj = snpInfoVec[windStartLDM[i]+j];
-            //if (inci==0) cout << inci << " " << j << " " << ZPZ[inci].size() << " " << windStartLDM[i] << " " << windSizeLDM[i] << " " << windSize[inci] << " " << v[j] << " " << snpj->included << endl;
-            if (snpj->included) {
-                //cout << inci << " " << incj << " " << ZPZ[inci].size() << " " << windStartLDM[i] << " " << windSizeLDM[i] << " " << windSize[inci] << " " << v[j] << endl;
-                ZPZ[inci][incj++] = v[j];
-            }
-        }
-        
-        if (inci++ == numIncdSnps) break;
-    }
-    
-    fclose(in);
-    
-    timer.getTime();
-    
-    cout << "Window width " << windowWidth << " Mb." << endl;
-    cout << "Average window size " << windSize.sum()/numIncdSnps << "." << endl;
-    cout << "Read LD matrix for " << numIncdSnps << " SNPs (time used: " << timer.format(timer.getElapse()) << ")." << endl;
-}
-
-void Data::buildSparseMME(){
-    snp2pq.resize(numIncdSnps);
-    D.resize(numIncdSnps);
-    ZPZdiag.resize(numIncdSnps);
-    ZPy.resize(numIncdSnps);
-    b.resize(numIncdSnps);
-    n.resize(numIncdSnps);
-    se.resize(numIncdSnps);
-    tss.resize(numIncdSnps);
-    SnpInfo *snp;
-    for (unsigned i=0; i<numIncdSnps; ++i) {
-        snp = incdSnpInfoVec[i];
-        snp->af = snp->gwas_af;
-        snp2pq[i] = 2.0f*snp->gwas_af*(1.0f-snp->gwas_af);
-        D[i] = snp2pq[i]*snp->gwas_n;
-        b[i] = snp->gwas_b;
-        n[i] = snp->gwas_n;
-        se[i]= snp->gwas_se;
-        tss[i] = D[i]*(n[i]*se[i]*se[i] + b[i]*b[i]);
-    }
-    
-    for (unsigned i=0; i<numIncdSnps; ++i) {
-        snp = incdSnpInfoVec[i];
-        for (unsigned j=0; j<snp->windSize; ++j) {
-            ZPZ[i][j] *= sqrt(D[i]*D[snp->windStart+j]);
-        }
-        //ZPZdiag[i] = ZPZ[i][i-snp->windStart];
-    }
-    ZPZdiag = D;
-    
-    //b.array() -= b.mean();
-    ZPy.array() = D.array()*b.array();
-    
-    //    cout << "ZPZdiag " << ZPZdiag.transpose() << endl;
-    //    cout << "ZPZ.back() " << ZPZ.back().transpose() << endl;
-    //    cout << "ZPZ.front() " << ZPZ.front().transpose() << endl;
-    //    cout << "ZPy " << ZPy.head(100).transpose() << endl;
-    //    cout << "b.mean() " << b.mean() << endl;
-    
-    // estimate ypy
-    ypy = (D.array()*(n.array()*se.array().square()+b.array().square())).mean();
-    numKeptInds = n.mean();
-    
-    //cout << ZPZ.size() << " " << ZPy.size() << " " << ypy << endl;
-    //    cout << ZPy << endl;
-    //    for (unsigned i=0; i<numIncdSnps; ++i) {
-    //        cout << D[i] << "\t" << ZPZdiag[i] << endl;
-    //    }
-    //    
-    //    cout << ZPZ << endl;
-    
-    // no fixed effects
-    numFixedEffects = 0;
-    fixedEffectNames.resize(0);
-    XPX.resize(0,0);
-    ZPX.resize(0,0);
-    XPy.resize(0);
-}
-
-void Data::readMultiLDmatInfoFile(const string &mldmatFile){
-    ifstream in(mldmatFile.c_str());
-    if (!in) throw ("Error: can not open the file [" + mldmatFile + "] to read.");
-    cout << "Reading SNP info from [" + mldmatFile + "]..." << endl;
-    
-    string inputStr;
-    while (getline(in, inputStr)) {
-        vector<SnpInfo*> vec;
-        readLDmatrixInfoFile(inputStr+".info", vec);
-        //        numSnpMldVec.push_back(numSnps);
-        mldmVec.push_back(vec);
-    }
-}
-
 
 //TODO Finish function to read the group file
 void Data::readGroupFile(const string &groupFile) {
@@ -1490,87 +1096,6 @@ void Data::readGroupFile(const string &groupFile) {
         cout << "Groups read from file" << endl;
 }
 
-
-//void Data::readMultiLDmatBinFile(const string &mldmatFile){
-//    ifstream in1(mldmatFile.c_str());
-//    if (!in1) throw ("Error: can not open the file [" + mldmatFile + "] to read.");
-//    cout << "Reading LD matrices from [" + mldmatFile + "]..." << endl;
-//    
-//    VectorXi windStartLDM(numSnps);
-//    VectorXi windSizeLDM(numSnps);
-//    
-//    for (unsigned i=0; i<numSnps; ++i) {
-//        SnpInfo *snp = snpInfoVec[i];
-//        windStartLDM[i] = snp->windStart;
-//        windSizeLDM[i] = snp->windSize;
-//    }
-//    
-//    Gadget::Timer timer;
-//    timer.setTime();
-//    
-//    string filename;
-//    float windowWidth=0;
-//    unsigned i=0, incj=0;
-//    while (getline(in1, filename)) {
-//        FILE *in2 = fopen((filename+".bin").c_str(), "rb");
-//        if (!in2) {
-//            throw("Error: cannot open LD matrix file " + filename + ".bin");
-//        }
-//        if (i==0) {
-//            fread(&windowWidth, sizeof(float), 1, in2);
-//            getWindowInfo(incdSnpInfoVec, windowWidth*1e6, windStart, windSize);
-////                cout << "windStart " << windStart.transpose() << endl;
-////                cout << "windSize " << windSize.transpose() << endl;
-//            ZPZ.resize(numIncdSnps);
-//            for (unsigned j=0; j<numIncdSnps; ++j) {
-//                ZPZ[j].resize(windSize[j]);
-//            }
-//        } else {
-//            float ww;
-//            fread(&ww, sizeof(float), 1, in2);
-//            if (ww!=windowWidth) {
-//                throw("Error: LD matrix file [" + filename + "] has a different window width (" + to_string(static_cast<long long>(ww/1e6))
-//                      + "Mb) than others (" + to_string(static_cast<long long>(windowWidth/1e6)) + "Mb)");
-//            }
-//        }
-//        
-//        SnpInfo *snpj = NULL;
-//        SnpInfo *snpk = NULL;
-//        unsigned start = 0;
-//        if (i>0) start = numSnpMldVec[i-1];
-//        
-//        for (unsigned j = start; j < numSnpMldVec[i]; j++) {
-//            snpj = snpInfoVec[j];
-//            
-//            float v[windSizeLDM[j]];
-//            fread(v, sizeof(v), 1, in2);
-//            
-//            if (!snpj->included) continue;
-//
-////            cout << windStartLDM[j] << " " << j << " " << snpInfoVec[j]->included << endl;
-//            for (unsigned k = 0, inck = 0; k<windSizeLDM[j]; ++k) {
-//                snpk = snpInfoVec[start+windStartLDM[j]+k];
-//                //if (incj==50 || incj==51) cout << incj << " " << k << " " << ZPZ[incj].size() << " " << start+windStartLDM[j] << " " << windSizeLDM[j] << " " << windSize[incj] << " " << v[k] << " " << snpk->included << endl;
-//                if (snpk->included) {
-//                    //cout << incj << " " << inck << " " << ZPZ[incj].size() << " " << start+windStartLDM[j] << " " << windSizeLDM[j] << " " << windSize[incj] << " " << v[k] << endl;
-//                    ZPZ[incj][inck++] = v[k];
-//                }
-//            }
-//            ++incj;
-//        }
-//        
-//        fclose(in2);
-//        cout << "Read LD matrix for " << numSnpMldVec[i] - start << " SNPs from [" << filename << "]." << endl;
-//        ++i;
-//    }
-//    
-//    timer.getTime();
-//    
-//    cout << "Window width " << windowWidth << " Mb." << endl;
-//    cout << "Average window size " << windSize.sum()/numIncdSnps << "." << endl;
-//    cout << "Read LD matrix for " << numIncdSnps << " SNPs (time used: " << timer.format(timer.getElapse()) << ")." << endl;
-//    
-//}
 
 void Data::getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, double * __restrict__ snpDat) {
 

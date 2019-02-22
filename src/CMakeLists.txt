@@ -43,6 +43,7 @@ add_executable(${PROJECT_NAME}
     gctb.cpp
     mympi.cpp
     options.cpp
+    
 )
 target_link_libraries(${PROJECT_NAME} ${MPI_LIBRARIES})
 
