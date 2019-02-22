@@ -49,10 +49,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
 			phenotypeFile = argv[++i];
 			ss << "--pheno " << argv[i] << "\n";
 		}
-		else if (!strcmp(argv[i], "--mpheno")) {
-			mphen = atoi(argv[++i]);
-			ss << "--mpheno " << mphen << "\n";
-		}
 		else if (!strcmp(argv[i], "--keep")) {
 			keepIndFile = argv[++i];
 			ss << "--keep " << argv[i] << "\n";
@@ -163,12 +159,8 @@ void Options::readFile(const string &file){  // input options from file
 			bedFile = value;
 		} else if (key == "phenotypeFile") {
 			phenotypeFile = value;
-		} else if (key == "mpheno") {
-			mphen = stoi(value);
 		} else if (key == "bedFile") {
 			bedFile = value;
-		} else if (key == "covariateFile") {
-			covariateFile = value;
 		} else if (key == "includeChr") {
 			includeChr = stoi(value);
 		} else if (key == "keepIndFile") {

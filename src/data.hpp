@@ -181,7 +181,7 @@ public:
     void getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, double   *snpDat);
     void getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, VectorXd &snpDat);
 
-    void readPhenotypeFile(const string &phenFile, const unsigned mphen);
+    void readPhenotypeFile(const string &phenFile);
     void readCovariateFile(const string &covarFile);
     void keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax);
     void includeSnp(const string &includeSnpFile);
