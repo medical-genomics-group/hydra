@@ -163,8 +163,6 @@ void Options::readFile(const string &file){  // input options from file
 			mphen = stoi(value);
 		} else if (key == "bedFile") {
 			bedFile = value;
-		} else if (key == "covariateFile") {
-			covariateFile = value;
 		} else if (key == "includeChr") {
 			includeChr = stoi(value);
 		} else if (key == "keepIndFile") {

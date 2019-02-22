@@ -24,16 +24,10 @@ public:
     GCTB(Options &options): opt(options){};
     
     void inputIndInfo(Data &data, const string &bedFile, const string &phenotypeFile, const string &keepIndFile,
-                      const unsigned keepIndMax, const unsigned mphen, const string &covariateFile);
+                      const unsigned keepIndMax, const unsigned mphen);
     void inputSnpInfo(Data &data, const string &bedFile, const string &includeSnpFile, const string &excludeSnpFile,
                       const unsigned includeChr, const bool readGenotypes);
-    void inputSnpInfo(Data &data, const string &includeSnpFile, const string &excludeSnpFile,
-                      const string &gwasSummaryFile, const string &ldmatrixFile, const unsigned includeChr, const bool multiLDmatrix);
 
-    void inputSnpResults(Data &data, const string &snpResFile);
-    void predict(const Data &data, const string &filename);
-
-    void clearGenotypes(Data &data);
 };
 
 #endif /* amber_hpp */

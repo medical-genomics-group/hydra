@@ -248,6 +248,7 @@ void Data::readBimFile(const string &bimFile) {
 
 //EO: Method to get a specific SNP data from a bed file using mmap
 //----------------------------------------------------------------
+
 void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint snpInd, VectorXf &snpData) {
 
     struct stat sb;
@@ -385,10 +386,10 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
     if (close(fd) == -1)
         handle_error("closing bedFile");
 
-    /*
-    if (snpInd%100 == 0)
-        printf("MARKER %6d mean = %12.7f computed on %6d with %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
-    */
+
+    //if (snpInd%100 == 0)
+     //   printf("MARKER %6d mean = %12.7f computed on %6d with %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
+
  
     snpData.array() -= mean;
 
@@ -401,6 +402,7 @@ void Data::getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const si
     ZPZdiag[snpInd]  = (float(numKeptInds)-1.0);
     //ZPZdiag[snpInd]  =snpData.squaredNorm() ;
 }
+
 
 void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint snpInd, VectorXf &snpData) {
 
@@ -482,10 +484,10 @@ void Data::getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t sn
     if (close(fd) == -1)
         handle_error("closing bedFile");
 
-    /*
-    if (snpInd%100 == 0)
-        printf("MARKER %6d mean = %12.7f computed on %6d with %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
-    */
+
+    //if (snpInd%100 == 0)
+    //    printf("MARKER %6d mean = %12.7f computed on %6d with %6d elements (%d - %d)\n", snpInd, mean, sumi, numKeptInds-nmiss, numKeptInds, nmiss);
+
 
     snpData.array() -= mean;
 
@@ -842,82 +844,6 @@ void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){
         
         if (myMPI::rank==0) {
             cout << numKeptInds << " matched individuals are kept." << endl;
-        }
-    }
-}
-
-void Data::readCovariateFile(const string &covarFile){
-    if (!covarFile.empty()) {
-        ifstream in(covarFile.c_str());
-        if (!in) throw ("Error: can not open the file [" + covarFile + "] to read.");
-        map<string, IndInfo*>::iterator it, end=indInfoMap.end();
-        IndInfo *ind = NULL;
-        Gadget::Tokenizer colData;
-        string inputStr;
-        string sep(" \t");
-        string id;
-        unsigned line=0;
-        unsigned numCovariates=0;
-        while (getline(in,inputStr)) {
-            colData.getTokens(inputStr, sep);
-            if (line==0) {
-                numCovariates = (unsigned)colData.size() - 2;
-                numFixedEffects = numCovariates + 1;
-                fixedEffectNames.resize(numFixedEffects);
-                fixedEffectNames[0] = "Intercept";
-                for (unsigned i=0; i<numCovariates; ++i)
-                    fixedEffectNames[i+1] = colData[i+2];
-            }
-            id = colData[0] + ":" + colData[1];
-            it = indInfoMap.find(id);
-            if (it != end) {
-                ind = it->second;
-                ind->covariates.resize(numCovariates + 1);  // plus intercept
-                ind->covariates[0] = 1;
-                for (unsigned i=2; i<colData.size(); ++i) {
-                    ind->covariates[i-1] = atof(colData[i].c_str());
-                }
-                ++line;
-            }
-        }
-        in.close();
-        
-        if (myMPI::rank==0)
-            cout << "Read " << numCovariates << " covariates from [" + covarFile + "]." << endl;
-        
-        X.resize(numKeptInds, numFixedEffects);
-        for (unsigned i=0; i<numKeptInds; ++i) {
-            X.row(i) = keptIndInfoVec[i]->covariates;
-        }
-        VectorXf my_XPXdiag = X.colwise().squaredNorm();
-        XPXdiag.setZero(numFixedEffects);
-        MPI_Allreduce(&my_XPXdiag[0], &XPXdiag[0], numFixedEffects, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-    }
-    else {
-        // only intercept for now
-        numFixedEffects = 1;
-        fixedEffectNames = {"Intercept"};
-        X.setOnes(numKeptInds,1);
-        XPX.resize(1,1);
-        XPXdiag.resize(1);
-        XPy.resize(1);
-        
-        if (myMPI::partition == "byrow") {
-            unsigned numKeptInds_all;
-            MPI_Allreduce(&numKeptInds, &numKeptInds_all, 1, MPI_UNSIGNED, MPI_SUM, MPI_COMM_WORLD);
-            
-            XPX << numKeptInds_all;
-            XPXdiag << numKeptInds_all;
-            
-            float sum = y.sum();
-            unsigned sum_all;
-            MPI_Allreduce(&sum, &sum_all, 1, MPI_FLOAT, MPI_SUM, MPI_COMM_WORLD);
-            XPy << sum_all;
-        }
-        else {
-            XPX << numKeptInds;
-            XPXdiag << numKeptInds;
-            XPy << y.sum();
         }
     }
 }

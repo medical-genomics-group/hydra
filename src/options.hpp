@@ -56,7 +56,6 @@ public:
     string algorithm;
     string optionFile;
     string phenotypeFile;
-    string covariateFile;
     string bedFile;
     string alleleFreqFile;
     string includeSnpFile;
@@ -91,7 +90,6 @@ public:
         algorithm               = "";
         optionFile              = "";
         phenotypeFile           = "";
-        covariateFile           = "";
         bedFile                 = "";
         alleleFreqFile          = "";
         includeSnpFile          = "";
