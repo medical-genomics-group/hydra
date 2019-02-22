@@ -24,7 +24,7 @@ public:
     GCTB(Options &options): opt(options){};
     
     void inputIndInfo(Data &data, const string &bedFile, const string &phenotypeFile, const string &keepIndFile,
-                      const unsigned keepIndMax, const unsigned mphen);
+                      const unsigned keepIndMax);
     void inputSnpInfo(Data &data, const string &bedFile, const string &includeSnpFile, const string &excludeSnpFile,
                       const unsigned includeChr, const bool readGenotypes);
 

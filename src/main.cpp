@@ -65,8 +65,7 @@ int main(int argc, const char * argv[]) {
       clock_t start = clock();
 
       readGenotypes = false;
-      gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
-            opt.mphen);
+      gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax);
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
             opt.includeChr, readGenotypes);
 
@@ -88,8 +87,7 @@ int main(int argc, const char * argv[]) {
         //clock_t start = clock();
 
       readGenotypes = false;
-      gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
-            opt.mphen);
+      gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax);
       gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
             opt.includeChr, readGenotypes);
 
@@ -107,8 +105,7 @@ int main(int argc, const char * argv[]) {
 
     } else if (opt.analysisType == "Preprocess") {
         readGenotypes = false;
-        gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
-                          opt.mphen);
+        gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax);
         gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
                           opt.includeChr, readGenotypes);
 
@@ -122,8 +119,7 @@ int main(int argc, const char * argv[]) {
         clock_t start = clock();
 
         readGenotypes = false;
-        gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax,
-                          opt.mphen);
+        gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax);
         gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
                           opt.includeChr, readGenotypes);
 

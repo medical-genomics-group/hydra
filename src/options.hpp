@@ -35,7 +35,6 @@ public:
     unsigned outputFreq;
     unsigned seed;
     unsigned numThread;
-    unsigned mphen; // triat order id in the phenotype file for analysis
     unsigned keepIndMax;  // the maximum number of individuals kept for analysis
     unsigned thin;  // save every this th sampled value in MCMC
     unsigned includeChr;  // chromosome to include
@@ -71,7 +70,6 @@ public:
         outputFreq              = 100;
         seed                    = static_cast<unsigned int>(std::time(0));
         numThread               = 1;
-        mphen                   = 1;
         keepIndMax              = UINT_MAX;
         thin                    = 5;
         includeChr              = 0;

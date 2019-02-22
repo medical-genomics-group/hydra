@@ -706,7 +706,7 @@ void Data::readBedFile(const string &bedFile){
         cout << "Genotype data for " << numKeptInds_all << " individuals and " << numIncdSnps << " SNPs are included from [" + bedFile + "]." << endl;
 }
 
-void Data::readPhenotypeFile(const string &phenFile, const unsigned mphen) {
+void Data::readPhenotypeFile(const string &phenFile) {
     // NA: missing phenotype
     ifstream in(phenFile.c_str());
     if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
@@ -723,16 +723,15 @@ void Data::readPhenotypeFile(const string &phenFile, const unsigned mphen) {
         colData.getTokens(inputStr, sep);
         id = colData[0] + ":" + colData[1];
         it = indInfoMap.find(id);
-        if (it != end && colData[mphen+1] != "NA") {
+        // First one corresponded to mphen variable (1+1)
+        if (it != end && colData[1+1] != "NA") {
             ind = it->second;
-            ind->phenotype = atof(colData[mphen+1].c_str());
+            ind->phenotype = atof(colData[1+1].c_str());
             ++line;
         }
     }
     in.close();
-    if (myMPI::rank==0)
-        cout << "Non-missing phenotypes of trait " << mphen << " of " << line << " individuals are included from [" + phenFile + "]." << endl;
-}
+    }
 
 void Data::keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax){  // keepIndFile is optional
     map<string, IndInfo*>::iterator it, end=indInfoMap.end();

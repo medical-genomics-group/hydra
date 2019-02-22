@@ -8,9 +8,9 @@
 
 #include "gctb.hpp"
 
-void GCTB::inputIndInfo(Data &data, const string &bedFile, const string &phenotypeFile, const string &keepIndFile, const unsigned keepIndMax, const unsigned mphen){
+void GCTB::inputIndInfo(Data &data, const string &bedFile, const string &phenotypeFile, const string &keepIndFile, const unsigned keepIndMax){
     data.readFamFile(bedFile + ".fam");
-    data.readPhenotypeFile(phenotypeFile, mphen);
+    data.readPhenotypeFile(phenotypeFile);
     data.keepMatchedInd(keepIndFile, keepIndMax);
 }
 
