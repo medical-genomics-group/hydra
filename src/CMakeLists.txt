@@ -34,13 +34,12 @@ add_executable(${PROJECT_NAME}
     main.cpp
     BayesRRm.cpp
     data.cpp
+    mympi.cpp
     distributions_boost.cpp
     gadgets.cpp
-    mympi.cpp
     options.cpp
     samplewriter.cpp
-    compression.cpp
-    
+    compression.cpp    
 )
 target_link_libraries(${PROJECT_NAME} ${MPI_LIBRARIES})
 

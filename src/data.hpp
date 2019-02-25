@@ -19,9 +19,9 @@
 #include <Eigen/Eigen>
 #include <Eigen/Sparse>
 #include <boost/format.hpp>
-#include <mpi.h>
 #include "gadgets.hpp"
-#include "mympi.hpp"
+#include <mpi.h>
+#include <mympi.hpp>
 
 using namespace std;
 using namespace Eigen;
@@ -57,16 +57,6 @@ public:
     };
 
     void resetWindow(void) {windStart = -1; windSize = 0;};
-};
-
-class ChromInfo {
-public:
-    const int id;
-    const unsigned size;
-    const int startSnpIdx;
-    const int endSnpIdx;
-
-    ChromInfo(const int id, const unsigned size, const int startSnp, const int endSnp): id(id), size(size), startSnpIdx(startSnp), endSnpIdx(endSnp){}
 };
 
 class IndInfo {
