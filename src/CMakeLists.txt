@@ -36,7 +36,6 @@ add_executable(${PROJECT_NAME}
     data.cpp
     distributions_boost.cpp
     gadgets.cpp
-    gctb.cpp
     mympi.cpp
     options.cpp
     samplewriter.cpp

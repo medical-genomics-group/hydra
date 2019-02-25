@@ -39,7 +39,8 @@ BayesRRm::~BayesRRm()
 
 void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCount)
 {
-    // Component variables
+
+// Component variables
     priorPi = VectorXd(K);      // prior probabilities for each component
     pi = VectorXd(K);           // mixture probabilities
     cVa = VectorXd(K);          // component-specific variance
@@ -91,8 +92,9 @@ void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCoun
 int BayesRRm::runGibbs()
 {
 
-    const unsigned int M(data.numIncdSnps);
-    const unsigned int N(data.numKeptInds);
+
+    const unsigned int M(data.numSnps);
+    const unsigned int N(data.numInds);
     const double NM1 = double(N - 1);
     const int K(int(cva.size()) + 1);
     const int km1 = K - 1;
@@ -134,15 +136,13 @@ int BayesRRm::runGibbs()
         // This for should not be parallelized, resulting chain would not be ergodic, still, some times it may converge to the correct solution
         for (unsigned int j = 0; j < M; j++) {
 
-
             double acum = 0.0;
             const auto marker = markerI[j];
             double beta_old=beta(marker);
 
-            // TODO: Can we improve things by decompressing a compressed mmap datafile?
-            //Cx = getSnpData(marker);
-             	Cx = getSnpData(marker);
 
+            Cx = getSnpData(marker);
+            //cout<<"second"<<endl;
             // Now y_tilde = Y-mu - X * beta + X.col(marker) * beta(marker)_old
             if(components(marker)!=0){
 
@@ -245,22 +245,16 @@ int BayesRRm::runGibbs()
 
 VectorXd BayesRRm::getSnpData(unsigned int marker) const
 {
-    if (!usePreprocessedData) {
-        // Compute the SNP data length in bytes
-        const size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
-
-        // I use a temporary variable to do the cast, there should be better ways to do this.
-        VectorXf normedSnpData(data.numKeptInds);
-        data.getSnpDataFromBedFileUsingMmap_openmp(bedFile, snpLenByt, memPageSize, marker, normedSnpData);
-        return normedSnpData.cast<double>();
-    } else {
-        return data.mappedZ.col(marker);
-    }
+	if (!usePreprocessedData) {
+		return data.Z.col(marker).cast<double>();
+	} else {
+		return data.mappedZ.col(marker);
+	}
 }
 
 void BayesRRm::printDebugInfo() const
 {
-    const unsigned int N(data.numKeptInds);
+    const unsigned int N(data.numInds);
     cout << "inv scaled parameters " << v0G + m0 << "__" << (beta.squaredNorm() * m0 + v0G * s02G) / (v0G + m0);
     cout << "num components: " << opt.S.size();
     cout << "\nMixture components: " << cva[0] << " " << cva[1] << " " << cva[2] << "\n";

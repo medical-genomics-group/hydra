@@ -28,11 +28,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
 			bayesType = argv[++i];
 			ss << "--ppbayes " << argv[i] << "\n";
 		}
-		else if (!strcmp(argv[i], "--sbayes")) {
-			analysisType = "SBayes";
-			bayesType = argv[++i];
-			ss << "--sbayes " << argv[i] << "\n";
-		}
 		else if (!strcmp(argv[i], "--preprocess")) {
 			analysisType = "Preprocess";
 			ss << "--preprocess " << "\n";
@@ -49,19 +44,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
 			phenotypeFile = argv[++i];
 			ss << "--pheno " << argv[i] << "\n";
 		}
-		else if (!strcmp(argv[i], "--keep")) {
-			keepIndFile = argv[++i];
-			ss << "--keep " << argv[i] << "\n";
-		}
-		else if (!strcmp(argv[i], "--keep-max")) {
-			keepIndMax = atoi(argv[++i]);
-			ss << "--keep-max " << argv[i] << "\n";
-		}
-		else if (!strcmp(argv[i], "--exclude")) {
-			excludeSnpFile = argv[++i];
-			ss << "--exclude " << argv[i] << "\n";
-		}
-
 		else if (!strcmp(argv[i], "--mcmc-samples")) {
 			mcmcSampleFile = argv[++i];
 			ss << "--mcmc-samples " << argv[i] << "\n";
@@ -85,10 +67,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
 		else if (!strcmp(argv[i], "--thin")) {
 			thin = atoi(argv[++i]);
 			ss << "--thin " << argv[i] << "\n";
-		}
-		else if (!strcmp(argv[i], "--varS")) {
-			varS = atof(argv[++i]);
-			ss << "--varS " << argv[i] << "\n";
 		}
 		else if (!strcmp(argv[i], "--S")) {
 			Gadget::Tokenizer strvec;
@@ -123,10 +101,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
 			numThread = atoi(argv[++i]);
 			ss << "--thread " << argv[i] << "\n";
 		}
-		else if (!strcmp(argv[i], "--chr")) {
-			includeChr = atoi(argv[++i]);
-			ss << "--chr " << argv[i] << "\n";
-		}
 		else {
 			stringstream errmsg;
 			errmsg << "\nError: invalid option \"" << argv[i] << "\".\n";
@@ -136,11 +110,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
 
 	MPI_Comm_rank(MPI_COMM_WORLD, &myMPI::rank);
 	if(myMPI::rank==0) cout << ss.str() << endl;
-
-	//if (bayesType == "Cap" || bayesType == "Sap") myMPI::partition = "bycol";
-
-
-
 }
 
 void Options::readFile(const string &file){  // input options from file
@@ -161,16 +130,6 @@ void Options::readFile(const string &file){  // input options from file
 			phenotypeFile = value;
 		} else if (key == "bedFile") {
 			bedFile = value;
-		} else if (key == "includeChr") {
-			includeChr = stoi(value);
-		} else if (key == "keepIndFile") {
-			keepIndFile = value;
-		} else if (key == "keepIndMax") {
-			keepIndMax = stoi(value);
-		} else if (key == "includeSnpFile") {
-			includeSnpFile = value;
-		} else if (key == "excludeSnpFile") {
-			excludeSnpFile = value;
 		} else if (key == "analysisType") {
 			analysisType = value;
 		} else if (key == "bayesType") {
@@ -181,13 +140,10 @@ void Options::readFile(const string &file){  // input options from file
 			chainLength = stoi(value);
 		} else if (key == "burnin") {
 			burnin = stoi(value);
-
 		} else if (key == "seed") {
 			seed = stoi(value);
 		} else if (key == "thin") {
 			thin = stoi(value);
-		} else if (key == "varS") {
-			varS = stof(value);
 		} else if (key == "S") {
 			Gadget::Tokenizer strvec;
 			strvec.getTokens(value, " ,");

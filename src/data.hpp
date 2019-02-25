@@ -57,8 +57,6 @@ public:
     };
 
     void resetWindow(void) {windStart = -1; windSize = 0;};
-    bool isProximal(const SnpInfo &snp2, const float genWindow) const;
-    bool isProximal(const SnpInfo &snp2, const unsigned physWindow) const;
 };
 
 class ChromInfo {
@@ -153,8 +151,6 @@ public:
     vector<string> fixedEffectNames;
     vector<string> snpEffectNames;
 
-    set<int> chromosomes;
-    vector<ChromInfo*> chromInfoVec;
 
     vector<bool> fullSnpFlag;
     vector<vector<SnpInfo*> > mldmVec;
@@ -162,37 +158,15 @@ public:
     unsigned numFixedEffects;
     unsigned numSnps;
     unsigned numInds;
-    unsigned numIncdSnps;
-    unsigned numKeptInds;
-    unsigned numChroms;
 
     void preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &preprocessedBedIndexFile, bool compress);
     void mapPreprocessBedFile(const string &preprocessedBedFile);
     void unmapPreprocessedBedFile();
 
-
     void readFamFile(const string &famFile);
     void readBimFile(const string &bimFile);
     void readBedFile_noMPI(const string &bedFile);
-    void readBedFile(const string &bedFile);
-
-    void getSnpDataFromBedFileUsingMmap_openmp(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint spnInd, VectorXf &snpData);
-    void getSnpDataFromBedFileUsingMmap(const string &bedFile, const size_t snpLenByt, const long memPageSize, const uint spnInd, VectorXf &snpData);
-    void getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, double   *snpDat);
-    void getSnpDataFromBedFileUsingMmap_new(const int fd, const size_t nb, const long memPageSize, const uint snpInd, VectorXd &snpDat);
-
     void readPhenotypeFile(const string &phenFile);
-    void readCovariateFile(const string &covarFile);
-    void keepMatchedInd(const string &keepIndFile, const unsigned keepIndMax);
-    void includeSnp(const string &includeSnpFile);
-    void excludeSnp(const string &excludeSnpFile);
-    void includeChr(const unsigned chr);
-    void includeMatchedSnp(void);
-
-    vector<SnpInfo*> makeIncdSnpInfoVec(const vector<SnpInfo*> &snpInfoVec);
-    vector<IndInfo*> makeKeptIndInfoVec(const vector<IndInfo*> &indInfoVec);
-
-    void reindexSnp(vector<SnpInfo*> snpInfoVec);
     void readGroupFile(const string &groupFile);
 };
 

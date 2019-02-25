@@ -8,11 +8,12 @@
 // Modified by Daniel Trejo Banos for memory mapped filed implementation
 
 #include <iostream>
-#include "gctb.hpp"
 #include <mpi.h>
 #include <string>
 #include "BayesRRm.h"
 
+#include "data.hpp"
+#include "options.hpp"
 
 using namespace std;
 
@@ -53,19 +54,13 @@ int main(int argc, const char * argv[]) {
 
     Data data;
 
-    bool readGenotypes;
-
-    GCTB gctb(opt);
-
-
     if (opt.analysisType == "Bayes" && opt.bayesType == "bayes") {
 
       clock_t start = clock();
 
-      readGenotypes = false;
-      gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax);
-      gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
-            opt.includeChr, readGenotypes);
+      data.readFamFile(opt.bedFile + ".fam");
+      data.readBimFile(opt.bedFile + ".bim");
+      data.readPhenotypeFile(opt.phenotypeFile);
 
       cout << "Start reading " << opt.bedFile+".bed" << endl;
       clock_t start_bed = clock();
@@ -84,12 +79,13 @@ int main(int argc, const char * argv[]) {
 
         //clock_t start = clock();
 
-      readGenotypes = false;
-      gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax);
-      gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
-            opt.includeChr, readGenotypes);
-      data.readBedFile_noMPI(opt.bedFile+".bed");
-      if (opt.bayesType == "bayesMmap") {
+        data.readFamFile(opt.bedFile + ".fam");
+        data.readBimFile(opt.bedFile + ".bim");
+        data.readPhenotypeFile(opt.phenotypeFile);
+
+        data.readBedFile_noMPI(opt.bedFile+".bed");
+
+        if (opt.bayesType == "bayesMmap") {
     	  BayesRRm mmapToy(data, opt, sysconf(_SC_PAGE_SIZE));
           mmapToy.runGibbs();
 
@@ -101,10 +97,9 @@ int main(int argc, const char * argv[]) {
       //printf("OVERALL read+compute time = %.3f sec.\n", (float)(end - start) / CLOCKS_PER_SEC);
 
     } else if (opt.analysisType == "Preprocess") {
-        readGenotypes = false;
-        gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax);
-        gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
-                          opt.includeChr, readGenotypes);
+        data.readFamFile(opt.bedFile + ".fam");
+        data.readBimFile(opt.bedFile + ".bim");
+        data.readPhenotypeFile(opt.phenotypeFile);
 
         cout << "Start preprocessing " << opt.bedFile + ".bed" << endl;
         clock_t start_bed = clock();
@@ -115,13 +110,13 @@ int main(int argc, const char * argv[]) {
         clock_t end = clock();
         printf("Finished preprocessing the bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
         cout << endl;
+
     } else if (opt.analysisType == "PPBayes") {
         clock_t start = clock();
 
-        readGenotypes = false;
-        gctb.inputIndInfo(data, opt.bedFile, opt.phenotypeFile, opt.keepIndFile, opt.keepIndMax);
-        gctb.inputSnpInfo(data, opt.bedFile, opt.includeSnpFile, opt.excludeSnpFile,
-                          opt.includeChr, readGenotypes);
+        data.readFamFile(opt.bedFile + ".fam");
+        data.readBimFile(opt.bedFile + ".bim");
+        data.readPhenotypeFile(opt.phenotypeFile);
 
         cout << "Start reading preprocessed bed file: " << opt.bedFile + ".ppbed" << endl;
         clock_t start_bed = clock();
