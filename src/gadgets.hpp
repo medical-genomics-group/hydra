@@ -34,7 +34,6 @@ namespace Gadget {
         time_t getElapse(void);
         string format(const time_t time);
         string getDate(void);
-        void printElapse(void);
     };
     
     class Tokenizer : public vector<string> {
@@ -67,14 +66,6 @@ namespace Gadget {
         }
     };
     
-    // file process functions
-    string getFileName(const string &file);
-    string getFileSuffix(const string &file);
-    void fileExist(const string &filename);
-    
-    // statistics functions
-    float calcVariance(const VectorXf &vec);
-
 }
 
 #endif /* toolbox_hpp */

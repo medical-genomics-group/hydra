@@ -19,7 +19,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
 			if (i==1) ss << "\nOptions:\n\n";
 		}
 		if (!strcmp(argv[i], "--bayes")) {
-			analysisType = "Bayes";
+			analysisType = "RAMBayes";
 			bayesType = argv[++i];
 			ss << "--bayes " << argv[i] << "\n";
 		}
