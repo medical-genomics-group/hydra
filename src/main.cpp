@@ -70,7 +70,6 @@ int main(int argc, const char * argv[]) {
 			data.readFamFile(opt.bedFile + ".fam");
 			data.readBimFile(opt.bedFile + ".bim");
 			data.readPhenotypeFile(opt.phenotypeFile);
-
 			data.readBedFile_noMPI(opt.bedFile+".bed");
 
 			if (opt.bayesType == "bayesMmap") {

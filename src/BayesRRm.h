@@ -46,6 +46,7 @@ class BayesRRm
     int m0;             // total num ber of markes in model
     VectorXd v;         // variable storing the component assignment
     VectorXd cVaI;      // inverse of the component variances
+    VectorXd components;
 
     // Mean and residual variables
     double mu;          // mean or intercept
