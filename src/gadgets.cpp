@@ -49,31 +49,3 @@ string Gadget::Timer::format(const time_t time){
 string Gadget::Timer::getDate(){
     return ctime(&curr);
 }
-
-void Gadget::Timer::printElapse(){
-    getTime();
-    cout << "Time elapse: " << format(getElapse()) << endl;
-}
-
-string Gadget::getFileName(const string &file){
-    size_t start = file.rfind('/');
-    size_t end   = file.rfind('.');
-    start = start==string::npos ? 0 : start+1;
-    return file.substr(start, end-start);
-}
-
-string Gadget::getFileSuffix(const string &file){
-    size_t start = file.rfind('.');
-    return file.substr(start);
-}
-
-void Gadget::fileExist(const string &filename){
-    ifstream file(filename.c_str());
-    if(!file) throw("Error: can not open the file ["+filename+"] to read.");
-}
-
-float Gadget::calcVariance(const Eigen::VectorXf &vec){
-    long size = vec.size();
-    float mean = vec.mean();
-    return vec.squaredNorm()/size - mean*mean;
-}
