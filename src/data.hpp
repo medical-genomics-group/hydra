@@ -20,8 +20,7 @@
 #include <Eigen/Sparse>
 #include <boost/format.hpp>
 #include "gadgets.hpp"
-#include <mpi.h>
-#include <mympi.hpp>
+
 
 using namespace std;
 using namespace Eigen;

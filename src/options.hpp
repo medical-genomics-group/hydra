@@ -16,8 +16,6 @@
 #include <cstring>
 #include <string>
 #include <limits.h>
-#include <mpi.h>
-#include <mympi.hpp>
 #include <boost/format.hpp>
 #include "gadgets.hpp"
 #include <Eigen/Eigen>

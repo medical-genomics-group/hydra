@@ -34,7 +34,6 @@ add_executable(${PROJECT_NAME}
     main.cpp
     BayesRRm.cpp
     data.cpp
-    mympi.cpp
     distributions_boost.cpp
     gadgets.cpp
     options.cpp

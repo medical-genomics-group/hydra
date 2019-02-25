@@ -108,8 +108,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
 		}
 	}
 
-	MPI_Comm_rank(MPI_COMM_WORLD, &myMPI::rank);
-	if(myMPI::rank==0) cout << ss.str() << endl;
+	cout << ss.str() << endl;
 }
 
 void Options::readFile(const string &file){  // input options from file
@@ -163,10 +162,8 @@ void Options::readFile(const string &file){  // input options from file
 	}
 	in.close();
 
-	MPI_Comm_rank(MPI_COMM_WORLD, &myMPI::rank);
-	if(myMPI::rank==0) cout << ss.str() << endl;
+	 cout << ss.str() << endl;
 
-	//if (bayesType == "Cap" || bayesType == "Sap") myMPI::partition = "bycol";
 
 
 }

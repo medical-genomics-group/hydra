@@ -8,7 +8,6 @@
 // most read file methods are adopted from GCTA with modification
 
 #include "data.hpp"
-#include <mpi.h>
 #include <Eigen/Eigen>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -191,8 +190,9 @@ void Data::readFamFile(const string &famFile){
     // ignore phenotype column
     ifstream in(famFile.c_str());
     if (!in) throw ("Error: can not open the file [" + famFile + "] to read.");
-    if (myMPI::rank==0)
-        cout << "Reading PLINK FAM file from [" + famFile + "]." << endl;
+
+    cout << "Reading PLINK FAM file from [" + famFile + "]." << endl;
+
     indInfoVec.clear();
     indInfoMap.clear();
     string fid, pid, dad, mom, sex, phen;
@@ -206,16 +206,16 @@ void Data::readFamFile(const string &famFile){
     }
     in.close();
     numInds = (unsigned) indInfoVec.size();
-    if (myMPI::rank==0)
-        cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
+
+    cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
 }
 
 void Data::readBimFile(const string &bimFile) {
     // Read bim file: recombination rate is defined between SNP i and SNP i-1
     ifstream in(bimFile.c_str());
     if (!in) throw ("Error: can not open the file [" + bimFile + "] to read.");
-    if (myMPI::rank==0)
-        cout << "Reading PLINK BIM file from [" + bimFile + "]." << endl;
+
+    cout << "Reading PLINK BIM file from [" + bimFile + "]." << endl;
     snpInfoVec.clear();
     snpInfoMap.clear();
     string id, allele1, allele2;
@@ -231,8 +231,8 @@ void Data::readBimFile(const string &bimFile) {
     }
     in.close();
     numSnps = (unsigned) snpInfoVec.size();
-    if (myMPI::rank==0)
-        cout << numSnps << " SNPs to be included from [" + bimFile + "]." << endl;
+
+    cout << numSnps << " SNPs to be included from [" + bimFile + "]." << endl;
 }
 
 
@@ -326,8 +326,8 @@ void Data::readPhenotypeFile(const string &phenFile) {
     // NA: missing phenotype
     ifstream in(phenFile.c_str());
     if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
-    if (myMPI::rank==0)
-        cout << "Reading phenotypes from [" + phenFile + "]." << endl;
+
+    cout << "Reading phenotypes from [" + phenFile + "]." << endl;
     map<string, IndInfo*>::iterator it, end=indInfoMap.end();
     IndInfo *ind = NULL;
     Gadget::Tokenizer colData;
@@ -359,14 +359,13 @@ void Data::readGroupFile(const string &groupFile) {
     // NA: missing phenotype
     ifstream in(groupFile.c_str());
     if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read.");
-    if (myMPI::rank==0)
-        cout << "Reading groups from [" + groupFile + "]." << endl;
+
+    cout << "Reading groups from [" + groupFile + "]." << endl;
 
     std::istream_iterator<double> start(in), end;
     std::vector<int> numbers(start, end);
     int* ptr =(int*)&numbers[0];
     G=(Eigen::Map<Eigen::VectorXi>(ptr,numbers.size()));
 
-    if (myMPI::rank==0)
-        cout << "Groups read from file" << endl;
+    cout << "Groups read from file" << endl;
 }
