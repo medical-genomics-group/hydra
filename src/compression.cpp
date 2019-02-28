@@ -27,7 +27,7 @@ unsigned long maxCompressedDataSize(const unsigned int numFloats)
     return maxOutputSize;
 }
 
-unsigned long compressData(const VectorXd &snpData, unsigned char *outputBuffer, unsigned long outputSize)
+unsigned long compressData(const VectorXf &snpData, unsigned char *outputBuffer, unsigned long outputSize)
 {
     // Initialise zlib
     z_stream strm;
@@ -42,7 +42,7 @@ unsigned long compressData(const VectorXd &snpData, unsigned char *outputBuffer,
     // Compress the data
     const unsigned int inputSize = static_cast<unsigned int>(snpData.size()) * sizeof(float);
     strm.avail_in = inputSize;
-    strm.next_in = reinterpret_cast<unsigned char *>(const_cast<double*>(&snpData[0]));
+    strm.next_in = reinterpret_cast<unsigned char *>(const_cast<float*>(&snpData[0]));
     strm.avail_out = static_cast<unsigned int>(outputSize);
     strm.next_out = outputBuffer;
 

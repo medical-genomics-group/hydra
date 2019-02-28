@@ -64,7 +64,7 @@ void Data::preprocessBedFile(const string &bedFile, const string &preprocessedBe
 		unsigned int nmiss = 0;
 
 		// Create some scratch space to preprocess the raw data
-		VectorXd snpData(numInds);
+		VectorXf snpData(numInds);
 
 		// Make a note of which individuals have a missing genotype
 		vector<long> missingIndices;
@@ -166,26 +166,58 @@ void Data::mapPreprocessBedFile(const string &preprocessedBedFile)
     if (ppBedFd == -1)
         throw("Error: Failed to open preprocessed bed file [" + preprocessedBedFile + "]");
 
-    ppBedMap = reinterpret_cast<double *>(mmap(nullptr, ppBedSize, PROT_READ, MAP_SHARED, ppBedFd, 0));
+    ppBedMap = reinterpret_cast<float *>(mmap(nullptr, ppBedSize, PROT_READ, MAP_SHARED, ppBedFd, 0));
     if (ppBedMap == MAP_FAILED)
         throw("Error: Failed to mmap preprocessed bed file");
 
     // Now that the raw data is available, wrap it into the mapped Eigen types using the
     // placement new operator.
     // See https://eigen.tuxfamily.org/dox/group__TutorialMapClass.html#TutorialMapPlacementNew
-    new (&mappedZ) Map<MatrixXd>(ppBedMap, numInds, numSnps);
+    new (&mappedZ) Map<MatrixXf>(ppBedMap, numInds, numSnps);
 }
 
 void Data::unmapPreprocessedBedFile()
 {
     // Unmap the data from the Eigen accessors
-    new (&mappedZ) Map<MatrixXd>(nullptr, 1, 1);
+    new (&mappedZ) Map<MatrixXf>(nullptr, 1, 1);
 
     const auto ppBedSize = numInds * numSnps * sizeof(double);
     munmap(ppBedMap, ppBedSize);
     close(ppBedFd);
 }
 
+void Data::mapCompressedPreprocessBedFile(const string &preprocessedBedFile,
+                                          const string &indexFile)
+{
+    // Load the index to the compressed preprocessed bed file
+    ppbedIndex.resize(numSnps);
+    ifstream indexStream(indexFile, std::ifstream::binary);
+    if (!indexStream)
+        throw("Error: Failed to open compressed preprocessed bed file index");
+    indexStream.read(reinterpret_cast<char *>(ppbedIndex.data()),
+    		numSnps * 2 * sizeof(long));
+
+    // Calculate the expected file sizes - cast to size_t so that we don't overflow the unsigned int's
+    // that we would otherwise get as intermediate variables!
+    const size_t ppBedSize = size_t(ppbedIndex.back().pos + ppbedIndex.back().size);
+
+    // Open and mmap the preprocessed bed file
+    ppBedFd = open(preprocessedBedFile.c_str(), O_RDONLY);
+    if (ppBedFd == -1)
+        throw("Error: Failed to open preprocessed bed file [" + preprocessedBedFile + "]");
+
+    ppBedMap = reinterpret_cast<float *>(mmap(nullptr, ppBedSize, PROT_READ, MAP_SHARED, ppBedFd, 0));
+    if (ppBedMap == MAP_FAILED)
+        throw("Error: Failed to mmap preprocessed bed file");
+}
+
+void Data::unmapCompressedPreprocessedBedFile()
+{
+    const size_t ppBedSize = size_t(ppbedIndex.back().pos + ppbedIndex.back().size);
+    munmap(ppBedMap, ppBedSize);
+    close(ppBedFd);
+    ppbedIndex.clear();
+}
 void Data::readFamFile(const string &famFile){
     // ignore phenotype column
     ifstream in(famFile.c_str());

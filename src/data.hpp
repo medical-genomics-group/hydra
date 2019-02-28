@@ -96,7 +96,7 @@ public:
 
     // mmap related data
     int ppBedFd;
-    double *ppBedMap;
+    float *ppBedMap;
     Map<MatrixXd> mappedZ;
     PpBedIndex ppbedIndex;
 
@@ -151,6 +151,9 @@ public:
     void preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &preprocessedBedIndexFile, bool compress);
     void mapPreprocessBedFile(const string &preprocessedBedFile);
     void unmapPreprocessedBedFile();
+    void mapCompressedPreprocessBedFile(const string &preprocessedBedFile,
+                                        const string &indexFile);
+    void unmapCompressedPreprocessedBedFile();
 
     void readFamFile(const string &famFile);
     void readBimFile(const string &bimFile);

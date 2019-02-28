@@ -7,7 +7,7 @@ using namespace Eigen;
 
 unsigned long maxCompressedDataSize(const unsigned int numFloats);
 
-unsigned long compressData(const VectorXd &snpData,
+unsigned long compressData(const VectorXf &snpData,
                            unsigned char *outputBuffer,
                            unsigned long outputSize);
 
