@@ -35,17 +35,6 @@ if(PARUP)
   add_definitions(-DPARUP)
 endif()
 
-find_package(MPI REQUIRED)
-
-include_directories(${MPI_INCLUDE_PATH})
-
-include(FindOpenMP)
-if(OPENMP_FOUND)
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-endif(OPENMP_FOUND)
-
 
 add_library(libbrr-dev
     BayesRRm.cpp
@@ -89,22 +78,8 @@ include(${TBB_ROOT}/cmake/TBBBuild.cmake)
 tbb_build(TBB_ROOT ${TBB_ROOT} CONFIG_DIR TBB_DIR MAKE_ARGS stdver=c++17 tbb_cpf=1)
 find_package(TBB REQUIRED tbb_preview)
 
-target_link_libraries(${PROJECT_NAME} ${MPI_LIBRARIES} ${TBB_IMPORTED_TARGETS})
-target_link_libraries(libbrr-dev ${MPI_LIBRARIES} ${TBB_IMPORTED_TARGETS})
-
-if(MPI_COMPILE_FLAGS)
-  set_target_properties(${PROJECT_NAME} PROPERTIES
-    COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-    set_target_properties(libbrr-dev PROPERTIES
-    COMPILE_FLAGS "${MPI_COMPILE_FLAGS}")
-endif()
-
-if(MPI_LINK_FLAGS)
-  set_target_properties(${PROJECT_NAME} PROPERTIES
-    LINK_FLAGS "${MPI_LINK_FLAGS}")
-    set_target_properties(libbrr-dev PROPERTIES
-    LINK_FLAGS "${MPI_LINK_FLAGS}")
-endif()
+target_link_libraries(${PROJECT_NAME} ${TBB_IMPORTED_TARGETS})
+target_link_libraries(libbrr-dev ${TBB_IMPORTED_TARGETS})
 
 set(${PROJECT_NAME}_INCLUDE_DIRS ${PROJECT_SOURCE_DIR} ${PROJECT_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR} CACHE INTERNAL "${PROJECT_NAME}: Include Directories" FORCE)
     
