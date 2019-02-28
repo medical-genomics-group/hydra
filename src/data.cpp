@@ -27,139 +27,141 @@ Data::Data()
 }
 void Data::preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &preprocessedBedIndexFile, bool compress)
 {
-	cout << "Preprocessing bed file: " << bedFile << ", Compress data = " << (compress ? "yes" : "no") << endl;
-	if (numSnps == 0)
-		throw ("Error: No SNP is included for analysis.");
-	if (numInds == 0)
-		throw ("Error: No individual is included for analysis.");
+    cout << "Preprocessing bed file: " << bedFile << ", Compress data = " << (compress ? "yes" : "no") << endl;
+    if (numSnps == 0)
+        throw ("Error: No SNP is retained for analysis.");
+    if (numInds == 0)
+        throw ("Error: No individual is retained for analysis.");
 
-	ifstream BIT(bedFile.c_str(), ios::binary);
-	if (!BIT)
-		throw ("Error: can not open the file [" + bedFile + "] to read.");
+    ifstream BIT(bedFile.c_str(), ios::binary);
+    if (!BIT)
+        throw ("Error: can not open the file [" + bedFile + "] to read.");
 
-	ofstream ppBedOutput(preprocessedBedFile.c_str(), ios::binary);
-	if (!ppBedOutput)
-		throw("Error: Unable to open the preprocessed bed file [" + preprocessedBedFile + "] for writing.");
-	ofstream ppBedIndexOutput(preprocessedBedIndexFile.c_str(), ios::binary);
-	if (!ppBedIndexOutput)
-		throw("Error: Unable to open the preprocessed bed index file [" + preprocessedBedIndexFile + "] for writing.");
+    ofstream ppBedOutput(preprocessedBedFile.c_str(), ios::binary);
+    if (!ppBedOutput)
+        throw("Error: Unable to open the preprocessed bed file [" + preprocessedBedFile + "] for writing.");
+    ofstream ppBedIndexOutput(preprocessedBedIndexFile.c_str(), ios::binary);
+    if (!ppBedIndexOutput)
+        throw("Error: Unable to open the preprocessed bed index file [" + preprocessedBedIndexFile + "] for writing.");
 
-	cout << "Reading PLINK BED file from [" + bedFile + "] in SNP-major format ..." << endl;
-	char header[3];
-	BIT.read(header, 3);
-	if (!BIT || header[0] != 0x6c || header[1] != 0x1b || header[2] != 0x01)
-		throw ("Error: Incorrect first three bytes of bed file: " + bedFile);
+    cout << "Reading PLINK BED file from [" + bedFile + "] in SNP-major format ..." << endl;
+    char header[3];
+    BIT.read(header, 3);
+    if (!BIT || header[0] != 0x6c || header[1] != 0x1b || header[2] != 0x01)
+        throw ("Error: Incorrect first three bytes of bed file: " + bedFile);
 
-	// How much space do we need to compress the data (if requested)
-	const auto maxCompressedOutputSize = compress ? maxCompressedDataSize(numInds) : 0;
-	unsigned char *compressedBuffer = nullptr;
-	unsigned long pos = 0;
-	if (compress)
-		compressedBuffer = new unsigned char[maxCompressedOutputSize];
+    // How much space do we need to compress the data (if requested)
+    const auto maxCompressedOutputSize = compress ? maxCompressedDataSize(numInds) : 0;
+    unsigned char *compressedBuffer = nullptr;
+    unsigned long pos = 0;
+    if (compress)
+        compressedBuffer = new unsigned char[maxCompressedOutputSize];
 
-	// Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
-	for (unsigned int j = 0, snp = 0; j < numSnps; j++) {
-		SnpInfo *snpInfo = snpInfoVec[j];
-		double sum = 0.0;
-		unsigned int nmiss = 0;
+    // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
+    for (unsigned int j = 0, snp = 0; j < numSnps; j++) {
+        SnpInfo *snpInfo = snpInfoVec[j];
+        double sum = 0.0;
+        unsigned int nmiss = 0;
 
-		// Create some scratch space to preprocess the raw data
-		VectorXf snpData(numInds);
+        // Create some scratch space to preprocess the raw data
+        VectorXf snpData(numInds);
+        float sqNorm = 0.0f;
 
-		// Make a note of which individuals have a missing genotype
-		vector<long> missingIndices;
+        // Make a note of which individuals have a missing genotype
+        vector<long> missingIndices;
 
-		const unsigned int size = (numInds + 3) >> 2;
-		if (!snpInfo->included) {
-			BIT.ignore(size);
-			continue;
-		}
+        const unsigned int size = (numInds + 3) >> 2;
+        if (!snpInfo->included) {
+            BIT.ignore(size);
+            continue;
+        }
 
-		for (unsigned int i = 0, ind = 0; i < numInds;) {
-			char ch;
-			BIT.read(&ch, 1);
-			if (!BIT)
-				throw ("Error: problem with the BED file ... has the FAM/BIM file been changed?");
+        for (unsigned int i = 0, ind = 0; i < numInds;) {
+            char ch;
+            BIT.read(&ch, 1);
+            if (!BIT)
+                throw ("Error: problem with the BED file ... has the FAM/BIM file been changed?");
 
-			bitset<8> b = ch;
-			unsigned int k = 0;
+            bitset<8> b = ch;
+            unsigned int k = 0;
 
-			while (k < 7 && i < numInds) {
-				if (!indInfoVec[i]->kept) {
-					k += 2;
-				} else {
-					const unsigned int allele1 = (!b[k++]);
-					const unsigned int allele2 = (!b[k++]);
+            while (k < 7 && i < numInds) {
+                if (!indInfoVec[i]->kept) {
+                    k += 2;
+                } else {
+                    const unsigned int allele1 = (!b[k++]);
+                    const unsigned int allele2 = (!b[k++]);
 
-					if (allele1 == 0 && allele2 == 1) {  // missing genotype
-						// Don't store a marker value like this as it requires floating point comparisons later
-						// which are not done properly. Instead, store the index of the individual in a vector and simply
-						// iterate over the collected indices. Also means iterating over far fewer elements which may
-						// make a noticeable difference as this scales up.
-						missingIndices.push_back(ind++);
-						++nmiss;
-					} else {
-						const auto value = allele1 + allele2;
-						snpData[ind++] = value;
-						sum += value;
-					}
-				}
-				i++;
-			}
-		}
+                    if (allele1 == 0 && allele2 == 1) {  // missing genotype
+                        // Don't store a marker value like this as it requires floating point comparisons later
+                        // which are not done properly. Instead, store the index of the individual in a vector and simply
+                        // iterate over the collected indices. Also means iterating over far fewer elements which may
+                        // make a noticeable difference as this scales up.
+                        missingIndices.push_back(ind++);
+                        ++nmiss;
+                    } else {
+                        const auto value = allele1 + allele2;
+                        snpData[ind++] = value;
+                        sum += value;
+                    }
+                }
+                i++;
+            }
+        }
 
-		// Fill missing values with the mean
-		const double mean = sum / double(numInds - nmiss);
-		if (j % 100 == 0) {
-			printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n",
-					j, mean, sum, numInds-nmiss, numInds, nmiss);
-			fflush(stdout);
-		}
-		if (nmiss) {
-			for (const auto index : missingIndices)
-				snpData[index] = mean;
-		}
+        // Fill missing values with the mean
+        const double mean = sum / double(numInds - nmiss);
+        if (j % 100 == 0) {
+            printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n",
+                   j, mean, sum, numInds-nmiss, numInds, nmiss);
+            fflush(stdout);
+        }
+        if (nmiss) {
+            for (const auto index : missingIndices)
+                snpData[index] = float(mean);
+        }
 
-		// Standardize genotypes
-		snpData.array() -= snpData.mean();
-		const auto sqn = snpData.squaredNorm();
-		const auto sigma = 1.0 / (sqrt(sqn / (double(numInds - 1))));
-		snpData.array() *= sigma;
+        // Standardize genotypes
+        snpData.array() -= snpData.mean();
+        float sqn = snpData.squaredNorm();
+        float std_ = 1.0f / (sqrt(sqn / (float(numInds - 1))));
+        snpData.array() *= std_;
 
-		// Write out the preprocessed data
-		if (!compress) {
-			ppBedOutput.write(reinterpret_cast<char *>(&snpData[0]), numInds * sizeof(double));
-		} else {
-			const unsigned long compressedSize = compressData(snpData, compressedBuffer, maxCompressedOutputSize);
-			ppBedOutput.write(reinterpret_cast<char *>(compressedBuffer), long(compressedSize));
+        // Write out the preprocessed data
+        if (!compress) {
+            ppBedOutput.write(reinterpret_cast<char *>(&snpData[0]), numInds * sizeof(float));
+        } else {
+            const unsigned long compressedSize = compressData(snpData, compressedBuffer, maxCompressedOutputSize);
+            ppBedOutput.write(reinterpret_cast<char *>(compressedBuffer), long(compressedSize));
 
-			// Calculate the index data for this column
-			ppBedIndexOutput.write(reinterpret_cast<char *>(&pos), sizeof(unsigned long));
-			ppBedIndexOutput.write(reinterpret_cast<const char *>(&compressedSize), sizeof(unsigned long));
-			pos += compressedSize;
-		}
+            // Calculate the index data for this column
+            ppBedIndexOutput.write(reinterpret_cast<char *>(&pos), sizeof(unsigned long));
+            ppBedIndexOutput.write(reinterpret_cast<const char *>(&compressedSize), sizeof(unsigned long));
+            pos += compressedSize;
+        }
 
-		// Compute allele frequency and any other required data and write out to file
-		//snpInfo->af = 0.5f * float(mean);
-		//snp2pq[snp] = 2.0f * snpInfo->af * (1.0f - snpInfo->af);
+        // Compute allele frequency and any other required data and write out to file
+        //snpInfo->af = 0.5f * float(mean);
+        //snp2pq[snp] = 2.0f * snpInfo->af * (1.0f - snpInfo->af);
 
-		if (++snp == numSnps)
-			break;
-	}
+        if (++snp == numSnps)
+            break;
+    }
 
-	if (compress)
-		delete[] compressedBuffer;
+    if (compress)
+        delete[] compressedBuffer;
 
-	BIT.clear();
-	BIT.close();
+    BIT.clear();
+    BIT.close();
 
-	cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
+    cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
 }
+
 void Data::mapPreprocessBedFile(const string &preprocessedBedFile)
 {
     // Calculate the expected file sizes - cast to size_t so that we don't overflow the unsigned int's
     // that we would otherwise get as intermediate variables!
-    const size_t ppBedSize = size_t(numInds) * size_t(numSnps) * sizeof(double);
+    const size_t ppBedSize = size_t(numInds) * size_t(numSnps) * sizeof(float);
 
     // Open and mmap the preprocessed bed file
     ppBedFd = open(preprocessedBedFile.c_str(), O_RDONLY);
@@ -181,7 +183,7 @@ void Data::unmapPreprocessedBedFile()
     // Unmap the data from the Eigen accessors
     new (&mappedZ) Map<MatrixXf>(nullptr, 1, 1);
 
-    const auto ppBedSize = numInds * numSnps * sizeof(double);
+    const auto ppBedSize = numInds * numSnps * sizeof(float);
     munmap(ppBedMap, ppBedSize);
     close(ppBedFd);
 }

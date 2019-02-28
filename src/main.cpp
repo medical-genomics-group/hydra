@@ -90,7 +90,6 @@ int main(int argc, const char * argv[]) {
 			clock_t start = clock();
 			data.readPhenotypeFile(opt.phenotypeFile);
 			if (opt.compress) {
-				data.readBedFile_noMPI(opt.bedFile+".bed");
 				cout << "Start reading preprocessed bed file: " << opt.bedFile + ".ppbed" << endl;
 				clock_t start_bed = clock();
 				data.mapCompressedPreprocessBedFile(opt.bedFile + ".ppbed",	opt.bedFile + ".ppbedindex");
