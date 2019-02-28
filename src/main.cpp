@@ -1,12 +1,3 @@
-//
-//  main.cpp
-//  gctb
-//
-//  Created by Jian Zeng on 14/06/2016.
-//  Copyright © 2016 Jian Zeng. All rights reserved.
-//
-// Modified by Daniel Trejo Banos for memory mapped filed implementation
-
 #include <iostream>
 #include <string>
 #include "BayesRRm.h"
@@ -15,7 +6,6 @@
 #include "options.hpp"
 
 using namespace std;
-
 
 int main(int argc, const char * argv[]) {
 

@@ -1,12 +1,3 @@
-//
-//  data.cpp
-//  gctb
-//
-//  Created by Jian Zeng on 14/06/2016.
-//  Copyright © 2016 Jian Zeng. All rights reserved.
-//
-// most read file methods are adopted from GCTA with modification
-
 #include "data.hpp"
 #include <Eigen/Eigen>
 #include <sys/mman.h>

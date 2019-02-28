@@ -1,11 +1,3 @@
-//
-//  options.hpp
-//  gctb
-//
-//  Created by Jian Zeng on 14/06/2016.
-//  Copyright © 2016 Jian Zeng. All rights reserved.
-//
-
 #ifndef options_hpp
 #define options_hpp
 

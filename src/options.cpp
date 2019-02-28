@@ -1,11 +1,3 @@
-//
-//  options.cpp
-//  gctb
-//
-//  Created by Jian Zeng on 14/06/2016.
-//  Copyright © 2016 Jian Zeng. All rights reserved.
-//
-
 #include "options.hpp"
 
 void Options::inputOptions(const int argc, const char* argv[]){
