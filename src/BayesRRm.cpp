@@ -258,7 +258,7 @@ VectorXd BayesRRm::getSnpData(unsigned int marker) const
 		return data.Z.col(marker).cast<double>();
 	} else {
 		//read column from preprocessed and memory mapped genotype matrix file.
-		return data.mappedZ.col(marker);
+		return data.mappedZ.col(marker).cast<double>();
 	}
 }
 

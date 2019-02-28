@@ -5,6 +5,7 @@
 #include "options.hpp"
 #include "distributions_boost.hpp"
 
+
 #include <Eigen/Eigen>
 #include <memory>
 #include <shared_mutex>
@@ -58,9 +59,6 @@ class BayesRRmz
 
     VectorXd m_y;
     VectorXd m_components;
-
-    mutable std::shared_mutex m_mutex;
-    mutable std::mutex m_rngMutex;
 
 public:
     BayesRRmz(Data &m_data, Options &m_opt);
