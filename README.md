@@ -1,4 +1,4 @@
-#BayesRRcmd
+# BayesRRcmd
 
 Software for performing Bayesian penalized regression for complex trait analysis.
 
@@ -14,7 +14,7 @@ boost (https://www.boost.org/)
 cmake (https://cmake.org/)
 ninja (https://ninja-build.org/manual.html)
 
-###Clone or download
+### Clone or download
 
 clone
 ```
@@ -27,7 +27,7 @@ download
 unzip master.zip
 ```
 
-###Compile
+### Compile
 
 You can compile by using CMake & ninja and the following commands:
 
@@ -38,7 +38,7 @@ ninja
 
 ```
 
-###Test run
+### Test run
 
 You can do a test run on a small provided dataset as follows:
 
