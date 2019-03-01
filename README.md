@@ -13,16 +13,18 @@ The software has some pre-requisites to be installed.
 
 eigen (http://eigen.tuxfamily.org/index.php?title=Main_Page)   
 boost (https://www.boost.org/)   
+ZLIB  (https://www.zlib.net/)	
 cmake (https://cmake.org/)   
 ninja (https://ninja-build.org/manual.html)   
 
 these can be easily installed in Linux:
 
 ```
-sudo apt-get install libeigen3-dev libboost-all-dev cmake ninja-build 
+sudo apt-get install libeigen3-dev libboost-all-dev zlib1g-dev cmake ninja-build 
 
 ```
 
+Additionally you will need to download Threading Building Blocks (TBB) software (see below in section 2.)
 
 ### 2. Clone or download
 
@@ -32,34 +34,52 @@ Clone
 git clone https://github.com/ctggroup/BayesRRcmd.git
 ```
 
-Download
+or Download
 
 ```
 wget https://github.com/ctggroup/BayesRRcmd/archive/master.zip
 unzip master.zip
+mv BayesRRcmd-master BayesRRcmd
+```
+
+At the moment we are using Threading Building Blocks software which should be installed as follows:
+
+if you cloned BayesRRcmd:
+```
+git submodule init
+git submodule update
+```
+
+if you downloaded BayesRRcmd:
+
+```
+cd BayesRRcmd
+wget https://github.com/01org/tbb/archive/tbb_2019.zip
+unzip tbb_2019.zip
+mv tbb-tbb_2019/* tbb
+rm -r tbb-tbb_2019 tbb_2019.zip
 ```
 
 ### 3. Compile
 
-You can compile by using CMake & ninja and the following commands:
+You can compile by using CMake & ninja within the BayesRRcmd directory awith the following commands:
 
 ```
-cd BayesRRcmd
 cmake -G "CodeBlocks - Ninja" -DCMAKE_BUILD_TYPE=Release ../BayesRRcmd
 ninja
 
 ```
+You should obtain the executable brr in src folder.
 
 ### 4. Test run
 
-You can do a test run on a small provided dataset as follows:
+You can do a test run within the BayesRRcmd directory on a small provided dataset as follows:
 
 ```
-cd BayesRRcmd/src
 dataset=uk10k_chr1_1mb
 
-./brr --bayes bayesMmap --bfile ../test/data/$dataset --pheno ../test/data/test.phen --chain-length 10 --burn-in 0 --thin 1 --mcmc-samples ./bayesOutput.csv --S 0.01,0.001,0.0001
+src/brr --bayes bayesMmap --bfile test/data/$dataset --pheno test/data/test.phen --chain-length 10 --burn-in 0 --thin 1 --mcmc-samples ./bayesOutput.csv --S 0.01,0.001,0.0001
 
 ```
 
-You should get messages in standard output for the reading of the dataset files, the running of Gibbs sampling, time taken for each iteration and finishing with "Analysis finished" message.
+You should get messages in standard output for the reading of the dataset files, the running of Gibbs sampling, time taken for each iteration and finishing with "Analysis finished" message and the time taken to run.
