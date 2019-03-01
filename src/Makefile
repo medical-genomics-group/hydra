@@ -27,7 +27,7 @@ CXXFLAGS += -march=native
 #CXXFLAGS += -S
 
 # LIB += -lz -lmpi -lm  -lc++
-LIB     += -lz -lm -lc++ -ltbb
+LIB     += -lz -lm 
 
 LDFLAGS = -L/usr/local/opt/llvm/lib
 

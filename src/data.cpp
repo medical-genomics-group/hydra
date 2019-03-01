@@ -104,7 +104,7 @@ void Data::preprocessBedFile(const string &bedFile, const string &preprocessedBe
         const double mean = sum / double(numInds - nmiss);
         if (j % 100 == 0) {
             printf("MARKER %6d mean = %12.7f computed on %6.0f with %6d elements (%d - %d)\n",
-                   j, mean, sum, numInds-nmiss, numInds, nmiss);
+                    j, mean, sum, numInds-nmiss, numInds, nmiss);
             fflush(stdout);
         }
         if (nmiss) {
@@ -180,7 +180,7 @@ void Data::unmapPreprocessedBedFile()
 }
 
 void Data::mapCompressedPreprocessBedFile(const string &preprocessedBedFile,
-                                          const string &indexFile)
+        const string &indexFile)
 {
     // Load the index to the compressed preprocessed bed file
     ppbedIndex.resize(numSnps);
@@ -188,7 +188,7 @@ void Data::mapCompressedPreprocessBedFile(const string &preprocessedBedFile,
     if (!indexStream)
         throw("Error: Failed to open compressed preprocessed bed file index");
     indexStream.read(reinterpret_cast<char *>(ppbedIndex.data()),
-    		numSnps * 2 * sizeof(long));
+            numSnps * 2 * sizeof(long));
 
     // Calculate the expected file sizes - cast to size_t so that we don't overflow the unsigned int's
     // that we would otherwise get as intermediate variables!
@@ -263,14 +263,14 @@ void Data::readBimFile(const string &bimFile) {
 
 void Data::readBedFile_noMPI(const string &bedFile){
     unsigned i = 0, j = 0, k = 0;
-    
+
     if (numSnps == 0) throw ("Error: No SNP is retained for analysis.");
     if (numInds == 0) throw ("Error: No individual is retained for analysis.");
-    
+
     Z.resize(numInds, numSnps);
     ZPZdiag.resize(numSnps);
     snp2pq.resize(numSnps);
-    
+
     // Read bed file
     char ch[1];
     bitset<8> b;
@@ -321,7 +321,7 @@ void Data::readBedFile_noMPI(const string &bedFile){
                 if (Z(i,snp) == -9) Z(i,snp) = mean;
             }
         }
-        
+
         // compute allele frequency
         snpInfo->af = 0.5f*mean;
         snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
@@ -378,7 +378,7 @@ void Data::readPhenotypeFile(const string &phenFile) {
     }
 
     in.close();
-    }
+}
 //TODO Finish function to read the group file
 void Data::readGroupFile(const string &groupFile) {
     // NA: missing phenotype

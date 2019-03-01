@@ -1,16 +1,53 @@
-# Code for a test example
-Much of the code is borrowed from GCTB: a tool for Genome-wide Complex Trait Bayesian analysis
+#BayesRRcmd
 
+Software for performing Bayesian penalized regression for complex trait analysis.
 
-### How to compile
-We have set dependencies on both MPI and OpenMP libraries as well as two C++ libraries i.e. Eigen and Boost. In /src/Makefile please change the compiler and directories of these libraries in the Makefile to suit your operating system.
+For the moment the software is compatible with Linux OS and we are working into making it compatible with Mac OS.
 
-### Aims
-After compiling run /src/test.sh
+## Quick start
 
-This will read in a data file that is in a specific format, select a column at random, and call Eigen to calculate the mean value of each column. Output will be printed as the data are read and then the means will print to screen.
+### Install prerequisites
+The software has some pre-requisites to be installed.   
 
-On line 45 the file /src/data.cpp the binary file that contains the data is read into memory. Instead of this, we would like Eigen to operate on a memory mapped version of this file, so that only one randomly selected column is read into memory at any time, rather than the entire file.
+eigen (http://eigen.tuxfamily.org/index.php?title=Main_Page)
+boost (https://www.boost.org/)
+cmake (https://cmake.org/)
+ninja (https://ninja-build.org/manual.html)
 
-Our overall aim is to apply this to a datset that has 470,000 rows and 38 million columns, with each data entry consisting of 8 bytes. The computations we are doing require only one randomly selected column at a time and so we hope to reduce the RAM requirements as much as possible through memory mapping, though other suggestions are more than welcome also.
+###Clone or download
 
+clone
+```
+git clone https://github.com/ctggroup/BayesRRcmd.git
+```
+
+download
+
+```wget https://github.com/ctggroup/BayesRRcmd/archive/master.zip
+unzip master.zip
+```
+
+###Compile
+
+You can compile by using CMake & ninja and the following commands:
+
+```
+cd BayesRRcmd
+cmake -G "CodeBlocks - Ninja" -DCMAKE_BUILD_TYPE=Release ../BayesRRcmd
+ninja
+
+```
+
+###Test run
+
+You can do a test run on a small provided dataset as follows:
+
+```
+cd BayesRRcmd/src
+dataset=uk10k_chr1_1mb
+
+./brr --bayes bayesMmap --bfile ../test/data/$dataset --pheno ../test/data/test.phen --chain-length 10 --burn-in 0 --thin 1 --mcmc-samples ./bayesOutput.csv --S 0.01,0.001,0.0001
+
+```
+
+You should get messages in standard output for the reading of the dataset files, the running of Gibbs sampling, time taken for each iteration and finishing with "Analysis finished" message.

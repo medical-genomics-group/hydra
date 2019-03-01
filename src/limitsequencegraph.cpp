@@ -16,9 +16,9 @@ LimitSequenceGraph::LimitSequenceGraph(BayesRRmz *bayes, size_t maxParallel)
         msg.decompressBuffer = new unsigned char[colSize];
 
         extractData(reinterpret_cast<unsigned char *>(m_bayes->m_data.ppBedMap) + m_bayes->m_data.ppbedIndex[msg.marker].pos,
-                    static_cast<unsigned int>(m_bayes->m_data.ppbedIndex[msg.marker].size),
-                    msg.decompressBuffer,
-                    colSize);
+                static_cast<unsigned int>(m_bayes->m_data.ppbedIndex[msg.marker].size),
+                msg.decompressBuffer,
+                colSize);
 
         return msg;
     };
@@ -82,7 +82,10 @@ void LimitSequenceGraph::exec(unsigned int numInds,
 
     // Push some messages into the top of the graph to be processed - representing the column indices
     for (unsigned int i = 0; i < numSnps; ++i) {
-        Message msg = { i, markerIndices[i], numInds };
+        Message msg;
+        msg.id = i;
+        msg.marker = markerIndices[i];
+        msg.numInds = numInds;
         m_ordering->try_put(msg);
     }
 

@@ -93,15 +93,15 @@ unsigned long compressData(const VectorXf &snpData, unsigned char *outputBuffer,
     // Cleanup
     delete[] checkBuffer;
     (void) inflateEnd(&strm2);
-    */
+     */
 
     return compressedSize;
 }
 
 void extractData(unsigned char *compressedData,
-                 unsigned int compressedDataSize,
-                 unsigned char *outputBuffer,
-                 unsigned int outputBufferSize)
+        unsigned int compressedDataSize,
+        unsigned char *outputBuffer,
+        unsigned int outputBufferSize)
 {
     z_stream strm;
     strm.zalloc = nullptr;

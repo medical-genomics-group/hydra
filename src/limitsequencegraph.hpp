@@ -17,8 +17,8 @@ public:
     LimitSequenceGraph(BayesRRmz *bayes, size_t maxParallel = 12);
 
     void exec(unsigned int numInds,
-              unsigned int numSnps,
-              const std::vector<unsigned int> &markerIndices) override;
+            unsigned int numSnps,
+            const std::vector<unsigned int> &markerIndices) override;
 
 private:
     struct Message {
