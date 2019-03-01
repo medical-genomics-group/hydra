@@ -86,10 +86,11 @@ int main(int argc, const char * argv[]) {
 				clock_t end = clock();
 				printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
 				cout << endl;
-				if (opt.bayesType == "bayesMmap") {
-					BayesRRmz analysis(data, opt);
-					analysis.runGibbs();
-				}
+
+				BayesRRmz analysis(data, opt);
+				analysis.runGibbs();
+
+				data.unmapCompressedPreprocessedBedFile();
 			}else{
 				cout << "Start reading preprocessed bed file: " << opt.bedFile + ".ppbed" << endl;
 				clock_t start_bed = clock();
