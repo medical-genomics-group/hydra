@@ -46,6 +46,7 @@ At the moment we are using Threading Building Blocks software which should be in
 
 if you cloned BayesRRcmd:
 ```
+cd BayesRRcmd
 git submodule init
 git submodule update
 ```
