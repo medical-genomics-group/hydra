@@ -4,6 +4,8 @@ Software for performing Bayesian penalized regression for complex trait analysis
 
 For the moment the software is compatible with Linux OS and we are working into making it compatible with Mac OS.
 
+In the README you will find installation instructions, got to the wiki (https://github.com/ctggroup/BayesRRcmd/wiki) for more information on the algorithms, analysis types available and options. 
+
 ## Quick start
 
 Follow instructions to deploy software.
