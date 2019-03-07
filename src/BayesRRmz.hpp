@@ -1,10 +1,16 @@
+/*
+ * BayesRRm.h
+ *
+ *  Created on: 5 Sep 2018
+ *      Author: admin
+ */
+
 #ifndef SRC_BAYESRRMZ_H_
 #define SRC_BAYESRRMZ_H_
 
 #include "data.hpp"
 #include "options.hpp"
 #include "distributions_boost.hpp"
-
 
 #include <Eigen/Eigen>
 #include <memory>
@@ -15,6 +21,7 @@ class AnalysisGraph;
 class BayesRRmz
 {
     friend class LimitSequenceGraph;
+    friend class ParallelGraph;
     std::unique_ptr<AnalysisGraph> m_flowGraph;
     Data                &m_data; // data matrices
     Options             &m_opt;
@@ -43,9 +50,7 @@ class BayesRRmz
     int m_m0;             // total number of markers in model
     VectorXd m_v;         // variable storing the component assignment
     VectorXd m_cVaI;      // inverse of the component variances
-    VectorXd Cx;
-    //unsigned char *decompressBuffer = nullptr;
-    //unsigned int colSize ;
+
     // Mean and residual variables
     double m_mu;          // mean or intercept
     double m_sigmaG;      // genetic variance
@@ -60,11 +65,15 @@ class BayesRRmz
     VectorXd m_y;
     VectorXd m_components;
 
+    mutable std::shared_mutex m_mutex;
+    mutable std::mutex m_rngMutex;
+
 public:
     BayesRRmz(Data &m_data, Options &m_opt);
     virtual ~BayesRRmz();
     int runGibbs(); // where we run Gibbs sampling over the parametrised model
-    void processColumn(unsigned int marker,  const Map<VectorXf> &Cx);
+    void processColumn(unsigned int marker, const Map<VectorXd> &Cx);
+    void processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx);
 
     void setDebugEnabled(bool enabled) { m_showDebug = enabled; }
     bool isDebugEnabled() const { return m_showDebug; }

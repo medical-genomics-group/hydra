@@ -7,13 +7,13 @@ using namespace Eigen;
 
 unsigned long maxCompressedDataSize(const unsigned int numFloats);
 
-unsigned long compressData(const VectorXf &snpData,
-        unsigned char *outputBuffer,
-        unsigned long outputSize);
+unsigned long compressData(const VectorXd &snpData,
+                           unsigned char *outputBuffer,
+                           unsigned long outputSize);
 
 void extractData(unsigned char *compressedData,
-        unsigned int compressedDataSize,
-        unsigned char *outputBuffer,
-        unsigned int outputBufferSize);
+                 unsigned int compressedDataSize,
+                 unsigned char *outputBuffer,
+                 unsigned int outputBufferSize);
 
 #endif // COMPRESSION_H

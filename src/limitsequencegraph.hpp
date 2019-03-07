@@ -16,9 +16,9 @@ class LimitSequenceGraph : public AnalysisGraph
 public:
     LimitSequenceGraph(BayesRRmz *bayes, size_t maxParallel = 12);
 
-    void exec(unsigned int numInds,
-            unsigned int numSnps,
-            const std::vector<unsigned int> &markerIndices) override;
+    void exec(unsigned int numKeptInds,
+              unsigned int numIncdSnps,
+              const std::vector<unsigned int> &markerIndices) override;
 
 private:
     struct Message {

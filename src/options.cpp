@@ -20,6 +20,11 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bayesType = argv[++i];
             ss << "--ppbayes " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--ppasyncbayes")) {
+            analysisType = "PPAsyncBayes";
+            bayesType = argv[++i];
+            ss << "--ppasyncbayes " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--preprocess")) {
             analysisType = "Preprocess";
             ss << "--preprocess " << "\n";

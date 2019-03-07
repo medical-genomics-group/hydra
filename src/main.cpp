@@ -73,25 +73,23 @@ int main(int argc, const char * argv[]) {
             clock_t end = clock();
             printf("Finished preprocessing the bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
             cout << endl;
-        }
-
-        // Run analysis on the pre-processed data set
-        else if (opt.analysisType == "PPBayes") {
+        }else if (opt.analysisType == "PPBayes" || opt.analysisType == "PPAsyncBayes") {
             clock_t start = clock();
             data.readPhenotypeFile(opt.phenotypeFile);
+            // Run analysis using mapped data files
             if (opt.compress) {
                 cout << "Start reading preprocessed bed file: " << opt.bedFile + ".ppbed" << endl;
                 clock_t start_bed = clock();
-                data.mapCompressedPreprocessBedFile(opt.bedFile + ".ppbed",	opt.bedFile + ".ppbedindex");
+                data.mapCompressedPreprocessBedFile(opt.bedFile + ".ppbed",
+                        opt.bedFile + ".ppbedindex");
                 clock_t end = clock();
                 printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
                 cout << endl;
 
                 BayesRRmz analysis(data, opt);
                 analysis.runGibbs();
-
                 data.unmapCompressedPreprocessedBedFile();
-            }else{
+            } else {
                 cout << "Start reading preprocessed bed file: " << opt.bedFile + ".ppbed" << endl;
                 clock_t start_bed = clock();
                 data.mapPreprocessBedFile(opt.bedFile + ".ppbed");
@@ -99,19 +97,8 @@ int main(int argc, const char * argv[]) {
                 printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
                 cout << endl;
 
-                // Run analysis using mapped data files
-                // Option bayesType="bayesMmap" is going to be deprecated
-                if (opt.bayesType == "bayesMmap" || opt.bayesType == "bayes"){
-                    BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
-                    analysis.runGibbs();
-                } else if (opt.bayesType == "horseshoe") {
-                    //TODO Finish horseshoe
-                } else if (opt.bayesType == "bayesW") {
-                    //TODO Add BayesW
-                } else if (opt.bayesType == "bayesG") {
-                    //TODO add Bayes groups
-                }
-
+                BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+                analysis.runGibbs();
 
                 data.unmapPreprocessedBedFile();
                 end = clock();

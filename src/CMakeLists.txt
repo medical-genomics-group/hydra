@@ -12,6 +12,8 @@ if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
 endif()
 
+find_package(Threads)
+
 include(CheckCXXCompilerFlag)
 
 # Check for -march=native support in the compiler
@@ -46,6 +48,7 @@ add_library(libbrr-dev
     samplewriter.cpp
     compression.cpp
     limitsequencegraph.cpp
+    parallelgraph.cpp
     analysisgraph.cpp
 )
 
@@ -60,11 +63,15 @@ add_executable(${PROJECT_NAME}
     samplewriter.cpp
     compression.cpp
     limitsequencegraph.cpp
+    parallelgraph.cpp
     analysisgraph.cpp
 )
 
 set_property(TARGET libbrr-dev PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET libbrr-dev PROPERTY CXX_STANDARD 17)
+
 set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD_REQUIRED ON)
+set_property(TARGET ${PROJECT_NAME} PROPERTY CXX_STANDARD 17)
 
 find_package(ZLIB REQUIRED)
 if(ZLIB_FOUND)
@@ -80,6 +87,9 @@ find_package(TBB REQUIRED tbb_preview)
 
 target_link_libraries(${PROJECT_NAME} ${TBB_IMPORTED_TARGETS})
 target_link_libraries(libbrr-dev ${TBB_IMPORTED_TARGETS})
+target_link_libraries(${PROJECT_NAME} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(libbrr-dev ${CMAKE_THREAD_LIBS_INIT})
 
 set(${PROJECT_NAME}_INCLUDE_DIRS ${PROJECT_SOURCE_DIR} ${PROJECT_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR} CACHE INTERNAL "${PROJECT_NAME}: Include Directories" FORCE)
+
     
