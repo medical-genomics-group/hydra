@@ -40,7 +40,7 @@ ParallelGraph::ParallelGraph(BayesRRmz *bayes, size_t maxParallel)
 
         std::get<0>(outputPorts).try_put(continue_msg());
 
-        if (input.old_beta != 0.0 && input.beta != 0.0) {
+        if (input.old_beta != 0.0 || input.beta != 0.0) {
             // Do global computation
             std::get<1>(outputPorts).try_put(std::move(input));
         } else {
