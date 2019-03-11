@@ -73,7 +73,8 @@ public:
     virtual ~BayesRRmz();
     int runGibbs(); // where we run Gibbs sampling over the parametrised model
     void processColumn(unsigned int marker, const Map<VectorXd> &Cx);
-    void processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx);
+    double processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx);
+    void updateGlobal(unsigned int marker, const Map<VectorXd> &Cx);
 
     void setDebugEnabled(bool enabled) { m_showDebug = enabled; }
     bool isDebugEnabled() const { return m_showDebug; }

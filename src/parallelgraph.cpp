@@ -10,30 +10,55 @@ ParallelGraph::ParallelGraph(BayesRRmz *bayes, size_t maxParallel)
     , m_graph(new graph)
 {
     // Decompress the column for this marker then process the column using the algorithm class
-    auto f = [this] (Message msg) -> continue_msg {
+    auto f = [this] (Message msg) -> Message {
         // Decompress the column
         const unsigned int colSize = msg.numInds * sizeof(double);
-        unsigned char *decompressBuffer = new unsigned char[colSize];
+
+        msg.data.reset(new unsigned char[colSize]);
 
         extractData(reinterpret_cast<unsigned char *>(m_bayes->m_data.ppBedMap) + m_bayes->m_data.ppbedIndex[msg.marker].pos,
                     static_cast<unsigned int>(m_bayes->m_data.ppbedIndex[msg.marker].size),
-                    decompressBuffer,
+                    msg.data.get(),
                     colSize);
 
         // Delegate the processing of this column to the algorithm class
-        Map<VectorXd> Cx(reinterpret_cast<double *>(decompressBuffer), msg.numInds);
-        m_bayes->processColumnAsync(msg.marker, Cx);
+        Map<VectorXd> Cx(reinterpret_cast<double *>(msg.data.get()), msg.numInds);
+        msg.beta = m_bayes->processColumnAsync(msg.marker, Cx);
 
-        // Cleanup
-        delete[] decompressBuffer;
-        decompressBuffer = nullptr;
-
-        // Signal for next decompression task to continue
-        return continue_msg();
+        return msg;
     };
 
     // Do the decompress and compute work on up to maxParallel threads at once
-    m_computeNode.reset(new function_node<Message>(*m_graph, m_maxParallel, f));
+    m_asyncComputeNode.reset(new function_node<Message, Message>(*m_graph, m_maxParallel, f));
+
+    // Decide whether to continue calculations or discard
+    auto g = [] (decision_node::input_type input,
+                 decision_node::output_ports_type &outputPorts) {
+
+        std::get<0>(outputPorts).try_put(continue_msg());
+
+        if (input.beta != 0.0) {
+            // Do global computation
+            std::get<1>(outputPorts).try_put(std::move(input));
+        } else {
+            // Discard
+            std::get<0>(outputPorts).try_put(continue_msg());
+        }
+    };
+
+    m_decisionNode.reset(new decision_node(*m_graph, m_maxParallel, g));
+
+    // Do global computation
+    auto h = [this] (Message msg) -> continue_msg {
+
+        // Delegate the processing of this column to the algorithm class
+        Map<VectorXd> Cx(reinterpret_cast<double *>(msg.data.get()), msg.numInds);
+        m_bayes->updateGlobal(msg.marker, Cx);
+
+        return continue_msg();
+    };
+    // Use the serial policy
+    m_globalComputeNode.reset(new function_node<Message>(*m_graph, serial, h));
 
     // Limit the number of parallel computations
     m_limit.reset(new limiter_node<Message>(*m_graph, m_maxParallel));
@@ -47,15 +72,25 @@ ParallelGraph::ParallelGraph(BayesRRmz *bayes, size_t maxParallel)
     //
     // orderingNode -> limitNode -> decompressionAndSamplingNode (parallel)
     //                      ^                   |
-    //                      |___________________|
+    //                      |___discard____decisionNode (parallel)
+    //                      ^                   |
+    //                      |                   | keep
+    //                      |                   |
+    //                      |______________globalCompute (serial)
     //
-    // Run the decompressionAndSampling node in the correct order, but do not wait for the most
-    // up-to-date data.
+    // Run the decompressionAndSampling node in the correct order, but do not
+    // wait for the most up-to-date data.
     make_edge(*m_ordering, *m_limit);
-    make_edge(*m_limit, *m_computeNode);
+    make_edge(*m_limit, *m_asyncComputeNode);
+
+    // Feedback that we can now decompress another column, OR
+    make_edge(*m_asyncComputeNode, *m_decisionNode);
+    make_edge(output_port<0>(*m_decisionNode), m_limit->decrement);
+    // Do the global computation
+    make_edge(output_port<1>(*m_decisionNode), *m_globalComputeNode);
 
     // Feedback that we can now decompress another column
-    make_edge(*m_computeNode, m_limit->decrement);
+    make_edge(*m_globalComputeNode, m_limit->decrement);
 }
 
 void ParallelGraph::exec(unsigned int numInds,

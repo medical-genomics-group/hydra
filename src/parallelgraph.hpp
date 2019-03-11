@@ -23,15 +23,32 @@ public:
 
 private:
     struct Message {
-        unsigned int id;
-        unsigned int marker;
-        unsigned int numInds;
+        Message(unsigned int id = 0, unsigned int marker = 0, unsigned int numInds = 0)
+            : id(id)
+            , marker(marker)
+            , numInds(numInds)
+        {
+
+        }
+
+        unsigned int id = 0;
+        unsigned int marker = 0;
+        unsigned int numInds = 0;
+
+        using DataPtr = std::shared_ptr<unsigned char[]>;
+        DataPtr data = nullptr;
+
+        double beta = 0.0;
     };
 
     std::unique_ptr<graph> m_graph;
-    std::unique_ptr<function_node<Message>> m_computeNode;
+    std::unique_ptr<function_node<Message, Message>> m_asyncComputeNode;
     std::unique_ptr<limiter_node<Message>> m_limit;
     std::unique_ptr<sequencer_node<Message>> m_ordering;
+
+    using decision_node = multifunction_node<Message, tbb::flow::tuple<continue_msg, Message> >;
+    std::unique_ptr<decision_node> m_decisionNode;
+    std::unique_ptr<function_node<Message>> m_globalComputeNode;
 };
 
 #endif // PARALLELGRAPH_H

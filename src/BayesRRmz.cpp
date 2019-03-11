@@ -255,7 +255,7 @@ void BayesRRmz::processColumn(unsigned int marker, const Map<VectorXd> &Cx)
     // Now epsilon contains Y-mu - X*beta + X.col(marker) * beta(marker)_old - X.col(marker) * beta(marker)_new
 }
 
-void BayesRRmz::processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx)
+double BayesRRmz::processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx)
 {
     // Lock and take local copies of needed variabls
     // [*] m_beta(marker) rwr - used, updated, then used - per column, could take a copy and update at end
@@ -399,6 +399,13 @@ void BayesRRmz::processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx)
     // These updates do not need to be atomic
     m_beta(marker) = beta;
     m_components(marker) = component;
+
+    return beta;
+}
+
+void BayesRRmz::updateGlobal(unsigned int marker, const Map<VectorXd> &Cx)
+{
+    // Update global epsilon...
 }
 
 void BayesRRmz::printDebugInfo() const
