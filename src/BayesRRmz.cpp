@@ -68,6 +68,7 @@ void BayesRRmz::init(int K, unsigned int markerCount, unsigned int individualCou
     m_beta = VectorXd(markerCount);           // effect sizes
     m_y_tilde = VectorXd(individualCount);    // variable containing the adjusted residuals to exclude the effects of a given marker
     m_epsilon = VectorXd(individualCount);    // variable containing the residuals
+    m_async_epsilon = VectorXd(individualCount);
 
     m_y = VectorXd();
     //Cx = VectorXd();
@@ -132,6 +133,8 @@ int BayesRRmz::runGibbs()
          m_epsilon = m_epsilon.array() + m_mu;//  we substract previous value
          m_mu = m_dist.norm_rng(m_epsilon.sum() / (double)N, m_sigmaE / (double)N); //update mu
          m_epsilon = m_epsilon.array() - m_mu;// we substract again now epsilon =Y-mu-X*beta
+
+         std::memcpy(m_async_epsilon.data(), m_epsilon.data(), static_cast<size_t>(m_epsilon.size()) * sizeof(double));
 
         std::random_shuffle(markerI.begin(), markerI.end());
 
@@ -255,7 +258,7 @@ void BayesRRmz::processColumn(unsigned int marker, const Map<VectorXd> &Cx)
     // Now epsilon contains Y-mu - X*beta + X.col(marker) * beta(marker)_old - X.col(marker) * beta(marker)_new
 }
 
-void BayesRRmz::processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx)
+std::tuple<double, double> BayesRRmz::processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx)
 {
     // Lock and take local copies of needed variabls
     // [*] m_beta(marker) rwr - used, updated, then used - per column, could take a copy and update at end
@@ -291,7 +294,7 @@ void BayesRRmz::processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx)
         // std::memcpy is faster than epsilon = m_epsilon which compiles down to a loop over pairs of
         // doubles and uses _mm_load_pd(source) SIMD intrinsics. Just be careful if we change the type
         // contained in the vector back to floats.
-        std::memcpy(y_tilde.data(), m_epsilon.data(), static_cast<size_t>(epsilon.size()) * sizeof(double));
+        std::memcpy(y_tilde.data(), m_async_epsilon.data(), static_cast<size_t>(epsilon.size()) * sizeof(double));
         beta = m_beta(marker);
         component = m_components(marker);
     }
@@ -390,7 +393,7 @@ void BayesRRmz::processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx)
         // Use a unique lock to ensure only one thread can write updates
         std::unique_lock lock(m_mutex);
         if (!skipUpdate) {
-            std::memcpy(m_epsilon.data(), y_tilde.data(), static_cast<size_t>(y_tilde.size()) * sizeof(double));
+            std::memcpy(m_async_epsilon.data(), y_tilde.data(), static_cast<size_t>(y_tilde.size()) * sizeof(double));
             m_betasqn += beta * beta - beta_old * beta_old;
         }
         m_v += v;
@@ -399,6 +402,14 @@ void BayesRRmz::processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx)
     // These updates do not need to be atomic
     m_beta(marker) = beta;
     m_components(marker) = component;
+
+    return {beta_old, beta};
+}
+
+void BayesRRmz::updateGlobal(double beta_old, double beta, const Map<VectorXd> &Cx)
+{
+    // No mutex required here whilst m_globalComputeNode uses the serial policy
+    m_epsilon -= Cx * (beta - beta_old);
 }
 
 void BayesRRmz::printDebugInfo() const
