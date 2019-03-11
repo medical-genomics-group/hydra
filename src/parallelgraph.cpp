@@ -23,7 +23,10 @@ ParallelGraph::ParallelGraph(BayesRRmz *bayes, size_t maxParallel)
 
         // Delegate the processing of this column to the algorithm class
         Map<VectorXd> Cx(reinterpret_cast<double *>(msg.data.get()), msg.numInds);
-        msg.beta = m_bayes->processColumnAsync(msg.marker, Cx);
+        const auto betas = m_bayes->processColumnAsync(msg.marker, Cx);
+
+        msg.old_beta = std::get<0>(betas);
+        msg.beta = std::get<1>(betas);
 
         return msg;
     };
@@ -37,7 +40,7 @@ ParallelGraph::ParallelGraph(BayesRRmz *bayes, size_t maxParallel)
 
         std::get<0>(outputPorts).try_put(continue_msg());
 
-        if (input.beta != 0.0) {
+        if (input.old_beta != 0.0 && input.beta != 0.0) {
             // Do global computation
             std::get<1>(outputPorts).try_put(std::move(input));
         } else {
@@ -53,7 +56,7 @@ ParallelGraph::ParallelGraph(BayesRRmz *bayes, size_t maxParallel)
 
         // Delegate the processing of this column to the algorithm class
         Map<VectorXd> Cx(reinterpret_cast<double *>(msg.data.get()), msg.numInds);
-        m_bayes->updateGlobal(msg.marker, Cx);
+        m_bayes->updateGlobal(msg.old_beta, msg.beta, Cx);
 
         return continue_msg();
     };

@@ -60,6 +60,7 @@ class BayesRRmz
     VectorXd m_beta;       // effect sizes
     VectorXd m_y_tilde;    // variable containing the adjusted residuals to exclude the effects of a given marker
     VectorXd m_epsilon;    // variable containing the residuals
+    VectorXd m_async_epsilon;
     double m_betasqn = 0.0;
 
     VectorXd m_y;
@@ -73,8 +74,8 @@ public:
     virtual ~BayesRRmz();
     int runGibbs(); // where we run Gibbs sampling over the parametrised model
     void processColumn(unsigned int marker, const Map<VectorXd> &Cx);
-    double processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx);
-    void updateGlobal(unsigned int marker, const Map<VectorXd> &Cx);
+    std::tuple<double, double> processColumnAsync(unsigned int marker, const Map<VectorXd> &Cx);
+    void updateGlobal(double beta_old, double beta, const Map<VectorXd> &Cx);
 
     void setDebugEnabled(bool enabled) { m_showDebug = enabled; }
     bool isDebugEnabled() const { return m_showDebug; }
