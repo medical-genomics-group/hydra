@@ -4,6 +4,7 @@
 #include "BayesRRmz.hpp"
 #include "data.hpp"
 #include "options.hpp"
+#include "tbb/task_scheduler_init.h"
 
 using namespace std;
 
@@ -85,6 +86,10 @@ int main(int argc, const char * argv[]) {
                 clock_t end = clock();
                 printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
                 cout << endl;
+
+                std::unique_ptr<tbb::task_scheduler_init> taskScheduler { nullptr };
+                if (opt.numThreadSpawned > 0)
+                    taskScheduler = std::make_unique<tbb::task_scheduler_init>(opt.numThreadSpawned);
 
                 BayesRRmz analysis(data, opt);
                 analysis.runGibbs();
