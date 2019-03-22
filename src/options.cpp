@@ -98,6 +98,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             numThread = atoi(argv[++i]);
             ss << "--thread " << argv[i] << "\n";
         }
+        else if(!strcmp(argv[i], "--thread-spawned")) {
+            numThreadSpawned = atoi(argv[++i]);
+            ss << "--thread-spawned " << argv[i] << "\n";
+        }
         else {
             stringstream errmsg;
             errmsg << "\nError: invalid option \"" << argv[i] << "\".\n";
