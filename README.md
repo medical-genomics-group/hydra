@@ -86,3 +86,6 @@ src/brr --bayes bayesMmap --bfile test/data/$dataset --pheno test/data/test.phen
 ```
 
 You should get messages in standard output for the reading of the dataset files, the running of Gibbs sampling, time taken for each iteration and finishing with "Analysis finished" message and the time taken to run.
+
+
+## MPI GIBBS (experimental)
