@@ -19,6 +19,12 @@ const unsigned Megabase = 1e6;
 
 class Options {
 public:
+
+#ifdef USE_MPI
+    unsigned shuffleMarkers; //EO
+    unsigned MPISyncRate;    //EO
+    unsigned numberMarkers;  //EO
+#endif
     unsigned chainLength;
     unsigned burnin;
     unsigned seed;

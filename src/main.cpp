@@ -1,10 +1,12 @@
 #include <iostream>
 #include <string>
 #include "BayesRRm.h"
-#include "BayesRRmz.hpp"
 #include "data.hpp"
 #include "options.hpp"
+#ifndef USE_MPI
+#include "BayesRRmz.hpp"
 #include "tbb/task_scheduler_init.h"
+#endif
 
 using namespace std;
 
@@ -26,6 +28,7 @@ int main(int argc, const char * argv[]) {
         cerr << " \nDid you forget to give the input parameters?\n" << endl;
         exit(1);
     }
+
     try {
         Options opt;
         opt.inputOptions(argc, argv);
@@ -36,6 +39,26 @@ int main(int argc, const char * argv[]) {
         data.readFamFile(opt.bedFile + ".fam");
         data.readBimFile(opt.bedFile + ".bim");
 
+
+#ifdef USE_MPI
+        
+        cout << "DETECTED USE_MPI FLAGS with opt.bayesType = " << opt.bayesType << " and opt.analysisType = " << opt.analysisType << endl;
+
+        if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
+            cout << "Will launch MPI (RAM) GIBBS" << endl;
+
+            // Read phenotype file and bed file for the option specified
+            data.readPhenotypeFile(opt.phenotypeFile);
+            data.readBedFile_noMPI(opt.bedFile+".bed");
+            
+            BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+            analysis.runMpiGibbs();
+
+        } else {
+            throw(" Error: Wrong analysis type: " + opt.analysisType);
+        }
+
+#else
         // RAM solution (analysisType = RAMBayes)
         if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
 
@@ -109,10 +132,15 @@ int main(int argc, const char * argv[]) {
                 end = clock();
                 printf("OVERALL read+compute time = %.3f sec.\n", double(end - start) / double(CLOCKS_PER_SEC));
             }
-        }else {
+        }
+        else {
             throw(" Error: Wrong analysis type: " + opt.analysisType);
         }
+
+#endif
+
     }
+        
     catch (const string &err_msg) {
         cerr << "\n" << err_msg << endl;
     }

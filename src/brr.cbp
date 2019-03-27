@@ -5,253 +5,249 @@
 		<Option title="brr"/>
 		<Option makefile_is_custom="1"/>
 		<Option compiler="gcc"/>
-		<Option virtualFolders="CMake Files\;CMake Files\src\;CMake Files\..\;CMake Files\..\..\;CMake Files\..\..\..\;CMake Files\..\..\..\..\;CMake Files\..\..\..\..\usr\;CMake Files\..\..\..\..\usr\lib\;CMake Files\..\..\..\..\usr\lib\cmake\;CMake Files\..\..\..\..\usr\lib\cmake\eigen3\;CMake Files\tbb\;CMake Files\tbb\cmake\;CMake Files\tbb\cmake\templates\;"/>
+		<Option virtualFolders="CMake Files\;CMake Files\src\;CMake Files\..\;CMake Files\..\..\;CMake Files\..\..\..\;CMake Files\..\..\..\..\;CMake Files\..\..\..\..\..\;CMake Files\..\..\..\..\..\ssoft\;CMake Files\..\..\..\..\..\ssoft\spack\;CMake Files\..\..\..\..\..\ssoft\spack\paien\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\gcc-7.3.0\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\gcc-7.3.0\eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\gcc-7.3.0\eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju\share\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\gcc-7.3.0\eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju\share\eigen3\;CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\gcc-7.3.0\eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju\share\eigen3\cmake\;CMake Files\tbb\;CMake Files\tbb\cmake\;CMake Files\tbb\cmake\templates\;"/>
 		<Build>
 			<Target title="all">
-				<Option working_dir="/home/sven/git/BayesRRcmd/src"/>
+				<Option working_dir="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
 				<Option type="4"/>
 				<MakeCommands>
-					<Build command="/usr/bin/ninja -v all"/>
-					<CompileFile command="/usr/bin/ninja -v &quot;$file&quot;"/>
-					<Clean command="/usr/bin/ninja -v clean"/>
-					<DistClean command="/usr/bin/ninja -v clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="libbrr-dev">
-				<Option output="/home/sven/git/BayesRRcmd/src/liblibbrr-dev.a" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/sven/git/BayesRRcmd/src"/>
-				<Option object_output="./"/>
-				<Option type="2"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add directory="/home/sven/git/BayesRRcmd/src"/>
-					<Add directory="/usr/include/eigen3"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent/include"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include"/>
-					<Add directory="/home/sven/git/BayesRRcmd/tbb/include"/>
-					<Add directory="/usr/include/c++/7"/>
-					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
-					<Add directory="/usr/include/c++/7/backward"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/ninja -v libbrr-dev"/>
-					<CompileFile command="/usr/bin/ninja -v &quot;$file&quot;"/>
-					<Clean command="/usr/bin/ninja -v clean"/>
-					<DistClean command="/usr/bin/ninja -v clean"/>
-				</MakeCommands>
-			</Target>
-			<Target title="libbrr-dev/fast">
-				<Option output="/home/sven/git/BayesRRcmd/src/liblibbrr-dev.a" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/sven/git/BayesRRcmd/src"/>
-				<Option object_output="./"/>
-				<Option type="2"/>
-				<Option compiler="gcc"/>
-				<Compiler>
-					<Add directory="/home/sven/git/BayesRRcmd/src"/>
-					<Add directory="/usr/include/eigen3"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent/include"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include"/>
-					<Add directory="/home/sven/git/BayesRRcmd/tbb/include"/>
-					<Add directory="/usr/include/c++/7"/>
-					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
-					<Add directory="/usr/include/c++/7/backward"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
-					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
-					<Add directory="/usr/include"/>
-				</Compiler>
-				<MakeCommands>
-					<Build command="/usr/bin/ninja -v libbrr-dev/fast"/>
-					<CompileFile command="/usr/bin/ninja -v &quot;$file&quot;"/>
-					<Clean command="/usr/bin/ninja -v clean"/>
-					<DistClean command="/usr/bin/ninja -v clean"/>
+					<Build command="/home/orliac/bin/ninja -v all"/>
+					<CompileFile command="/home/orliac/bin/ninja -v &quot;$file&quot;"/>
+					<Clean command="/home/orliac/bin/ninja -v clean"/>
+					<DistClean command="/home/orliac/bin/ninja -v clean"/>
 				</MakeCommands>
 			</Target>
 			<Target title="brr">
-				<Option output="/home/sven/git/BayesRRcmd/src/brr" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/sven/git/BayesRRcmd/src"/>
+				<Option output="/home/orliac/DCSR/CTGG/BayesRRcmd/src/brr" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
 				<Option compiler="gcc"/>
 				<Compiler>
-					<Add directory="/home/sven/git/BayesRRcmd/src"/>
-					<Add directory="/usr/include/eigen3"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent/include"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include"/>
-					<Add directory="/home/sven/git/BayesRRcmd/tbb/include"/>
-					<Add directory="/usr/include/c++/7"/>
-					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
-					<Add directory="/usr/include/c++/7/backward"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju/include/eigen3"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/boost-1.67.0-5cr6635rwz2z4erinfdqyrp355tvfwdy/include"/>
+					<Add directory="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0/x86_64-pc-linux-gnu"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0/backward"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/include"/>
 					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/include-fixed"/>
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/ninja -v brr"/>
-					<CompileFile command="/usr/bin/ninja -v &quot;$file&quot;"/>
-					<Clean command="/usr/bin/ninja -v clean"/>
-					<DistClean command="/usr/bin/ninja -v clean"/>
+					<Build command="/home/orliac/bin/ninja -v brr"/>
+					<CompileFile command="/home/orliac/bin/ninja -v &quot;$file&quot;"/>
+					<Clean command="/home/orliac/bin/ninja -v clean"/>
+					<DistClean command="/home/orliac/bin/ninja -v clean"/>
 				</MakeCommands>
 			</Target>
 			<Target title="brr/fast">
-				<Option output="/home/sven/git/BayesRRcmd/src/brr" prefix_auto="0" extension_auto="0"/>
-				<Option working_dir="/home/sven/git/BayesRRcmd/src"/>
+				<Option output="/home/orliac/DCSR/CTGG/BayesRRcmd/src/brr" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
 				<Option object_output="./"/>
 				<Option type="1"/>
 				<Option compiler="gcc"/>
 				<Compiler>
-					<Add directory="/home/sven/git/BayesRRcmd/src"/>
-					<Add directory="/usr/include/eigen3"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include/openmpi/opal/mca/event/libevent2022/libevent/include"/>
-					<Add directory="/usr/lib/x86_64-linux-gnu/openmpi/include"/>
-					<Add directory="/home/sven/git/BayesRRcmd/tbb/include"/>
-					<Add directory="/usr/include/c++/7"/>
-					<Add directory="/usr/include/x86_64-linux-gnu/c++/7"/>
-					<Add directory="/usr/include/c++/7/backward"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include"/>
+					<Add directory="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju/include/eigen3"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/boost-1.67.0-5cr6635rwz2z4erinfdqyrp355tvfwdy/include"/>
+					<Add directory="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0/x86_64-pc-linux-gnu"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0/backward"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/include"/>
 					<Add directory="/usr/local/include"/>
-					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/7/include-fixed"/>
-					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/include-fixed"/>
 					<Add directory="/usr/include"/>
 				</Compiler>
 				<MakeCommands>
-					<Build command="/usr/bin/ninja -v brr/fast"/>
-					<CompileFile command="/usr/bin/ninja -v &quot;$file&quot;"/>
-					<Clean command="/usr/bin/ninja -v clean"/>
-					<DistClean command="/usr/bin/ninja -v clean"/>
+					<Build command="/home/orliac/bin/ninja -v brr/fast"/>
+					<CompileFile command="/home/orliac/bin/ninja -v &quot;$file&quot;"/>
+					<Clean command="/home/orliac/bin/ninja -v clean"/>
+					<DistClean command="/home/orliac/bin/ninja -v clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="libbrr-dev">
+				<Option output="/home/orliac/DCSR/CTGG/BayesRRcmd/src/liblibbrr-dev.a" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
+				<Option object_output="./"/>
+				<Option type="2"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju/include/eigen3"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/boost-1.67.0-5cr6635rwz2z4erinfdqyrp355tvfwdy/include"/>
+					<Add directory="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0/x86_64-pc-linux-gnu"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0/backward"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/include-fixed"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/home/orliac/bin/ninja -v libbrr-dev"/>
+					<CompileFile command="/home/orliac/bin/ninja -v &quot;$file&quot;"/>
+					<Clean command="/home/orliac/bin/ninja -v clean"/>
+					<DistClean command="/home/orliac/bin/ninja -v clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="libbrr-dev/fast">
+				<Option output="/home/orliac/DCSR/CTGG/BayesRRcmd/src/liblibbrr-dev.a" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
+				<Option object_output="./"/>
+				<Option type="2"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/home/orliac/DCSR/CTGG/BayesRRcmd/src"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju/include/eigen3"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/boost-1.67.0-5cr6635rwz2z4erinfdqyrp355tvfwdy/include"/>
+					<Add directory="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0/x86_64-pc-linux-gnu"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/../../../../include/c++/7.3.0/backward"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/include"/>
+					<Add directory="/ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-4.8.5/gcc-7.3.0-drb5cfgzldhzbrs6lyzk7xdqqcixbxhb/lib/gcc/x86_64-pc-linux-gnu/7.3.0/include-fixed"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/home/orliac/bin/ninja -v libbrr-dev/fast"/>
+					<CompileFile command="/home/orliac/bin/ninja -v &quot;$file&quot;"/>
+					<Clean command="/home/orliac/bin/ninja -v clean"/>
+					<DistClean command="/home/orliac/bin/ninja -v clean"/>
 				</MakeCommands>
 			</Target>
 		</Build>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/BayesRRm.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/BayesRRm.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/BayesRRm.h">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/BayesRRm.h">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/BayesRRmz.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/BayesRRmz.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/BayesRRmz.hpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/BayesRRmz.hpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/analysisgraph.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/analysisgraph.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/analysisgraph.hpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/analysisgraph.hpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/compression.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/compression.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/compression.h">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/compression.h">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/data.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/data.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/data.hpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/data.hpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/distributions_boost.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/distributions_boost.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/distributions_boost.hpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/distributions_boost.hpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/gadgets.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/gadgets.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/gadgets.hpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/gadgets.hpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/limitsequencegraph.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/limitsequencegraph.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/limitsequencegraph.hpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/limitsequencegraph.hpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
+		</Unit>
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/main.cpp">
 			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/main.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/options.cpp">
 			<Option target="brr"/>
-		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/options.cpp">
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/options.hpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/options.hpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/samplewriter.cpp">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/parallelgraph.cpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/samplewriter.h">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/parallelgraph.hpp">
+			<Option target="brr"/>
 			<Option target="libbrr-dev"/>
-			<Option target="brr"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/CMakeLists.txt">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/samplewriter.cpp">
+			<Option target="brr"/>
+			<Option target="libbrr-dev"/>
+		</Unit>
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/samplewriter.h">
+			<Option target="brr"/>
+			<Option target="libbrr-dev"/>
+		</Unit>
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/src/CMakeLists.txt">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/src/CMakeLists.txt">
 			<Option virtualFolder="CMake Files\src\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/../../../../usr/lib/cmake/eigen3/Eigen3Config.cmake">
-			<Option virtualFolder="CMake Files\..\..\..\..\usr\lib\cmake\eigen3\"/>
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/../../../../../ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju/share/eigen3/cmake/Eigen3Config.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\gcc-7.3.0\eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju\share\eigen3\cmake\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/../../../../usr/lib/cmake/eigen3/Eigen3ConfigVersion.cmake">
-			<Option virtualFolder="CMake Files\..\..\..\..\usr\lib\cmake\eigen3\"/>
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/../../../../../ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju/share/eigen3/cmake/Eigen3ConfigVersion.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\gcc-7.3.0\eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju\share\eigen3\cmake\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/../../../../usr/lib/cmake/eigen3/Eigen3Targets.cmake">
-			<Option virtualFolder="CMake Files\..\..\..\..\usr\lib\cmake\eigen3\"/>
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/../../../../../ssoft/spack/paien/v2/opt/spack/linux-rhel7-x86_E5v4_Mellanox/gcc-7.3.0/eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju/share/eigen3/cmake/Eigen3Targets.cmake">
+			<Option virtualFolder="CMake Files\..\..\..\..\..\ssoft\spack\paien\v2\opt\spack\linux-rhel7-x86_E5v4_Mellanox\gcc-7.3.0\eigen-3.3.4-i2jfdbkl2tvczqn6emuodmfnqp7e5aju\share\eigen3\cmake\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/tbb/cmake/TBBBuild.cmake">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/cmake/TBBBuild.cmake">
 			<Option virtualFolder="CMake Files\tbb\cmake\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/tbb/cmake/TBBConfig.cmake">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/cmake/TBBConfig.cmake">
 			<Option virtualFolder="CMake Files\tbb\cmake\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/tbb/cmake/TBBConfigVersion.cmake">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/cmake/TBBConfigVersion.cmake">
 			<Option virtualFolder="CMake Files\tbb\cmake\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/tbb/cmake/TBBMakeConfig.cmake">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/cmake/TBBMakeConfig.cmake">
 			<Option virtualFolder="CMake Files\tbb\cmake\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/tbb/cmake/templates/TBBConfigForSource.cmake.in">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/cmake/templates/TBBConfigForSource.cmake.in">
 			<Option virtualFolder="CMake Files\tbb\cmake\templates\"/>
 		</Unit>
-		<Unit filename="/home/sven/git/BayesRRcmd/tbb/cmake/templates/TBBConfigVersion.cmake.in">
+		<Unit filename="/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/cmake/templates/TBBConfigVersion.cmake.in">
 			<Option virtualFolder="CMake Files\tbb\cmake\templates\"/>
 		</Unit>
 	</Project>

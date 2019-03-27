@@ -130,6 +130,10 @@ public:
     unsigned numSnps;
     unsigned numInds;
 
+#ifdef USE_MPI
+    void preprocess_data(const char* data, const uint NC, const uint NB, double* ppdata, const int rank);
+#endif
+
     void preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &preprocessedBedIndexFile, bool compress);
     void mapPreprocessBedFile(const string &preprocessedBedFile);
     void unmapPreprocessedBedFile();

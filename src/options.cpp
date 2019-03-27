@@ -15,6 +15,13 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bayesType = argv[++i];
             ss << "--bayes " << argv[i] << "\n";
         }
+#ifdef USE_MPI
+        else if (!strcmp(argv[i], "--mpibayes")) {
+            analysisType = "RAM";
+            bayesType = argv[++i];
+            ss << "--mpibayes " << argv[i] << "\n";
+        }
+#endif
         else if (!strcmp(argv[i], "--ppbayes")) {
             analysisType = "PPBayes";
             bayesType = argv[++i];
@@ -45,6 +52,20 @@ void Options::inputOptions(const int argc, const char* argv[]){
             mcmcSampleFile = argv[++i];
             ss << "--mcmc-samples " << argv[i] << "\n";
         }
+#ifdef USE_MPI
+        else if (!strcmp(argv[i], "--shuf-mark")) {    //EO
+            shuffleMarkers = atoi(argv[++i]);
+            ss << "--shuf-mark " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--mpi-sync-rate")) {    //EO
+            MPISyncRate = atoi(argv[++i]);
+            ss << "--mpi-sync-rate " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--number-markers")) {    //EO
+            numberMarkers = atoi(argv[++i]);
+            ss << "--number-markers " << argv[i] << "\n";
+        }
+#endif
         else if (!strcmp(argv[i], "--chain-length")) {
             chainLength = atoi(argv[++i]);
             ss << "--chain-length " << argv[i] << "\n";
@@ -136,7 +157,17 @@ void Options::readFile(const string &file){  // input options from file
             bayesType = value;
         } else if (key == "mcmcSampleFile") {
             mcmcSampleFile = value;
-        } else if (key == "chainLength") {
+        }
+#ifdef USE_MPI
+        else if (key == "shuffleMarkers") {
+            shuffleMarkers = stoi(value);
+        } else if (key == "MPISyncRate") {
+            MPISyncRate = stoi(value);
+        } else if (key == "numberMarkers") {
+            numberMarkers = stoi(value);
+        }
+#endif
+        else if (key == "chainLength") {
             chainLength = stoi(value);
         } else if (key == "burnin") {
             burnin = stoi(value);

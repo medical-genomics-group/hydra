@@ -1,78 +1,47 @@
-
-# -----------------------------------------------------------------
-#   Makefile for testing repo
 #
-#   Supported platforms
-#       Unix / Linux                UNIX
-#       MacOS                       MAC
-# ---------------------------------------------------------------------
+# Purpose: Makefile for compile the MPI based asynchronous Gibbs sampler
+# Author : E. Orliac
+# Date   : 22.01.2019
+#
 
-# Set this variable to either LINUX, MAC or WIN
-OUTPUT = brr
+EXE      = mpi_gibbs
+CXX      = mpiicpc
 
-# Put C++ compiler here
-CXX_UNIX = g++
-#CXX_MAC = gcc   #g++
+CXXFLAGS  = -g -O3 -Wall 
+#CXXFLAGS += -std=c++11 -qopenmp
+CXXFLAGS += -std=c++17
 
-#CXXFLAGS += -I../ -I../../ -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/   -ldl -idirafter /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/
-CXXFLAGS  = -I/software/include/Eigen -I/software/include/boost -DUNIX -m64 -ldl -O3
-CXXFLAGS = -w -O3 -m64 -DEIGEN_NO_DEBUG -msse2 -std=c++11 -I./ -I../tbb/include -I/home/thanasis/anaconda3/include
-# CXXFLAGS += -I../ -I../../  -I/usr/local/include -I/usr/local/include/Eigen -I/usr/local/include/boost -I/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/ -DUNIX -m64 -ldl
+#CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
+#CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512
+#EO: Set this back!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+CXXFLAGS += -xCORE-AVX2 
+CXXFLAGS += -qopenmp-simd
+#CXXFLAGS += -fp-model precise -fp-model source
+#CXXFLAGS += -DISABLE_MPI
 
-#CXXFLAGS += -fopenmp
-#CXXFLAGS += -mavx512f -mavx512cd -fopt-info-vec-all
-#CXXFLAGS += -g
-#CXXFLAGS += -Wall
-CXXFLAGS += -march=native
-#CXXFLAGS += -S
+CXXFLAGS += -D USE_MPI
 
-# LIB += -lz -lmpi -lm  -lc++
-LIB     += -lz -lm 
+INCLUDE  = -I/home/orliac/external_soft/pcg-c/include
+INCLUDE += -I$(EIGEN_ROOT)/include/eigen3
+INCLUDE += -I$(BOOST_ROOT)/include
+INCLUDE += -I$(INTEL_TBB_ROOT)/include
 
-LDFLAGS = -L/usr/local/opt/llvm/lib
+LIBS     = -L$(INTEL_TBB_ROOT)/lib -ltbb -lz
 
-CXX = $(CXX_UNIX)
+#INCLUDE  += -I/home/orliac/DCSR/CTGG/BayesRRcmd/tbb/include/
 
+#SRC = $(wildcard *.cpp)
 
-HDR = BayesRRm.h \
-    BayesRRmz.hpp \
-    data.hpp \
-    distributions_boost.hpp \
-    gadgets.hpp \
-    options.hpp \
-    samplewriter.h \
-    compression.h \
-    limitsequencegraph.hpp \
-    analysisgraph.hpp 
- 
-SRC = BayesRRm.cpp \
-    BayesRRmz.cpp \
-    data.cpp \
-    distributions_boost.cpp \
-    gadgets.cpp \
-    options.cpp \
-    samplewriter.cpp \
-    compression.cpp \
-    limitsequencegraph.cpp \
-    analysisgraph.cpp 
+SRC = data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
 
-OBJ = $(SRC:.cpp=.o)
+OBJ = $(SRC:.cpp = .o)
 
-all : $(OUTPUT)
+all:	$(EXE)
 
-$(OUTPUT) :
-	$(CXX) $(CXXFLAGS) -o $(OUTPUT) $(OBJ) $(LDFLAGS) $(LIB) 
-
-$(OBJ) : $(HDR)
-
-.cpp.o :
-	$(CXX) $(CXXFLAGS) -c $*.cpp
-
-.SUFFIXES : .cpp .c .o $(SUFFIXES)
-
-$(OUTPUT) : $(OBJ)
-
-FORCE:
+$(EXE):	$(OBJ)
+		$(CXX) $(CXXFLAGS) $(INCLUDE) $(LIBS) -o $(EXE) $(OBJ)
 
 clean:
-	rm -f *.o *~
+	/usr/bin/rm -rvf	\
+	*.o
+

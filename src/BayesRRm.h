@@ -68,9 +68,12 @@ public:
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();
     int runGibbs(); // where we run Gibbs sampling over the parametrised model
-
     void setDebugEnabled(bool enabled) { showDebug = enabled; }
     bool isDebugEnabled() const { return showDebug; }
+
+#ifdef USE_MPI
+    int runMpiGibbs();
+#endif
 
 private:
     void init(int K, unsigned int markerCount, unsigned int individualCount);
