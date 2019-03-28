@@ -21,9 +21,9 @@ class Options {
 public:
 
 #ifdef USE_MPI
-    unsigned shuffleMarkers; //EO
-    unsigned MPISyncRate;    //EO
-    unsigned numberMarkers;  //EO
+    unsigned shuffleMarkers =  1;
+    unsigned MPISyncRate    =  1;
+    unsigned numberMarkers  = -1;
 #endif
     unsigned chainLength;
     unsigned burnin;
