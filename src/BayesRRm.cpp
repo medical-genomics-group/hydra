@@ -291,16 +291,16 @@ int BayesRRm::runMpiGibbs() {
         sample_error(result, buff);
     }
 
-    int          blockcounts[2] = {2, 2};
-    MPI_Datatype types[2]       = {MPI_INT, MPI_DOUBLE}; 
-    MPI_Aint     displs[2];
-    MPI_Datatype typeout;
-    MPI_Get_address(&lineout.sigmaE,    &displs[0]);
-    MPI_Get_address(&lineout.iteration, &displs[1]);
-    for (int i = 1; i >= 0; i--)
-        displs[i] -= displs[0];
-    MPI_Type_create_struct(2, blockcounts, displs, types, &typeout);
-    MPI_Type_commit(&typeout);
+    //int          blockcounts[2] = {2, 2};
+    //MPI_Datatype types[2]       = {MPI_INT, MPI_DOUBLE}; 
+    //MPI_Aint     displs[2];
+    //MPI_Datatype typeout;
+    //MPI_Get_address(&lineout.sigmaE,    &displs[0]);
+    //MPI_Get_address(&lineout.iteration, &displs[1]);
+    //for (int i = 1; i >= 0; i--)
+    //    displs[i] -= displs[0];
+    //MPI_Type_create_struct(2, blockcounts, displs, types, &typeout);
+    //MPI_Type_commit(&typeout);
 
 
     size_t rawdata_n = size_t(M) * size_t(snpLenByt) * sizeof(char);
@@ -348,7 +348,6 @@ int BayesRRm::runMpiGibbs() {
     deltaEps = (double*)_mm_malloc(N * sizeof(double), 64); if (deltaEps == NULL) {printf("malloc deltaEps failed.\n"); exit (1);}
     dEpsSum  = (double*)_mm_malloc(N * sizeof(double), 64); if (dEpsSum  == NULL) {printf("malloc dEpsSum failed.\n");  exit (1);}
     deltaSum = (double*)_mm_malloc(N * sizeof(double), 64); if (deltaSum == NULL) {printf("malloc deltaSum failed.\n"); exit (1);}
-    Cx       = (double*)_mm_malloc(N * sizeof(double), 64); if (Cx       == NULL) {printf("malloc Cx failed.\n");       exit (1);}
 
     priorPi[0] = 0.5d;
     cVa[0]     = 0.0d;
@@ -452,7 +451,7 @@ int BayesRRm::runMpiGibbs() {
             markabs = MrankS[rank] + marker; 
 
             markoff = size_t(marker) * size_t(N);
-            Cx     = &ppdata[markoff];
+            Cx      = &ppdata[markoff];
             //printf("%d/%d/%d: Cx[0] = %20.15f / %20.15f\n", iteration, rank, marker, Cx[0], ppdata[markoff]);
 
             bet =  beta(marker,0);
@@ -579,7 +578,7 @@ int BayesRRm::runMpiGibbs() {
         //printf("sigmaG = %20.15f, sigmaE = %20.15f, e_sqn = %20.15f\n", sigmaG, sigmaE, e_sqn);
         //printf("it %6d, rank %3d: epsilon[0] = %15.10f, y[0] = %15.10f, m0=%10.1f,  sigE=%15.10f,  sigG=%15.10f [%6d / %6d]\n", iteration, rank, epsilon[0], y[0], m0, sigmaE, sigmaG, markerI[0], markerI[M-1]);
 
-        pi=dist.dirichilet_rng(v.array() + 1.0);
+        pi = dist.dirichilet_rng(v.array() + 1.0);
 
         // Write to output file
         //Lineout lineout;
@@ -590,26 +589,18 @@ int BayesRRm::runMpiGibbs() {
         //offset = size_t(iteration) * size_t(nranks) + size_t(rank) * sizeof(lineout);
         //result = MPI_File_write_at_all(outfh, offset, &lineout, 1, typeout, &status);
 
-       
         left = snprintf(buf, LENBUF, "%3d, %6d, %15.10f, %15.10f, %15.10f\n", rank, iteration, sigmaE, sigmaG, sigmaG/(sigmaE+sigmaG));
         //printf("letf = %d\n", left);
         offset = (size_t(iteration) * size_t(nranks) + size_t(rank)) * strlen(buf);
         result = MPI_File_write_at_all(outfh, offset, &buf, strlen(buf), MPI_CHAR, &status);
         if (result != MPI_SUCCESS) 
             sample_error(result, "MPI_File_write_at_all");
-
-        //MPI_Barrier(MPI_COMM_WORLD);
     }
-
 
     MPI_File_close(&outfh);
     printf("rank %d finished writing to csv output file %-100s\n", rank, outfp.c_str());
-
-    MPI_Type_free(&typeout);
-
-
-    // Finalize the MPI environment. No more MPI calls can be made after this
-    MPI_Finalize();
+    
+    //MPI_Type_free(&typeout);
 
     _mm_free(y);
     _mm_free(y_tilde);
@@ -618,9 +609,11 @@ int BayesRRm::runMpiGibbs() {
     _mm_free(deltaEps);
     _mm_free(dEpsSum);
     _mm_free(deltaSum);
-    _mm_free(Cx);
     _mm_free(rawdata);
     _mm_free(ppdata);
+
+    // Finalize the MPI environment. No more MPI calls can be made after this
+    MPI_Finalize();
 
     return 0;
 }
