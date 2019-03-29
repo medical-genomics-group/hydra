@@ -297,9 +297,9 @@ void Data::readFamFile(const string &famFile){
     // ignore phenotype column
     ifstream in(famFile.c_str());
     if (!in) throw ("Error: can not open the file [" + famFile + "] to read.");
-
+#ifndef USE_MPI
     cout << "Reading PLINK FAM file from [" + famFile + "]." << endl;
-
+#endif
     indInfoVec.clear();
     indInfoMap.clear();
     string fid, pid, dad, mom, sex, phen;
@@ -313,16 +313,18 @@ void Data::readFamFile(const string &famFile){
     }
     in.close();
     numInds = (unsigned) indInfoVec.size();
-
+#ifndef USE_MPI
     cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
+#endif
 }
 
 void Data::readBimFile(const string &bimFile) {
     // Read bim file: recombination rate is defined between SNP i and SNP i-1
     ifstream in(bimFile.c_str());
     if (!in) throw ("Error: can not open the file [" + bimFile + "] to read.");
-
+#ifndef USE_MPI
     cout << "Reading PLINK BIM file from [" + bimFile + "]." << endl;
+#endif
     snpInfoVec.clear();
     snpInfoMap.clear();
     string id, allele1, allele2;
@@ -338,8 +340,9 @@ void Data::readBimFile(const string &bimFile) {
     }
     in.close();
     numSnps = (unsigned) snpInfoVec.size();
-
+#ifndef USE_MPI
     cout << numSnps << " SNPs to be included from [" + bimFile + "]." << endl;
+#endif
 }
 
 
@@ -359,7 +362,9 @@ void Data::readBedFile_noMPI(const string &bedFile){
     unsigned allele1=0, allele2=0;
     ifstream BIT(bedFile.c_str(), ios::binary);
     if (!BIT) throw ("Error: can not open the file [" + bedFile + "] to read.");
+#ifndef USE_MPI
     cout << "Reading PLINK BED file from [" + bedFile + "] in SNP-major format ..." << endl;
+#endif
     for (i = 0; i < 3; i++) BIT.read(ch, 1); // skip the first three bytes
     SnpInfo *snpInfo = NULL;
     unsigned snp = 0, ind = 0;
@@ -426,15 +431,18 @@ void Data::readBedFile_noMPI(const string &bedFile){
         Z.col(i).array() -= Z.col(i).mean();
         ZPZdiag[i] = Z.col(i).squaredNorm();
     }
+#ifndef USE_MPI
     cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
+#endif
 }
 
 void Data::readPhenotypeFile(const string &phenFile) {
     // NA: missing phenotype
     ifstream in(phenFile.c_str());
     if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
-
+#ifndef USE_MPI
     cout << "Reading phenotypes from [" + phenFile + "]." << endl;
+#endif
     map<string, IndInfo*>::iterator it, end=indInfoMap.end();
     IndInfo *ind = NULL;
     Gadget::Tokenizer colData;

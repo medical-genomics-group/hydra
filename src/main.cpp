@@ -12,17 +12,11 @@ using namespace std;
 
 int main(int argc, const char * argv[]) {
 
-
-    cout << "***********************************************\n";
-    cout << "* BayesRRcmd                                  *\n";
-    cout << "* Complex Trait Genetics group UNIL           *\n";
-    cout << "*                                             *\n";
-    cout << "* MIT License                                 *\n";
-    cout << "***********************************************\n";
-
+#ifndef USE_MPI
     Gadget::Timer timer;
     timer.setTime();
     cout << "\nAnalysis started: " << timer.getDate();
+#endif
 
     if (argc < 2){
         cerr << " \nDid you forget to give the input parameters?\n" << endl;
@@ -31,6 +25,9 @@ int main(int argc, const char * argv[]) {
 
     try {
         Options opt;
+#ifndef USE_MPI
+        opt.printBanner();
+#endif
         opt.inputOptions(argc, argv);
 
         Data data;
@@ -41,23 +38,14 @@ int main(int argc, const char * argv[]) {
 
 
 #ifdef USE_MPI
-        
-        cout << "DETECTED USE_MPI FLAGS with opt.bayesType = " << opt.bayesType << " and opt.analysisType = " << opt.analysisType << endl;
-
         if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
-            cout << "Will launch MPI (RAM) GIBBS" << endl;
-
-            // Read phenotype file and bed file for the option specified
+            // Read phenotype file
             data.readPhenotypeFile(opt.phenotypeFile);
-            data.readBedFile_noMPI(opt.bedFile+".bed");
-            
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
             analysis.runMpiGibbs();
-
         } else {
             throw(" Error: Wrong analysis type: " + opt.analysisType);
         }
-
 #else
         // RAM solution (analysisType = RAMBayes)
         if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
@@ -148,11 +136,12 @@ int main(int argc, const char * argv[]) {
         cerr << "\n" << err_msg << endl;
     }
 
+#ifndef USE_MPI
     timer.getTime();
 
     cout << "\nAnalysis finished: " << timer.getDate();
     cout << "Computational time: "  << timer.format(timer.getElapse()) << endl;
-
+#endif
 
     return 0;
 }

@@ -153,13 +153,11 @@ inline double dotprod(const double* __restrict__ vec1, const double* __restrict_
     return dp;
 }
 
+#define LENBUF 200
 
 int BayesRRm::runMpiGibbs() {
 
-#define LENBUF 200
-
-    char reply[100];
-    char buff[128]; 
+    char buff[LENBUF]; 
     int  nranks, rank, name_len, result;
 
     MPI_Init(NULL, NULL);
@@ -173,10 +171,8 @@ int BayesRRm::runMpiGibbs() {
     // Set up processing options
     // -------------------------
     if (rank == 0) {
-        cout << "shuffleMarkers?    " << opt.shuffleMarkers << endl;
-        cout << "MPISyncRate?       " << opt.MPISyncRate    << endl;
-        if (opt.numberMarkers > 0)
-            cout << "Ask to reset M to: " << opt.numberMarkers << endl;
+        opt.printBanner();
+        opt.printProcessingOptions();
     }
     unsigned shuf_mark = opt.shuffleMarkers;
     unsigned sync_rate = opt.MPISyncRate;
@@ -188,11 +184,14 @@ int BayesRRm::runMpiGibbs() {
     const unsigned int max_it = opt.chainLength;
     const unsigned int N(data.numInds);
     unsigned int Mtot(data.numSnps);
-    printf("Dataset included %d markers\n", Mtot);
+    if (rank == 0)
+        printf("Full dataset includes %d markers and %d individuals.\n", Mtot, N);
     if (opt.numberMarkers > 0 && opt.numberMarkers < Mtot)
         Mtot = opt.numberMarkers;
     if (rank == 0)
-        printf("Will process %d Markers in total.\n", Mtot);
+        printf("Option passed to process only %d markers!\n", Mtot);
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
 
 
     // Define global marker indexing
@@ -239,9 +238,6 @@ int BayesRRm::runMpiGibbs() {
     const double        s02E   = 0.0001;
     const double        v0G    = 0.0001;
     const double        s02G   = 0.0001;
-    //EO: fix that in original code!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //Eigen::VectorXd     cva(3);   cva << 1E-2, 1E-3, 1E-4;
-    Eigen::VectorXd     cva(2);   cva << 1.0, 0.1;
     const unsigned int  K      = int(cva.size()) + 1;
     const unsigned int  km1    = K - 1;
     double              dNm1   = (double)(N - 1);
@@ -261,6 +257,7 @@ int BayesRRm::runMpiGibbs() {
     //int                 m0;              // total number of markes in model
     double              m0;
     VectorXd            v(K);            // variable storing the component assignment
+    VectorXd            sum_v(K);        // To store the sum of v elements over all ranks
     MatrixXd            beta(M,1);       // effect sizes
     //VectorXd            sample(2*M+4+N); // varible containg a sample of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
 
@@ -303,44 +300,86 @@ int BayesRRm::runMpiGibbs() {
     //MPI_Type_commit(&typeout);
 
 
-    size_t rawdata_n = size_t(M) * size_t(snpLenByt) * sizeof(char);
-    //cout << "rawdata_n = " << rawdata_n << endl;
+    size_t  rawdata_n = size_t(M) * size_t(snpLenByt)    * sizeof(char);
+    size_t  ppdata_n  = size_t(M) * size_t(data.numInds) * sizeof(double);
+    char*   rawdata   = (char*)   _mm_malloc(rawdata_n, 64); if (rawdata == NULL) { printf("malloc rawdata failed.\n"); exit (1); }
+    double* ppdata    = (double*) _mm_malloc(ppdata_n,  64); if (ppdata  == NULL) { printf("malloc ppdata failed.\n");  exit (1); }
+    printf("rank %d allocation %zu bytes (%.3f GB)\n", rank, ppdata_n, double(ppdata_n/1E9));
 
+
+    // Compute the offset of the section to read from the BED file
+    // -----------------------------------------------------------
+    MPI_Offset offset = size_t(3) + size_t(MrankS[rank]) * size_t(snpLenByt) * sizeof(char);
+
+
+    // Read the BED file
+    // -----------------
+    const auto st1 = std::chrono::high_resolution_clock::now();
+
+    // Check how many calls are needed (limited by the int type of the number of elements to read!)
+    uint nmpiread = 1;
     if (rawdata_n >= pow(2,(sizeof(int)*8)-1)) {   
         printf("MPI_file_read_at capacity exceeded. Asking to read %zu elements vs max %12.0f\n", 
                rawdata_n, pow(2,(sizeof(int)*8)-1));
-               fflush(stdout);
-        exit(1);
+        nmpiread = ceil(double(rawdata_n) / double(pow(2,(sizeof(int)*8)-1)));
+        cout << "Will need " << nmpiread << " calls to MPI_file_read_at to load all the data." << endl;
     }
+    assert(nmpiread >= 1);
+    
+    if (nmpiread == 1) {
+        result = MPI_File_read_at(bedfh, offset, rawdata, rawdata_n, MPI_CHAR, &status);
+        if(result != MPI_SUCCESS) 
+            sample_error(result, "MPI_File_read_at");
+    } else {
+        cout << "rawdata_n = " << rawdata_n << endl;
+        size_t chunk    = size_t(double(rawdata_n)/double(nmpiread));
+        size_t checksum = 0;
+        for (int i=0; i<nmpiread; ++i) {
+            size_t chunk_ = chunk;        
+            if (i==nmpiread-1)
+                chunk_ = rawdata_n - (i * chunk);
+            checksum += chunk_;
+            printf("rank %03d: chunk %02d: read at %zu a chunk of %zu.\n", rank, i, i*chunk*sizeof(char), chunk_);
+            result = MPI_File_read_at(bedfh, offset + i*chunk*sizeof(char), &rawdata[i*chunk], chunk_, MPI_CHAR, &status);
+            if(result != MPI_SUCCESS) 
+                sample_error(result, "MPI_File_read_at");
+        }
+        assert(checksum == rawdata_n);
+    }
+    const auto et1 = std::chrono::high_resolution_clock::now();
+    const auto dt1 = et1 - st1;
+    const auto du1 = std::chrono::duration_cast<std::chrono::milliseconds>(dt1).count();
+    std::cout << "rank " << rank << ", time to read the BED file: " << du1 / double(1000.0) << " s." << std::endl;
 
-    size_t  ppdata_n = size_t(M) * size_t(data.numInds) * sizeof(double);
-    char*   rawdata  = (char*)   _mm_malloc(rawdata_n, 64); if (rawdata == NULL) { printf("malloc rawdata failed.\n"); exit (1); }
-    double* ppdata   = (double*) _mm_malloc(ppdata_n,  64); if (ppdata  == NULL) { printf("malloc ppdata failed.\n");  exit (1); }
-    printf("rank %d allocation %zu bytes (%.3f GB)\n", rank, ppdata_n, double(ppdata_n/1E9));
-
-    MPI_Offset offset = size_t(3) + size_t(MrankS[rank]) * size_t(snpLenByt) * sizeof(char);
-
-    result = MPI_File_read_at(bedfh, offset, rawdata, rawdata_n, MPI_CHAR, &status);
+    result = MPI_File_close(&bedfh);
     if(result != MPI_SUCCESS) 
-        sample_error(result, "MPI_File_read_at");
+        sample_error(result, "MPI_File_close");
 
-    MPI_File_close(&bedfh);
-    printf("rank %d finished reading data\n", rank);
-    //fflush(stdout);
-    //MPI_Barrier(MPI_COMM_WORLD);
 
+
+    // Pre-process the data
+    // --------------------
+    const auto st2 = std::chrono::high_resolution_clock::now();
     data.preprocess_data(rawdata, M, snpLenByt, ppdata, rank);
-    printf("rank %d finished preprocessing data\n", rank);
-    //fflush(stdout);
-    //MPI_Barrier(MPI_COMM_WORLD);
+    const auto et2 = std::chrono::high_resolution_clock::now();
+    const auto dt2 = et2 - st2;
+    const auto du2 = std::chrono::duration_cast<std::chrono::milliseconds>(dt2).count();
+    std::cout << "rank " << rank << ", time to preprocess the data: " << du2 / double(1000.0) << " s." << std::endl;
+    
 
     for (int i=0; i<M; ++i)
         markerI.push_back(i);
     //std::iota(markerI.begin(), markerI.end(), 0);
 
-    data.ZPZdiag.resize(M);
+    //data.ZPZdiag.resize(M);
+
+
+    // Processing part
+    // ---------------
+    const auto st3 = std::chrono::high_resolution_clock::now();
 
     double *y, *y_tilde, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum, *Cx;
+
     y        = (double*)_mm_malloc(N * sizeof(double), 64); if (y        == NULL) {printf("malloc y failed.\n");        exit (1);}
     y_tilde  = (double*)_mm_malloc(N * sizeof(double), 64); if (y_tilde  == NULL) {printf("malloc y_tilde failed.\n");  exit (1);}
     epsilon  = (double*)_mm_malloc(N * sizeof(double), 64); if (epsilon  == NULL) {printf("malloc epsilon failed.\n");  exit (1);}
@@ -349,15 +388,15 @@ int BayesRRm::runMpiGibbs() {
     dEpsSum  = (double*)_mm_malloc(N * sizeof(double), 64); if (dEpsSum  == NULL) {printf("malloc dEpsSum failed.\n");  exit (1);}
     deltaSum = (double*)_mm_malloc(N * sizeof(double), 64); if (deltaSum == NULL) {printf("malloc deltaSum failed.\n"); exit (1);}
 
-    priorPi[0] = 0.5d;
-    cVa[0]     = 0.0d;
-    cVaI[0]    = 0.0d;
-    muk[0]     = 0.0d;
-    mu         = 0.0d;
+    priorPi[0] = 0.5;
+    cVa[0]     = 0.0;
+    cVaI[0]    = 0.0;
+    muk[0]     = 0.0;
+    mu         = 0.0;
 
     for (int i=0; i<N; ++i) {
-        y_tilde[i] = 0.0d;
-        dEpsSum[i] = 0.0d;
+        y_tilde[i] = 0.0;
+        dEpsSum[i] = 0.0;
     }
 
     cVa.segment(1,km1)     = cva;
@@ -368,7 +407,7 @@ int BayesRRm::runMpiGibbs() {
     beta.setZero();
     components.setZero();
 
-    double y_mean = 0.0d;
+    double y_mean = 0.0;
     for (int i=0; i<N; ++i) {
         y[i]    = (double)data.y(i);
         y_mean += y[i];
@@ -399,12 +438,10 @@ int BayesRRm::runMpiGibbs() {
 
 
     double   sum_beta_squaredNorm, sum_eps, mean_eps;
-    double   sum_v0, sum_v1, sum_v2, sum_v3;
     double   sigE_G, sigG_E, i_2sigE;
     double   bet, betaOld, deltaBeta, beta_squaredNorm, p, acum, e_sqn;
     size_t   markoff;
     int      marker, markabs, left;
-    char     buf[LENBUF];
     VectorXd logL(K);
 
 
@@ -487,7 +524,7 @@ int BayesRRm::runMpiGibbs() {
                 acum = 1.0d / ((logL.array()-logL[0]).exp().sum());
             }
 
-            //EO: K -> K-1 by Daniel on 20190219!
+            //EO: K -> K-1 by Daniel on 20190219!            
             //-----------------------------------
             for (int k=0; k<K-1; k++) {                
                 if (p <= acum) {
@@ -546,18 +583,12 @@ int BayesRRm::runMpiGibbs() {
 
         beta_squaredNorm = beta.squaredNorm();
 
-        //EO: see to reduce to a single call
-        MPI_Allreduce(&beta_squaredNorm, &sum_beta_squaredNorm, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Allreduce(&v[0],             &sum_v0,               1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Allreduce(&v[1],             &sum_v1,               1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        MPI_Allreduce(&v[2],             &sum_v2,               1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-        //MPI_Allreduce(&v[3],             &sum_v3,               1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-        v[0] = sum_v0;
-        v[1] = sum_v1;
-        v[2] = sum_v2;
-        //v[3] = sum_v3;
-        m0   = double(Mtot) - v[0];
+        // Transfer global to local
+        // ------------------------
+        MPI_Allreduce(&beta_squaredNorm, &sum_beta_squaredNorm, 1,        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        MPI_Allreduce(v.data(),          sum_v.data(),          v.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        v                = sum_v;
+        m0               = double(Mtot) - v[0];
         beta_squaredNorm = sum_beta_squaredNorm;
 
         sigmaG  = dist.inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0));
@@ -589,10 +620,10 @@ int BayesRRm::runMpiGibbs() {
         //offset = size_t(iteration) * size_t(nranks) + size_t(rank) * sizeof(lineout);
         //result = MPI_File_write_at_all(outfh, offset, &lineout, 1, typeout, &status);
 
-        left = snprintf(buf, LENBUF, "%3d, %6d, %15.10f, %15.10f, %15.10f\n", rank, iteration, sigmaE, sigmaG, sigmaG/(sigmaE+sigmaG));
+        left = snprintf(buff, LENBUF, "%3d, %6d, %15.10f, %15.10f, %15.10f\n", rank, iteration, sigmaE, sigmaG, sigmaG/(sigmaE+sigmaG));
         //printf("letf = %d\n", left);
-        offset = (size_t(iteration) * size_t(nranks) + size_t(rank)) * strlen(buf);
-        result = MPI_File_write_at_all(outfh, offset, &buf, strlen(buf), MPI_CHAR, &status);
+        offset = (size_t(iteration) * size_t(nranks) + size_t(rank)) * strlen(buff);
+        result = MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status);
         if (result != MPI_SUCCESS) 
             sample_error(result, "MPI_File_write_at_all");
     }
@@ -614,6 +645,11 @@ int BayesRRm::runMpiGibbs() {
 
     // Finalize the MPI environment. No more MPI calls can be made after this
     MPI_Finalize();
+
+    const auto et3 = std::chrono::high_resolution_clock::now();
+    const auto dt3 = et3 - st3;
+    const auto du3 = std::chrono::duration_cast<std::chrono::milliseconds>(dt3).count();
+    std::cout << "rank " << rank << ", time to process the data: " << du3 / double(1000.0) << " s." << std::endl;
 
     return 0;
 }

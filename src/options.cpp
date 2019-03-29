@@ -130,7 +130,8 @@ void Options::inputOptions(const int argc, const char* argv[]){
         }
     }
 
-    cout << ss.str() << endl;
+    options_s = ss.str();
+    //cout << ss.str() << endl;
 }
 
 void Options::readFile(const string &file){  // input options from file
@@ -193,12 +194,25 @@ void Options::readFile(const string &file){  // input options from file
         ss << boost::format("%20s %-1s %-20s\n") %key %":" %value;
     }
     in.close();
-
     cout << ss.str() << endl;
-
-
-
 }
+
+
+void Options::printBanner(void) {
+    cout << "\n";
+    cout << "***********************************************\n";
+    cout << "* BayesRRcmd                                  *\n";
+    cout << "* Complex Trait Genetics group UNIL           *\n";
+    cout << "*                                             *\n";
+    cout << "* MIT License                                 *\n";
+    cout << "***********************************************\n\n";
+}
+
+
+void Options::printProcessingOptions(void) {
+    cout << options_s << endl;
+}
+
 
 void Options::makeTitle(void){
     title = optionFile;
@@ -207,3 +221,4 @@ void Options::makeTitle(void){
         title = optionFile.substr(0,pos);
     }
 }
+

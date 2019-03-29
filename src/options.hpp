@@ -46,6 +46,8 @@ public:
     string optionFile;
     bool compress = false;
 
+    string options_s;
+
     Options(){
         chainLength             = 10000;
         burnin                  = 5000;
@@ -70,6 +72,9 @@ public:
     }
 
     void inputOptions(const int argc, const char* argv[]);
+
+    void printBanner(void);
+    void printProcessingOptions(void);
 
 private:
     void readFile(const string &file);
