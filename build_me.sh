@@ -13,16 +13,18 @@ echo "   COMPILING THE MPI VERSION   "
 echo "==============================="
 echo
 module purge
-module load intel intel-mpi intel-mkl intel-tbb boost eigen zlib
-env | grep TBB
+module load intel intel-mpi intel-mkl boost eigen zlib
 module list
 
 cd src
 
+#make -B
 make
-# -B
+if [ $? -ne 0 ] ; then
+    echo "make failed."
+    exit 1
+fi
 
-#exit 0
 
 #
 ## COMPILATION OF THE SEQUENTIAL VERSION
