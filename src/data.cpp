@@ -18,22 +18,22 @@ Data::Data()
 }
 
 #ifdef USE_MPI
+
 // Read raw data loaded in memory to preprocess them (center, scale and cast to double)
 void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, double* ppdata, const int rank) {
 
     assert(numInds<=NB*4);
 
-    //printf("Data::preprocess_data @ rank %d, NC = %d, NB = %d, numInds = %d\n",
-    //       rank, NC, NB, numInds);
-
     for (int i=0; i<NC; ++i) {
+
+        char* locraw = (char*)&rawdata[i*NB];
 
         // temporary array used for translation
         int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(int8_t), 64);
 
         for (int ii=0; ii<NB; ++ii) {
             for (int iii=0; iii<4; ++iii) {
-                tmpi[ii*4 + iii] = (rawdata[i*NB + ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
+                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
             }
         }
         
@@ -55,43 +55,34 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
             }
         }
 
-        //if (i%1000==0)
-        //printf("rank %d, i=%6d: sum = %d, N = %d, nmiss = %d\n", rank, i, sum, numKeptInds, nmiss);
-        //double mean = double(sum) / double(numKeptInds + nmiss); //EO: nmiss is neg
         double mean = double(sum) / double(numInds + nmiss); //EO: nmiss is neg
-
         //printf("rank %d snpInd %2d: sum = %6d, N = %6d, nmiss = %6d, mean = %20.15f\n",
         //       rank, rank*NC+i, sum, numKeptInds, nmiss, mean);
 
 #ifndef ENABLE_PPDATA
         size_t ppdata_i = size_t(i) * size_t(numInds);
+        double *locpp = (double*)&ppdata[ppdata_i];
+
         for (size_t ii=0; ii<numInds; ++ii) {
             if (tmpi[ii] < 0) {
-                ppdata[ppdata_i + ii] = 0.0d;
+                locpp[ii] = 0.0d;
             } else {
-                ppdata[ppdata_i + ii] = double(tmpi[ii]) - mean;
+                locpp[ii] = double(tmpi[ii]) - mean;
             }
-            //if (ii==0)
-            //    printf("ppdata[%zu] = %20.10f\n", ppdata_i + ii, ppdata[ppdata_i + ii]);
         }
 
         double sqn  = 0.0d;
         for (size_t ii=0; ii<numInds; ++ii) {
-            sqn += ppdata[ppdata_i + ii] * ppdata[ppdata_i + ii];
+            sqn += locpp[ii] * locpp[ii];
         }
 
-        //double std_ = sqrt(double(numKeptInds - 1) / sqn);
         double std_ = sqrt(double(numInds - 1) / sqn);
-        //printf("std_ = %20.10f\n", std_);
 
         for (size_t ii=0; ii<numInds; ++ii) {
-            ppdata[ppdata_i + ii] *= std_;
+            locpp[ii] *= std_;
         }
 #endif
         _mm_free(tmpi);
-
-        //EO? Check this one
-        //ZPZdiag[snpInd]  = (float(numKeptInds)-1.0); 
     }
 }
 #endif

@@ -304,7 +304,8 @@ int BayesRRm::runMpiGibbs() {
     size_t  ppdata_n  = size_t(M) * size_t(data.numInds) * sizeof(double);
     char*   rawdata   = (char*)   _mm_malloc(rawdata_n, 64); if (rawdata == NULL) { printf("malloc rawdata failed.\n"); exit (1); }
     double* ppdata    = (double*) _mm_malloc(ppdata_n,  64); if (ppdata  == NULL) { printf("malloc ppdata failed.\n");  exit (1); }
-    printf("rank %d allocation %zu bytes (%.3f GB)\n", rank, ppdata_n, double(ppdata_n/1E9));
+    printf("rank %d allocation %zu bytes (%.3f GB) for the raw data.\n",           rank, rawdata_n, double(rawdata_n/1E9));
+    printf("rank %d allocation %zu bytes (%.3f GB) for the pre-processed data.\n", rank, ppdata_n,  double(ppdata_n/1E9));
 
 
     // Compute the offset of the section to read from the BED file
@@ -321,11 +322,11 @@ int BayesRRm::runMpiGibbs() {
     if (rawdata_n >= pow(2,(sizeof(int)*8)-1)) {   
         printf("MPI_file_read_at capacity exceeded. Asking to read %zu elements vs max %12.0f\n", 
                rawdata_n, pow(2,(sizeof(int)*8)-1));
-        nmpiread = ceil(double(rawdata_n) / double(pow(2,(sizeof(int)*8)-1)));
-        cout << "Will need " << nmpiread << " calls to MPI_file_read_at to load all the data." << endl;
+        nmpiread = ceil(double(rawdata_n) / double(pow(2,(sizeof(int)*8)-1)));       
     }
     assert(nmpiread >= 1);
-    
+    cout << "Will need " << nmpiread << " calls to MPI_file_read_at to load all the data." << endl;
+
     if (nmpiread == 1) {
         result = MPI_File_read_at(bedfh, offset, rawdata, rawdata_n, MPI_CHAR, &status);
         if(result != MPI_SUCCESS) 
@@ -340,11 +341,13 @@ int BayesRRm::runMpiGibbs() {
                 chunk_ = rawdata_n - (i * chunk);
             checksum += chunk_;
             printf("rank %03d: chunk %02d: read at %zu a chunk of %zu.\n", rank, i, i*chunk*sizeof(char), chunk_);
-            result = MPI_File_read_at(bedfh, offset + i*chunk*sizeof(char), &rawdata[i*chunk], chunk_, MPI_CHAR, &status);
+            result = MPI_File_read_at(bedfh, offset + size_t(i)*chunk*sizeof(char), &rawdata[size_t(i)*chunk], chunk_, MPI_CHAR, &status);
             if(result != MPI_SUCCESS) 
                 sample_error(result, "MPI_File_read_at");
         }
-        assert(checksum == rawdata_n);
+        if (checksum != rawdata_n) {
+            cout << "FATAL!! checksum not equal to rawdata_n: " << checksum << " vs " << rawdata_n << endl; 
+        }
     }
     const auto et1 = std::chrono::high_resolution_clock::now();
     const auto dt1 = et1 - st1;
@@ -354,7 +357,6 @@ int BayesRRm::runMpiGibbs() {
     result = MPI_File_close(&bedfh);
     if(result != MPI_SUCCESS) 
         sample_error(result, "MPI_File_close");
-
 
 
     // Pre-process the data
