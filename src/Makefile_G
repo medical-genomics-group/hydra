@@ -4,25 +4,21 @@
 # Date   : 22.01.2019
 #
 
-EXE       = mpi_gibbs
+EXE       = mpi_gibbs_G
 
-CXX       = mpiicpc
+CXX       = mpic++
 
 CXXFLAGS  = -g -O3
 CXXFLAGS += -std=c++17
-CXXFLAGS += -xCORE-AVX2
+CXXFLAGS += -march=core-avx2	
 CXXFLAGS += -D USE_MPI
 
-#EO: set this back when switching to production
-#    This will allow to fully use vectorization on both fidis and gacrux
-#CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512
-##CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
+#CXXFLAGS +=  -fopt-info-vec-optimized
 
-#EO: enable the following for a strict comparison with Eigen
-#CXXFLAGS += -fp-model precise -fp-model source
-
-INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
+INCLUDE  = -I/home/orliac/external_soft/pcg-c/include
+INCLUDE += -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
+INCLUDE += -I$(MVAPICH2_ROOT)/include
 
 LIBS     = -lz
 

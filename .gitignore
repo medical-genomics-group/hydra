@@ -9,3 +9,5 @@ brr
 *~
 *.optrpt
 /MR_ADV/
+slurm-*.out
+bayesOutput_??.*

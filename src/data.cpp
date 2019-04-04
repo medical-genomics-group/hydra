@@ -29,7 +29,7 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
         char* locraw = (char*)&rawdata[i*NB];
 
         // temporary array used for translation
-        int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(int8_t), 64);
+        int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
 
         for (int ii=0; ii<NB; ++ii) {
             for (int iii=0; iii<4; ++iii) {
@@ -59,7 +59,6 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
         //printf("rank %d snpInd %2d: sum = %6d, N = %6d, nmiss = %6d, mean = %20.15f\n",
         //       rank, rank*NC+i, sum, numKeptInds, nmiss, mean);
 
-#ifndef ENABLE_PPDATA
         size_t ppdata_i = size_t(i) * size_t(numInds);
         double *locpp = (double*)&ppdata[ppdata_i];
 
@@ -81,8 +80,8 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
         for (size_t ii=0; ii<numInds; ++ii) {
             locpp[ii] *= std_;
         }
-#endif
-        _mm_free(tmpi);
+
+        free(tmpi);
     }
 }
 #endif

@@ -5,6 +5,7 @@
  *      Author: admin
  */
 
+#include <cstdlib>
 #include "BayesRRm.h"
 #include "data.hpp"
 #include "distributions_boost.hpp"
@@ -13,6 +14,8 @@
 #include <chrono>
 #include <numeric>
 #include <random>
+#include <algorithm>
+
 #ifdef USE_MPI
 #include <mpi.h>
 #endif
@@ -87,7 +90,7 @@ void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCoun
     beta.setZero();
 
     //sample from beta distribution
-    sigmaG = dist.beta_rng(1,1);
+    sigmaG = dist.beta_rng(1.0, 1.0);
 
     pi = priorPi;
 
@@ -111,7 +114,7 @@ struct Lineout {
     int    iteration, rank;
 } lineout;
 
-void sample_error(int error, char *string)
+void sample_error(int error, const char *string)
 {
   fprintf(stderr, "Error %d in %s\n", error, string);
   MPI_Finalize();
@@ -119,30 +122,34 @@ void sample_error(int error, char *string)
 }
 
 inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, const double* __restrict__ vin2, const double dMULT, const int N) {
-    
-    __assume_aligned(vout, 64);
-    __assume_aligned(vin1, 64);
-    __assume_aligned(vin2, 64);
 
-    for (int i=0; i<N; i++) {
-        vout[i] = vin1[i] + dMULT * vin2[i];
+    if (dMULT == 0.0) {
+        for (int i=0; i<N; i++) {
+            vout[i] = vin1[i];
+        }
+    } else {
+        for (int i=0; i<N; i++) {
+            vout[i] = vin1[i] + dMULT * vin2[i];
+        }
     }
+
 }
 
 inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin2, const double dMULT, const int N) {
-    
-    __assume_aligned(vout, 64);
-    __assume_aligned(vin2, 64);
 
-    for (int i=0; i<N; i++) {
-        vout[i] = dMULT * vin2[i];
+    if (dMULT == 0.0) {
+        for (int i=0; i<N; i++) {
+            vout[i] = 0.0;
+        }
+    } else {
+        for (int i=0; i<N; i++) {
+            vout[i] = dMULT * vin2[i];
+        }
     }
+
 }
 
 inline double dotprod(const double* __restrict__ vec1, const double* __restrict__ vec2, const int N) {
-
-    __assume_aligned(vec1, 64);
-    __assume_aligned(vec2, 64);
 
     double dp = 0.0d;
 
@@ -153,9 +160,11 @@ inline double dotprod(const double* __restrict__ vec1, const double* __restrict_
     return dp;
 }
 
-#define LENBUF 200
 
 int BayesRRm::runMpiGibbs() {
+
+    const size_t LENBUF=200;
+    const size_t ALIGN=1024;
 
     char buff[LENBUF]; 
     int  nranks, rank, name_len, result;
@@ -180,7 +189,10 @@ int BayesRRm::runMpiGibbs() {
 
     // Initialize MC on each worker
     // ----------------------------
-    Distributions_boost dist(opt.seed + rank*1000);
+    //cout << "Instantiating dist with seed = " << opt.seed + rank*1000 << endl;
+    //Distributions_boost dist((uint)(opt.seed + rank*1000));
+    dist.reset_rng((uint)(opt.seed + rank*1000), rank);
+
     const unsigned int max_it = opt.chainLength;
     const unsigned int N(data.numInds);
     unsigned int Mtot(data.numSnps);
@@ -300,10 +312,10 @@ int BayesRRm::runMpiGibbs() {
     //MPI_Type_commit(&typeout);
 
 
-    size_t  rawdata_n = size_t(M) * size_t(snpLenByt)    * sizeof(char);
-    size_t  ppdata_n  = size_t(M) * size_t(data.numInds) * sizeof(double);
-    char*   rawdata   = (char*)   _mm_malloc(rawdata_n, 64); if (rawdata == NULL) { printf("malloc rawdata failed.\n"); exit (1); }
-    double* ppdata    = (double*) _mm_malloc(ppdata_n,  64); if (ppdata  == NULL) { printf("malloc ppdata failed.\n");  exit (1); }
+    const size_t rawdata_n = size_t(M) * size_t(snpLenByt)    * sizeof(char);
+    const size_t ppdata_n  = size_t(M) * size_t(data.numInds) * sizeof(double);
+    char*   rawdata   = (char*)  malloc(rawdata_n); if (rawdata == NULL) { printf("malloc rawdata failed.\n"); exit (1); }
+    double* ppdata    = (double*)malloc(ppdata_n);  if (ppdata  == NULL) { printf("malloc ppdata failed.\n");  exit (1); }
     printf("rank %d allocation %zu bytes (%.3f GB) for the raw data.\n",           rank, rawdata_n, double(rawdata_n/1E9));
     printf("rank %d allocation %zu bytes (%.3f GB) for the pre-processed data.\n", rank, ppdata_n,  double(ppdata_n/1E9));
 
@@ -382,13 +394,15 @@ int BayesRRm::runMpiGibbs() {
 
     double *y, *y_tilde, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum, *Cx;
 
-    y        = (double*)_mm_malloc(N * sizeof(double), 64); if (y        == NULL) {printf("malloc y failed.\n");        exit (1);}
-    y_tilde  = (double*)_mm_malloc(N * sizeof(double), 64); if (y_tilde  == NULL) {printf("malloc y_tilde failed.\n");  exit (1);}
-    epsilon  = (double*)_mm_malloc(N * sizeof(double), 64); if (epsilon  == NULL) {printf("malloc epsilon failed.\n");  exit (1);}
-    tmpEps   = (double*)_mm_malloc(N * sizeof(double), 64); if (tmpEps   == NULL) {printf("malloc tmpEps failed.\n");   exit (1);}
-    deltaEps = (double*)_mm_malloc(N * sizeof(double), 64); if (deltaEps == NULL) {printf("malloc deltaEps failed.\n"); exit (1);}
-    dEpsSum  = (double*)_mm_malloc(N * sizeof(double), 64); if (dEpsSum  == NULL) {printf("malloc dEpsSum failed.\n");  exit (1);}
-    deltaSum = (double*)_mm_malloc(N * sizeof(double), 64); if (deltaSum == NULL) {printf("malloc deltaSum failed.\n"); exit (1);}
+    const size_t NDB = size_t(N) * sizeof(double);
+
+    y        = (double*)malloc(NDB); if (y        == NULL) { printf("malloc y failed.\n");        exit (1); }
+    y_tilde  = (double*)malloc(NDB); if (y_tilde  == NULL) { printf("malloc y_tilde failed.\n");  exit (1); }
+    epsilon  = (double*)malloc(NDB); if (epsilon  == NULL) { printf("malloc epsilon failed.\n");  exit (1); }
+    tmpEps   = (double*)malloc(NDB); if (tmpEps   == NULL) { printf("malloc tmpEps failed.\n");   exit (1); }
+    deltaEps = (double*)malloc(NDB); if (deltaEps == NULL) { printf("malloc deltaEps failed.\n"); exit (1); }
+    dEpsSum  = (double*)malloc(NDB); if (dEpsSum  == NULL) { printf("malloc dEpsSum failed.\n");  exit (1); }
+    deltaSum = (double*)malloc(NDB); if (deltaSum == NULL) { printf("malloc deltaSum failed.\n"); exit (1); }
 
     priorPi[0] = 0.5;
     cVa[0]     = 0.0;
@@ -443,9 +457,9 @@ int BayesRRm::runMpiGibbs() {
     double   sigE_G, sigG_E, i_2sigE;
     double   bet, betaOld, deltaBeta, beta_squaredNorm, p, acum, e_sqn;
     size_t   markoff;
-    int      marker, markabs, left;
+    int      marker, left;
     VectorXd logL(K);
-
+    
 
     // Main iteration loop
     // -------------------
@@ -466,12 +480,19 @@ int BayesRRm::runMpiGibbs() {
         for (int i=0; i<N; ++i)
             epsilon[i] -= mu;
 
+        //EO: watch out, std::shuffle is not portable, so do no expect identical
+        //    results between Intel and GCC when shuffling the markers is on!!
+        //------------------------------------------------------------------------
+        //for (auto i = 10; i; --i)
+        //    std::cout << i << " b> " << dist.rng() << std::endl;
         //EO: shuffle or not the markers (only tests)
         if (shuf_mark) {
             std::shuffle(markerI.begin(), markerI.end(), dist.rng);
-            //std::random_shuffle(markerI.begin(), markerI.end(), dist.rng);
             //std::random_shuffle(markerI.begin(), markerI.end());
         }
+        //for (auto i = 10; i; --i)
+        //    std::cout << i << " a> " << dist.rng() << std::endl;
+
         
         m0 = 0.0d;
         v.setZero();
@@ -487,14 +508,12 @@ int BayesRRm::runMpiGibbs() {
         for (int j = 0; j < M; j++) {
 
             marker  = markerI[j];
-            markabs = MrankS[rank] + marker; 
-
             markoff = size_t(marker) * size_t(N);
             Cx      = &ppdata[markoff];
             //printf("%d/%d/%d: Cx[0] = %20.15f / %20.15f\n", iteration, rank, marker, Cx[0], ppdata[markoff]);
 
             bet =  beta(marker,0);
-            
+
             scaadd(y_tilde, epsilon, Cx, bet, N);
 
             //we compute the denominator in the variance expression to save computations
@@ -556,6 +575,8 @@ int BayesRRm::runMpiGibbs() {
             bet       = beta(marker,0);
             deltaBeta = betaOld - bet;
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f\n", iteration, rank, marker, deltaBeta, betaOld, bet);
+            //fflush(stdout);
+            //MPI_Barrier(MPI_COMM_WORLD);
 
             // Compute delta epsilon
             scaadd(deltaEps, Cx, deltaBeta, N);
@@ -569,7 +590,7 @@ int BayesRRm::runMpiGibbs() {
                 // Synchronize the deltaEps
                 //MPI_Allreduce(&deltaEps[0], &deltaSum[0], N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
                 MPI_Allreduce(&dEpsSum[0], &deltaSum[0], N, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-            
+
                 for (int i=0; i<N; ++i)
                     epsilon[i] = tmpEps[i] + deltaSum[i];
 
@@ -635,15 +656,15 @@ int BayesRRm::runMpiGibbs() {
     
     //MPI_Type_free(&typeout);
 
-    _mm_free(y);
-    _mm_free(y_tilde);
-    _mm_free(epsilon);
-    _mm_free(tmpEps);
-    _mm_free(deltaEps);
-    _mm_free(dEpsSum);
-    _mm_free(deltaSum);
-    _mm_free(rawdata);
-    _mm_free(ppdata);
+    free(y);
+    free(y_tilde);
+    free(epsilon);
+    free(tmpEps);
+    free(deltaEps);
+    free(dEpsSum);
+    free(deltaSum);
+    free(rawdata);
+    free(ppdata);
 
     // Finalize the MPI environment. No more MPI calls can be made after this
     MPI_Finalize();

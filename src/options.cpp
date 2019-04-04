@@ -75,7 +75,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
             ss << "--burn-in " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--seed")) {
-            seed = atoi(argv[++i]);
+            seed = (uint)atoi(argv[++i]);
             ss << "--seed " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--out")) {
@@ -173,7 +173,7 @@ void Options::readFile(const string &file){  // input options from file
         } else if (key == "burnin") {
             burnin = stoi(value);
         } else if (key == "seed") {
-            seed = stoi(value);
+            seed = (uint)stoi(value);
         } else if (key == "thin") {
             thin = stoi(value);
         } else if (key == "S") {

@@ -13,12 +13,21 @@
 #include <boost/random/normal_distribution.hpp>
 #include <boost/random/beta_distribution.hpp>
 #include <boost/random/uniform_01.hpp>
+#include <iostream>
+
 
 Distributions_boost::Distributions_boost(unsigned int pseed):seed(pseed){
-    rng=boost::mt19937(pseed);
+    std::cout << "Initiating dist.rng with pseed = " << pseed << std::endl;
 }
+
 Distributions_boost::~Distributions_boost(){
 }
+
+void Distributions_boost::reset_rng(unsigned int seed, unsigned int rank) {
+    std::cout << "INFO: task " << rank << " reseting boost::mt19937 with seed: " << seed << std::endl;
+    rng = boost::mt19937(seed);
+}
+
 
 double Distributions_boost::rgamma(double shape, double scale){
     boost::random::gamma_distribution<double> myGamma(shape, scale);
@@ -81,9 +90,6 @@ double Distributions_boost::component_probs(double b2,Eigen::VectorXd pi){
     else
         return 1;
 }
-
-
-
 
 double Distributions_boost::beta_rng(double a,double b){
     boost::random::beta_distribution<double> mybeta(a, b);
