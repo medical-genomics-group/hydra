@@ -5,8 +5,8 @@
 #include "options.hpp"
 #ifndef USE_MPI
 #include "BayesRRmz.hpp"
-#include "tbb/task_scheduler_init.h"
 #endif
+#include "tbb/task_scheduler_init.h"
 
 using namespace std;
 
@@ -36,20 +36,20 @@ int main(int argc, const char * argv[]) {
         data.readFamFile(opt.bedFile + ".fam");
         data.readBimFile(opt.bedFile + ".bim");
 
-
 #ifdef USE_MPI
         if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
             // Read phenotype file
             data.readPhenotypeFile(opt.phenotypeFile);
+            //EO to remove
+            //data.readBedFile_noMPI(opt.bedFile+".bed");
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
             analysis.runMpiGibbs();
-        } else {
-            throw(" Error: Wrong analysis type: " + opt.analysisType);
-        }
+        } else if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
+
 #else
         // RAM solution (analysisType = RAMBayes)
         if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
-
+#endif
             clock_t start = clock();
 
             // Read phenotype file and bed file for the option specified
@@ -85,7 +85,9 @@ int main(int argc, const char * argv[]) {
             clock_t end = clock();
             printf("Finished preprocessing the bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
             cout << endl;
-        }else if (opt.analysisType == "PPBayes" || opt.analysisType == "PPAsyncBayes") {
+        }
+#ifndef USE_MPI
+        else if (opt.analysisType == "PPBayes" || opt.analysisType == "PPAsyncBayes") {
             clock_t start = clock();
             data.readPhenotypeFile(opt.phenotypeFile);
             // Run analysis using mapped data files
@@ -121,11 +123,12 @@ int main(int argc, const char * argv[]) {
                 printf("OVERALL read+compute time = %.3f sec.\n", double(end - start) / double(CLOCKS_PER_SEC));
             }
         }
+#endif
         else {
-            throw(" Error: Wrong analysis type: " + opt.analysisType);
+            throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);
         }
 
-#endif
+        //#endif
 
     }
         

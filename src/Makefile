@@ -8,9 +8,11 @@ EXE       = mpi_gibbs
 
 CXX       = mpiicpc
 
-CXXFLAGS  = -g -O3
+CXXFLAGS  = -O3
+#CXXFLAGS += -g
 CXXFLAGS += -std=c++17
-CXXFLAGS += -xCORE-AVX2
+#CXXFLAGS += -xCORE-AVX2
+CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 CXXFLAGS += -D USE_MPI
 
 #EO: set this back when switching to production
@@ -19,10 +21,12 @@ CXXFLAGS += -D USE_MPI
 ##CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 
 #EO: enable the following for a strict comparison with Eigen
-#CXXFLAGS += -fp-model precise -fp-model source
+#CXXFLAGS += -fp-model precise 
+#CXXFLAGS += -fp-model source
 
 INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
+INCLUDE += -I../tbb/include
 
 LIBS     = -lz
 
@@ -38,4 +42,3 @@ $(EXE):	$(OBJ)
 clean:
 	/usr/bin/rm -rvf	\
 	*.o
-

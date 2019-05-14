@@ -20,11 +20,13 @@ const unsigned Megabase = 1e6;
 class Options {
 public:
 
-#ifdef USE_MPI
     unsigned shuffleMarkers =  1;
+#ifdef USE_MPI
     unsigned MPISyncRate    =  1;
-    unsigned numberMarkers  = -1;
 #endif
+    unsigned numberMarkers  =  0;
+    unsigned m2skip         =  0;
+    unsigned mstart         =  0;
     unsigned chainLength;
     unsigned burnin;
     unsigned seed;
@@ -42,7 +44,7 @@ public:
     string bayesType;
     string phenotypeFile;
     string bedFile;
-    string mcmcSampleFile;
+    string mcmcSampleFile, mcmcBetFile;
     string optionFile;
     bool compress = false;
 
@@ -67,6 +69,7 @@ public:
         phenotypeFile           = "";
         bedFile                 = "";
         mcmcSampleFile          = "bayesOutput.csv";
+        mcmcBetFile             = "bayesOutput.bet";
         optionFile				= "";
         numGroups				=2;
     }

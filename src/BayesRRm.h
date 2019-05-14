@@ -43,7 +43,7 @@ class BayesRRm
     VectorXd logL;      // log likelihood of component
     VectorXd muk;       // mean of k-th component marker effect size
     VectorXd denom;     // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
-    int m0;             // total num ber of markes in model
+    int m0;             // total number of markers in model
     VectorXd v;         // variable storing the component assignment
     VectorXd cVaI;      // inverse of the component variances
     VectorXd components;

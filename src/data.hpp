@@ -92,9 +92,11 @@ public:
 
     // Original data
     MatrixXf X;              // coefficient matrix for fixed effects
-    MatrixXf Z;              // coefficient matrix for SNP effects
+    //MatrixXf Z;              // coefficient matrix for SNP effects
+    MatrixXd Z;
     VectorXf D;              // 2pqn
-    VectorXf y;              // phenotypes
+    //VectorXf y;              // phenotypes
+    VectorXd y;              // phenotypes
     VectorXi G; // groups
 
     MatrixXf XPX;            // X'X the MME lhs
@@ -130,7 +132,13 @@ public:
     unsigned numSnps;
     unsigned numInds;
 
+
 #ifdef USE_MPI
+    void sparse_data_get_sizes(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2);
+    void sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB, size_t* N1S, size_t* N1L, size_t* N2S, size_t* N2L, size_t N1, size_t N2, size_t* I1, size_t* I2);
+    void compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum);
+    void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx);
+    void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx, const double mean, const double std_);
     void preprocess_data(const char* data, const uint NC, const uint NB, double* ppdata, const int rank);
 #endif
 

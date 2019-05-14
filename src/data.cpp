@@ -19,21 +19,299 @@ Data::Data()
 
 #ifdef USE_MPI
 
+void Data::sparse_data_get_sizes(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2) {
+
+    assert(numInds<=NB*4);
+
+    // temporary array used for translation
+    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+
+    size_t NM=0, N0=0;
+    *N1=0;
+    *N2=0;
+
+    for (int i=0; i<NC; ++i) {
+
+        char* locraw = (char*)&rawdata[size_t(i)*size_t(NB)];
+
+        for (int ii=0; ii<NB; ++ii) {
+            for (int iii=0; iii<4; ++iii) {
+                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;
+            }
+        }
+        
+        for (int ii=0; ii<numInds; ++ii) {
+            if (tmpi[ii] == 1) {
+                tmpi[ii] = -1;
+            } else {
+                tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
+            }
+        }
+
+        for (int ii=0; ii<numInds; ++ii) {
+            if (tmpi[ii] == 1) *N1 += 1;
+            if (tmpi[ii] == 2) *N2 += 1;
+        }
+    }
+
+    free(tmpi);
+}
+
+
+// Read raw data loaded in memory to preprocess them (center, scale and cast to double)
+void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB,
+                                    size_t* N1S, size_t* N1L, size_t* N2S, size_t* N2L,
+                                    size_t N1, size_t N2, size_t* I1, size_t* I2) {
+    
+    assert(numInds<=NB*4);
+
+    // temporary array used for translation
+    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+
+    size_t NM=0, N0=0, absi, i1=0, i2=0;
+    N1=0;
+    N2=0;
+
+    for (int i=0; i<NC; ++i) {
+
+        char* locraw = (char*)&rawdata[size_t(i)*size_t(NB)];
+
+        for (int ii=0; ii<NB; ++ii) {
+            for (int iii=0; iii<4; ++iii) {
+                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;
+            }
+        }
+        
+        for (int ii=0; ii<numInds; ++ii) {
+            if (tmpi[ii] == 1) {
+                tmpi[ii] = -1;
+            } else {
+                tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
+            }
+        }
+
+        int sum = 0, nmiss = 0;
+        int n0=0, n1=0, n2=0;
+
+        for (int ii=0; ii<numInds; ++ii) {
+            if (tmpi[ii] < 0) {
+                nmiss += tmpi[ii];
+            } else {
+                sum   += tmpi[ii];
+                if        (tmpi[ii] == 0) {
+                    n0 += 1;
+                } else if (tmpi[ii] == 1) {
+                    I1[i1] = size_t(ii);
+                    i1 += 1;
+                    n1 += 1;
+                } else if (tmpi[ii] == 2) {
+                    I2[i2] = size_t(ii);
+                    i2 += 1;
+                    n2 += 1;
+                }
+            }
+        }
+
+        NM += nmiss;
+
+        assert(nmiss + n0 + n1 + n2 == numInds);
+
+        //if (i == 0 || i == 1 || i == 343597 || i == 343598)
+        //    printf("marker %6d: %6d %6d %6d %6d (miss, 0, 1 , 2) sparsity = %4.1f %%\n", i, nmiss, n0, n1, n2, (double(n0)/double(numInds))*100);
+        N1S[i] = N1;  N1L[i] = n1;  N1 += n1;
+        N2S[i] = N2;  N2L[i] = n2;  N2 += n2;
+        //cout << i << ", " << N1S[i] << ", " << N1L[i] << endl;
+        //cout << i << ", " << N2S[i] << ", " << N2L[i] << endl;
+    }
+
+    free(tmpi);
+
+    //cout << "Total ones " << N1 << ", total twos " << N2 << endl;
+}
+
+
+void Data::compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum) {
+
+    // temporary array used for translation
+    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+
+    for (int i=0; i<M; i++) {
+
+        char* locraw = (char*)&rawdata[size_t(i) * size_t(NB)];
+
+        for (int ii=0; ii<NB; ++ii) {
+            for (int iii=0; iii<4; ++iii) {
+                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
+            }
+        }
+       
+        for (int ii=0; ii<numInds; ++ii) {
+            if (tmpi[ii] == 1) {
+                tmpi[ii] = -1;
+            } else {
+                tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
+            }
+        }
+
+        int sum = 0, nmiss = 0;
+        for (int ii=0; ii<numInds; ++ii) {
+            if (tmpi[ii] < 0) {
+                nmiss += tmpi[ii];
+            } else {
+                sum   += tmpi[ii];
+            }
+        }
+
+        double mean = double(sum) / double(numInds + nmiss); //EO: nmiss is neg
+        //printf("marker %d  mean = %15.10f stats\n", i, mean);
+
+        double sqn = 0.0d;
+        uint nzeros = 0;
+        for (size_t ii=0; ii<numInds; ++ii) {
+            if (tmpi[ii] >= 0)
+                sqn += (double(tmpi[ii]) - mean) * (double(tmpi[ii]) - mean);
+            if (tmpi[ii] == 0)
+                nzeros += 1;
+        }
+        //if (i < 3)
+        //    printf("marker %d  sqn = %20.15f  std_ = %20.15f stats; nzeros = %d; nmiss = %d\n", i, sqn, sqrt(double(numInds - 1) / sqn), nzeros, -nmiss);
+
+        msum[i] = sum;
+        mave[i] = mean;
+        mstd[i] = sqrt(double(numInds - 1) / sqn);
+    }
+    free(tmpi);
+}
+
+
+//void Data::get_normalized_marker_data(const char* rawdata, const uint NB)
+void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx, const double mean, const double std_) {
+
+    assert(numInds<=NB*4);
+
+    // Pointer to column in block of raw data
+    char* locraw = (char*)&rawdata[size_t(marker) * size_t(NB)];
+    
+    // temporary array used for translation
+    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+
+    for (int ii=0; ii<NB; ++ii) {
+        for (int iii=0; iii<4; ++iii) {
+            tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
+        }
+    }
+       
+    for (int ii=0; ii<numInds; ++ii) {
+        if (tmpi[ii] == 1) {
+            tmpi[ii] = -1;
+        } else {
+            tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
+        }
+    }
+    
+    for (size_t ii=0; ii<numInds; ++ii) {
+        if (tmpi[ii] < 0) {
+            Cx[ii]  = 0.0d;
+            cout << "marker " << marker << " at " << ii << " is 0.0" << endl;
+        } else {
+            Cx[ii] = (double(tmpi[ii]) - mean) * std_;
+        }
+    }
+    for (size_t ii=0; ii<numInds; ++ii) {
+        if (Cx[ii] == 0.0) {
+            cout << "marker " << marker << " at " << ii << " is 0.0" << endl;
+        }
+    }
+
+    free(tmpi);
+}
+
+
+
+
+//void Data::get_normalized_marker_data(const char* rawdata, const uint NB)
+void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx) {
+
+    assert(numInds<=NB*4);
+
+    // Pointer to column in block of raw data
+    char* locraw = (char*)&rawdata[size_t(marker) * size_t(NB)];
+    
+    // temporary array used for translation
+    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+
+    for (int ii=0; ii<NB; ++ii) {
+        for (int iii=0; iii<4; ++iii) {
+            tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
+        }
+    }
+       
+    for (int ii=0; ii<numInds; ++ii) {
+        if (tmpi[ii] == 1) {
+            tmpi[ii] = -1;
+        } else {
+            tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
+        }
+    }
+
+    int sum = 0, nmiss = 0;
+    //#pragma omp simd reduction(+:sum) reduction(+:nmiss)
+    for (int ii=0; ii<numInds; ++ii) {
+        if (tmpi[ii] < 0) {
+            nmiss += tmpi[ii];
+        } else {
+            sum   += tmpi[ii];
+        }
+    }
+
+    double mean = double(sum) / double(numInds + nmiss); //EO: nmiss is neg
+    //if (marker < 3)
+    //    printf("marker %d  mean = %20.15f\n", marker, mean);
+
+    //printf("rank %d snpInd %2d: sum = %6d, N = %6d, nmiss = %6d, mean = %20.15f\n",
+    //       rank, rank*NC+i, sum, numKeptInds, nmiss, mean);
+    
+    for (size_t ii=0; ii<numInds; ++ii) {
+        if (tmpi[ii] < 0) {
+            Cx[ii] = 0.0d;
+        } else {
+            Cx[ii] = double(tmpi[ii]) - mean;
+        }
+    }
+
+    // Normalize the data
+    double sqn  = 0.0d;
+    for (size_t ii=0; ii<numInds; ++ii) {
+        sqn += Cx[ii] * Cx[ii];
+    }
+    //if (marker < 3)
+    //    printf("marker %d  sqn = %20.15f\n", marker, sqn);
+
+    double std_ = sqrt(double(numInds - 1) / sqn);
+    //if (marker < 3)
+    //    printf("marker %d  std_ = %20.15f\n", marker, std_);
+
+    for (size_t ii=0; ii<numInds; ++ii)
+        Cx[ii] *= std_;
+
+    free(tmpi);
+}
+
 // Read raw data loaded in memory to preprocess them (center, scale and cast to double)
 void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, double* ppdata, const int rank) {
 
     assert(numInds<=NB*4);
 
+    // temporary array used for translation
+    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+
     for (int i=0; i<NC; ++i) {
 
-        char* locraw = (char*)&rawdata[i*NB];
-
-        // temporary array used for translation
-        int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+        char* locraw = (char*)&rawdata[size_t(i) * size_t(NB)];
 
         for (int ii=0; ii<NB; ++ii) {
             for (int iii=0; iii<4; ++iii) {
-                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
+                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;
             }
         }
         
@@ -80,10 +358,10 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
         for (size_t ii=0; ii<numInds; ++ii) {
             locpp[ii] *= std_;
         }
-
-        free(tmpi);
     }
+    free(tmpi);
 }
+
 #endif
 
 
@@ -341,6 +619,7 @@ void Data::readBedFile_noMPI(const string &bedFile){
 
     if (numSnps == 0) throw ("Error: No SNP is retained for analysis.");
     if (numInds == 0) throw ("Error: No individual is retained for analysis.");
+    cout << numInds << ", " << numSnps << endl;
 
     Z.resize(numInds, numSnps);
     ZPZdiag.resize(numSnps);
@@ -352,16 +631,20 @@ void Data::readBedFile_noMPI(const string &bedFile){
     unsigned allele1=0, allele2=0;
     ifstream BIT(bedFile.c_str(), ios::binary);
     if (!BIT) throw ("Error: can not open the file [" + bedFile + "] to read.");
-#ifndef USE_MPI
+    //#ifndef USE_MPI
     cout << "Reading PLINK BED file from [" + bedFile + "] in SNP-major format ..." << endl;
-#endif
+    //#endif
+
     for (i = 0; i < 3; i++) BIT.read(ch, 1); // skip the first three bytes
     SnpInfo *snpInfo = NULL;
     unsigned snp = 0, ind = 0;
     unsigned nmiss = 0;
-    float mean = 0.0;
+    //float mean = 0.0;
+    double mean = 0.0;
 
     for (j = 0, snp = 0; j < numSnps; j++) { // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
+        //cout << j << endl;
+
         snpInfo = snpInfoVec[j];
         mean = 0.0;
         nmiss = 0;
@@ -390,9 +673,15 @@ void Data::readBedFile_noMPI(const string &bedFile){
             }
         }
         // fill missing values with the mean
-        float sum = mean;
-        mean /= float(numInds-nmiss);
+        //float sum = mean;
+        //mean /= float(numInds-nmiss);
+        //if (j < 3)
+        //    printf("marker %d has mean = %20.15f div by %d\n", j, mean, numInds-nmiss);
 
+        mean /= double(numInds-nmiss);
+        //if (j < 3)
+        //    printf("OFF: marker %d has mean = %20.15f, nmiss = %d\n", j, mean, nmiss);
+        
         if (nmiss) {
             for (i=0; i<numInds; ++i) {
                 if (Z(i,snp) == -9) Z(i,snp) = mean;
@@ -400,14 +689,20 @@ void Data::readBedFile_noMPI(const string &bedFile){
         }
 
         // compute allele frequency
-        snpInfo->af = 0.5f*mean;
-        snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
+        //snpInfo->af = 0.5f*mean;
+        //snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
 
         // standardize genotypes
         Z.col(j).array() -= mean;
 
-        float sqn = Z.col(j).squaredNorm();
-        float std_ = 1.f / (sqrt(sqn / float(numInds)));
+        //float sqn = Z.col(j).squaredNorm();
+        //float std_ = 1.f / (sqrt(sqn / float(numInds)));
+        double sqn = Z.col(j).squaredNorm();
+        double std_ = 1.0 / (sqrt(sqn / double(numInds - 1)));
+        //if (j < 3)
+        //    printf("OFF: marker %d has mean = %20.15f sqn = %20.15f  std_ = %20.15f\n",
+        //           j, mean, sqn, std_);
+
         Z.col(j).array() *= std_;
 
         ZPZdiag[j] = sqn;
@@ -416,11 +711,12 @@ void Data::readBedFile_noMPI(const string &bedFile){
     }
     BIT.clear();
     BIT.close();
-    // standardize genotypes
+
     for (i=0; i<numSnps; ++i) {
-        Z.col(i).array() -= Z.col(i).mean();
+        //Z.col(i).array() -= Z.col(i).mean(); //EO alread done (so now mean is zero)
         ZPZdiag[i] = Z.col(i).squaredNorm();
     }
+
 #ifndef USE_MPI
     cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
 #endif
@@ -452,7 +748,7 @@ void Data::readPhenotypeFile(const string &phenFile) {
             ind = it->second;
             ind->phenotype = atof(colData[1+1].c_str());
             //fill in phenotype y vector
-            y[line] = ind->phenotype;
+            y[line] = double(ind->phenotype);
             ++line;
         }
     }

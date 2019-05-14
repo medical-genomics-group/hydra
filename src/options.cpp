@@ -52,20 +52,32 @@ void Options::inputOptions(const int argc, const char* argv[]){
             mcmcSampleFile = argv[++i];
             ss << "--mcmc-samples " << argv[i] << "\n";
         }
-#ifdef USE_MPI
+        else if (!strcmp(argv[i], "--mcmc-betas")) {   //EO
+            mcmcBetFile = argv[++i];
+            ss << "--mcmc-betas " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--shuf-mark")) {    //EO
             shuffleMarkers = atoi(argv[++i]);
             ss << "--shuf-mark " << argv[i] << "\n";
         }
+#ifdef USE_MPI
         else if (!strcmp(argv[i], "--mpi-sync-rate")) {    //EO
             MPISyncRate = atoi(argv[++i]);
             ss << "--mpi-sync-rate " << argv[i] << "\n";
         }
+#endif
         else if (!strcmp(argv[i], "--number-markers")) {    //EO
             numberMarkers = atoi(argv[++i]);
             ss << "--number-markers " << argv[i] << "\n";
         }
-#endif
+        else if (!strcmp(argv[i], "--m2skip")) {    //EO
+            m2skip = atoi(argv[++i]);
+            ss << "--m2skip " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--mstart")) {    //EO
+            mstart = atoi(argv[++i]);
+            ss << "--mstart " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--chain-length")) {
             chainLength = atoi(argv[++i]);
             ss << "--chain-length " << argv[i] << "\n";
@@ -159,15 +171,22 @@ void Options::readFile(const string &file){  // input options from file
         } else if (key == "mcmcSampleFile") {
             mcmcSampleFile = value;
         }
-#ifdef USE_MPI
         else if (key == "shuffleMarkers") {
             shuffleMarkers = stoi(value);
+#ifdef USE_MPI
         } else if (key == "MPISyncRate") {
             MPISyncRate = stoi(value);
-        } else if (key == "numberMarkers") {
-            numberMarkers = stoi(value);
         }
 #endif
+        else if (key == "numberMarkers") {
+            numberMarkers = stoi(value);
+        }
+        else if (key == "m2skip") {
+            m2skip = stoi(value);
+        }
+        else if (key == "mstart") {
+            mstart = stoi(value);
+        }
         else if (key == "chainLength") {
             chainLength = stoi(value);
         } else if (key == "burnin") {
