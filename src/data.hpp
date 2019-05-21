@@ -132,6 +132,10 @@ public:
     unsigned numSnps;
     unsigned numInds;
 
+    vector<int> blocksStarts;
+    vector<int> blocksEnds;
+    uint        numBlocks;
+
 
 #ifdef USE_MPI
     void sparse_data_get_sizes(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2);
@@ -141,6 +145,8 @@ public:
     void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx, const double mean, const double std_);
     void preprocess_data(const char* data, const uint NC, const uint NB, double* ppdata, const int rank);
 #endif
+    //EO to read definitions of blocks of markers to process
+    void readMarkerBlocksFile(const string &markerBlocksFile);
 
     void preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &preprocessedBedIndexFile, bool compress);
     void mapPreprocessBedFile(const string &preprocessedBedFile);

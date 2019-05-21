@@ -20,13 +20,13 @@ const unsigned Megabase = 1e6;
 class Options {
 public:
 
-    unsigned shuffleMarkers =  1;
+    unsigned shuffleMarkers  =  1;
 #ifdef USE_MPI
-    unsigned MPISyncRate    =  1;
+    unsigned MPISyncRate     =  1;
+    bool     bedToSparse     =  false;
+    bool     readFromBedFile =  false; //EO: by default read from sparse representation files
 #endif
     unsigned numberMarkers  =  0;
-    unsigned m2skip         =  0;
-    unsigned mstart         =  0;
     unsigned chainLength;
     unsigned burnin;
     unsigned seed;
@@ -43,6 +43,7 @@ public:
     string analysisType;
     string bayesType;
     string phenotypeFile;
+    string markerBlocksFile;
     string bedFile;
     string mcmcSampleFile, mcmcBetFile;
     string optionFile;
@@ -67,6 +68,7 @@ public:
         analysisType            = "Bayes";
         bayesType               = "C";
         phenotypeFile           = "";
+        markerBlocksFile        = "";
         bedFile                 = "";
         mcmcSampleFile          = "bayesOutput.csv";
         mcmcBetFile             = "bayesOutput.bet";

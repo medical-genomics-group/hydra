@@ -37,13 +37,27 @@ int main(int argc, const char * argv[]) {
         data.readBimFile(opt.bedFile + ".bim");
 
 #ifdef USE_MPI
-        if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
+
+        if (opt.bedToSparse == true) {
+            
+            data.readPhenotypeFile(opt.phenotypeFile);
+            BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+            analysis.write_sparse_data_files();
+
+        } else if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
             // Read phenotype file
             data.readPhenotypeFile(opt.phenotypeFile);
             //EO to remove
             //data.readBedFile_noMPI(opt.bedFile+".bed");
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+
+            if (opt.markerBlocksFile != "") {
+                data.readMarkerBlocksFile(opt.markerBlocksFile);
+            } else {
+                cout << "No request to read a block markers definition file." << endl;
+            }
             analysis.runMpiGibbs();
+
         } else if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
 
 #else

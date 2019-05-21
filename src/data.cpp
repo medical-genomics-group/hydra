@@ -6,8 +6,8 @@
 #include <iterator>
 #include "compression.h"
 
-#define handle_error(msg)                               \
-    do { perror(msg); exit(EXIT_FAILURE); } while (0)
+#include <boost/algorithm/string.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 Data::Data()
     : ppBedFd(-1)
@@ -560,6 +560,54 @@ void Data::unmapCompressedPreprocessedBedFile()
     close(ppBedFd);
     ppbedIndex.clear();
 }
+
+
+// EO
+// Read marker blocks definition file
+// Line format:  "%d %d\n"; Nothing else is accepted.
+// Gaps are allowed; Overlaps are forbiden
+// --------------------------------------------------
+void Data::readMarkerBlocksFile(const string &markerBlocksFile) {
+
+    ifstream in(markerBlocksFile.c_str());
+    if (!in) throw ("Error: can not open the file [" + markerBlocksFile + "] to read.");
+    
+    blocksStarts.clear();
+    blocksEnds.clear();
+    std::string str;
+    
+	while (std::getline(in, str)) {
+        std::vector<std::string> results;
+        boost::split(results, str, [](char c){return c == ' ';});
+        if (results.size() != 2) {
+            printf("Error: line with wrong format: >>%s<<\n", str.c_str());
+            printf("       => expected format \"%%d %%d\": two integers separated with a single space, with no leading or trailing space.\n");
+            exit(1);
+        }
+        blocksStarts.push_back(stoi(results[0]));
+        blocksEnds.push_back(stoi(results[1]));        
+	}
+	in.close();
+
+    numBlocks = (unsigned) blocksStarts.size();
+    //cout << "Found definitions for " << nbs << " marker blocks." << endl;
+
+    // Gaps allowed, overlaps not
+    for (int i=0; i<numBlocks; ++i) {
+        if (blocksStarts[i] > blocksEnds[i]) {
+            printf("Error: block starts beyond end [%d, %d].\n", blocksStarts[i], blocksEnds[i]);
+            printf("       => you must correct your marker blocks definition file %s\n", markerBlocksFile.c_str());
+            exit(1);
+        }
+        int j=i+1;
+        if (j < numBlocks && blocksEnds[i] >= blocksStarts[j]) {
+            printf("Error: block overlap detected between block %d ([%d, %d]) and block %d ([%d, %d]).\n", i, blocksStarts[i], blocksEnds[i], j, blocksStarts[i], blocksEnds[j]);
+            printf("       => you must correct your marker blocks definition file %s\n", markerBlocksFile.c_str());
+            exit(1);
+        }
+    }
+}
+
 
 void Data::readFamFile(const string &famFile){
     // ignore phenotype column

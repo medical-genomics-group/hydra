@@ -67,12 +67,15 @@ class BayesRRm
 public:
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();
+
     int runGibbs(); // where we run Gibbs sampling over the parametrised model
     void setDebugEnabled(bool enabled) { showDebug = enabled; }
     bool isDebugEnabled() const { return showDebug; }
 
 #ifdef USE_MPI
-    int runMpiGibbs();
+    void write_sparse_data_files();
+    void read_sparse_data_files(size_t*& I1, size_t*& I2, size_t*& N1S, size_t*& N1L,  size_t*& N2S, size_t*& N2L, int* MrankS, int* MrankL);
+    int  runMpiGibbs();
 #endif
 
 private:

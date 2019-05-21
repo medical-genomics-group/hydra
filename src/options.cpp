@@ -21,6 +21,14 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bayesType = argv[++i];
             ss << "--mpibayes " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--bed-to-sparse")) {
+            bedToSparse = true;
+            ss << "--bed-to-sparse " << "\n";
+        }
+        else if (!strcmp(argv[i], "--read-from-bed-file")) {
+            readFromBedFile = true;
+            ss << "--read-from-bed-file " << "\n";
+        }
 #endif
         else if (!strcmp(argv[i], "--ppbayes")) {
             analysisType = "PPBayes";
@@ -60,6 +68,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             shuffleMarkers = atoi(argv[++i]);
             ss << "--shuf-mark " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--marker-blocks-file")) {
+            markerBlocksFile = argv[++i];
+            ss << "--marker-blocks-file " << argv[i] << "\n";
+        }
 #ifdef USE_MPI
         else if (!strcmp(argv[i], "--mpi-sync-rate")) {    //EO
             MPISyncRate = atoi(argv[++i]);
@@ -69,14 +81,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if (!strcmp(argv[i], "--number-markers")) {    //EO
             numberMarkers = atoi(argv[++i]);
             ss << "--number-markers " << argv[i] << "\n";
-        }
-        else if (!strcmp(argv[i], "--m2skip")) {    //EO
-            m2skip = atoi(argv[++i]);
-            ss << "--m2skip " << argv[i] << "\n";
-        }
-        else if (!strcmp(argv[i], "--mstart")) {    //EO
-            mstart = atoi(argv[++i]);
-            ss << "--mstart " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--chain-length")) {
             chainLength = atoi(argv[++i]);
@@ -180,12 +184,6 @@ void Options::readFile(const string &file){  // input options from file
 #endif
         else if (key == "numberMarkers") {
             numberMarkers = stoi(value);
-        }
-        else if (key == "m2skip") {
-            m2skip = stoi(value);
-        }
-        else if (key == "mstart") {
-            mstart = stoi(value);
         }
         else if (key == "chainLength") {
             chainLength = stoi(value);

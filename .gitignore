@@ -11,3 +11,4 @@ brr
 /MR_ADV/
 slurm-*.out
 bayesOutput_??.*
+/tbb/
