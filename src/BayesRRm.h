@@ -36,6 +36,9 @@ class BayesRRm
     bool showDebug;
     double betasqn;
 
+    MatrixXd X;         //"fixed effects" matrix.
+    VectorXd gamma;     //fixed effects coefficients
+
     // Component variables
     VectorXd priorPi;   // prior probabilities for each component
     VectorXd pi;        // mixture probabilities
@@ -73,11 +76,12 @@ public:
     bool isDebugEnabled() const { return showDebug; }
 
 #ifdef USE_MPI
-    void write_sparse_data_files();
-    void read_sparse_data_files(size_t*& I1, size_t*& I2, size_t*& N1S, size_t*& N1L,  size_t*& N2S, size_t*& N2L, int* MrankS, int* MrankL);
+    std::string mpi_get_sparse_output_filebase(void);
+    void write_sparse_data_files(const uint bpr);
+    void read_sparse_data_files(size_t*& I1, size_t*& I2, size_t*& N1S, size_t*& N1L,  size_t*& N2S, size_t*& N2L, int* MrankS, int* MrankL, const int rank);
     int  runMpiGibbs();
 #endif
-
+    inline void sampleFixedEffects(double s02F, double N);
 private:
     void init(int K, unsigned int markerCount, unsigned int individualCount);
     VectorXd getSnpData(unsigned int marker) const;

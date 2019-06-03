@@ -42,7 +42,7 @@ int main(int argc, const char * argv[]) {
             
             data.readPhenotypeFile(opt.phenotypeFile);
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
-            analysis.write_sparse_data_files();
+            analysis.write_sparse_data_files(opt.blocksPerRank);
 
         } else if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
             // Read phenotype file

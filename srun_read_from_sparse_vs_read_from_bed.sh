@@ -35,10 +35,10 @@ dataset=uk10k_chr1_1mb
 phen=test
 S="1.0,0.1"
 
-datadir=/scratch/orliac/testN500K
-dataset=testN500K
-phen=$dataset
-S="1.0,0.1"
+#datadir=/scratch/orliac/testN500K
+#dataset=testN500K
+#phen=$dataset
+#S="1.0,0.1"
 
 echo 
 echo "======================================"
@@ -62,11 +62,17 @@ echo "@@@ Solution reading from  BED file @@@"
 sol=bed
 rm $sol.csv
 rm $sol.bet
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-samples $sol.csv --mcmc-betas $sol.bet --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file  --number-markers $NM
+srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-samples $sol.csv --mcmc-betas $sol.bet --mcmc-epsilon $sol.epsilon --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --covariates scaled_covariates.csv
+#  --number-markers $NM
 echo; echo
+
+#echo __EARLY_EXIT__
+#exit 0
+
 
 echo "@@@ Solution reading from SPARSE files @@@"
 sol=sparse
 rm $sol.csv
 rm $sol.bet
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-samples $sol.csv --mcmc-betas $sol.bet --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --marker-blocks-file $datadir/${dataset}.blk --number-markers $NM
+srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-samples $sol.csv --mcmc-betas $sol.bet --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --sparse-dir /scratch/orliac/ABC123 --sparse-basename iamsparse3
+# --marker-blocks-file $datadir/${dataset}.blk --number-markers $NM

@@ -29,6 +29,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             readFromBedFile = true;
             ss << "--read-from-bed-file " << "\n";
         }
+        else if (!strcmp(argv[i], "--blocks-per-rank")) {
+            blocksPerRank = atoi(argv[++i]);
+            ss << "--blocks-per-rank " << "\n";
+        }
 #endif
         else if (!strcmp(argv[i], "--ppbayes")) {
             analysisType = "PPBayes";
@@ -64,6 +68,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             mcmcBetFile = argv[++i];
             ss << "--mcmc-betas " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--mcmc-epsilon")) {   //EO
+            mcmcEpsFile = argv[++i];
+            ss << "--mcmc-epsilon " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--shuf-mark")) {    //EO
             shuffleMarkers = atoi(argv[++i]);
             ss << "--shuf-mark " << argv[i] << "\n";
@@ -76,6 +84,14 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if (!strcmp(argv[i], "--mpi-sync-rate")) {    //EO
             MPISyncRate = atoi(argv[++i]);
             ss << "--mpi-sync-rate " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--sparse-dir")) {    //EO
+            sparseDir = argv[++i];
+            ss << "--sparse-dir " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--sparse-basename")) {    //EO
+            sparseBsn = argv[++i];
+            ss << "--sparse-basename " << argv[i] << "\n";
         }
 #endif
         else if (!strcmp(argv[i], "--number-markers")) {    //EO
@@ -139,6 +155,11 @@ void Options::inputOptions(const int argc, const char* argv[]){
             numThreadSpawned = atoi(argv[++i]);
             ss << "--thread-spawned " << argv[i] << "\n";
         }
+        else if(!strcmp(argv[i], "--covariates")) {
+            covariate = true;
+            covariateFile = argv[++i];
+            ss << "--covariates " << argv[i] << "\n";
+        }
         else {
             stringstream errmsg;
             errmsg << "\nError: invalid option \"" << argv[i] << "\".\n";
@@ -174,12 +195,17 @@ void Options::readFile(const string &file){  // input options from file
             bayesType = value;
         } else if (key == "mcmcSampleFile") {
             mcmcSampleFile = value;
-        }
-        else if (key == "shuffleMarkers") {
+        } else if (key == "mcmcBetFile") {
+            mcmcBetFile = value;
+        } else if (key == "mcmcEpsFile") {
+            mcmcEpsFile = value;
+        } else if (key == "shuffleMarkers") {
             shuffleMarkers = stoi(value);
 #ifdef USE_MPI
         } else if (key == "MPISyncRate") {
             MPISyncRate = stoi(value);
+        } else if (key == "blocksPerRank") {
+            blocksPerRank = stoi(value);
         }
 #endif
         else if (key == "numberMarkers") {

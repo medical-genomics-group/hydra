@@ -25,29 +25,31 @@ public:
     unsigned MPISyncRate     =  1;
     bool     bedToSparse     =  false;
     bool     readFromBedFile =  false; //EO: by default read from sparse representation files
+    unsigned blocksPerRank   =  1;     //EO: for bed -> sparse conversion, to split blocks if too large
 #endif
-    unsigned numberMarkers  =  0;
+    unsigned numberMarkers   =  0;
     unsigned chainLength;
     unsigned burnin;
     unsigned seed;
     unsigned numThread;
-    int numThreadSpawned = 0; // Default to 0, let TBB do its thing
-    unsigned thin;  // save every this th sampled value in MCMC
-    vector<float> S;    //variance components
-
+    int numThreadSpawned     = 0;      // Default to 0, let TBB do its thing
+    unsigned thin;                     // save every this th sampled value in MCMC
+    vector<float> S;                   // variance components
     unsigned int numGroups;
     Eigen::MatrixXd mS;
     string groupFile;
-
     string title;
     string analysisType;
     string bayesType;
     string phenotypeFile;
     string markerBlocksFile;
     string bedFile;
-    string mcmcSampleFile, mcmcBetFile;
+    string mcmcSampleFile, mcmcBetFile, mcmcEpsFile;
+    string sparseDir,      sparseBsn;
     string optionFile;
-    bool compress = false;
+    string covariateFile;              // for extra covariates.
+    bool   covariate = false;          // for extra covatiates.
+    bool   compress  = false;
 
     string options_s;
 
@@ -72,8 +74,11 @@ public:
         bedFile                 = "";
         mcmcSampleFile          = "bayesOutput.csv";
         mcmcBetFile             = "bayesOutput.bet";
+        mcmcEpsFile             = "bayesOutput.eps";
+        sparseDir               = "";
+        sparseBsn               = "";
         optionFile				= "";
-        numGroups				=2;
+        numGroups				= 2;
     }
 
     void inputOptions(const int argc, const char* argv[]);

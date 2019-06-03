@@ -29,7 +29,7 @@ INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
 INCLUDE += -I../tbb/include
 
-LIBS     = -lz
+LIBS     = -lz #-lstdc++fs #-lboost_system -lboost_filesystem
 
 SRC = data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
 
