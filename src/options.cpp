@@ -118,6 +118,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             thin = atoi(argv[++i]);
             ss << "--thin " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--save")) {
+            save = atoi(argv[++i]);
+            ss << "--save " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--S")) {
             Gadget::Tokenizer strvec;
             strvec.getTokens(argv[++i], " ,");
@@ -219,6 +223,8 @@ void Options::readFile(const string &file){  // input options from file
             seed = (uint)stoi(value);
         } else if (key == "thin") {
             thin = stoi(value);
+        } else if (key == "save") {
+            save = stoi(value);
         } else if (key == "S") {
             Gadget::Tokenizer strvec;
             strvec.getTokens(value, " ,");

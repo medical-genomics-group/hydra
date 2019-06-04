@@ -32,7 +32,6 @@ BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
 , seed(opt.seed)
 , max_iterations(opt.chainLength)
 , burn_in(opt.burnin)
-, thinning(opt.thin)
 , dist(opt.seed)
 , usePreprocessedData(opt.analysisType == "PPBayes")
 , showDebug(false)
@@ -202,7 +201,6 @@ inline void sparse_scaadd(double*       __restrict__ vout,
                           const double  mu,
                           const double  sig_inv,
                           const int     N) {
-
 
     if (dMULT == 0.0) {
         for (int i=0; i<N; i++)
@@ -729,7 +727,7 @@ int BayesRRm::runMpiGibbs() {
     MPI_File   bedfh, outfh, betfh, epsfh;
     MPI_Status status;
     MPI_Info   info;
-    MPI_Offset offset, betoff;
+    MPI_Offset offset, betoff, epsoff;
 
     // Set up processing options
     // -------------------------
@@ -757,6 +755,13 @@ int BayesRRm::runMpiGibbs() {
         Mtot = opt.numberMarkers;
     if (rank == 0)
         printf("Option passed to process only %d markers!\n", Mtot);
+
+
+    // Define blocks of individuals (for dumping epsilon)
+    // Note: hack the marker block definition function to this end
+    // -----------------------------------------------------------
+    int IrankS[nranks], IrankL[nranks];
+    mpi_define_blocks_of_markers(N, IrankS, IrankL, nranks);
 
 
     // Define global marker indexing
@@ -1047,9 +1052,28 @@ int BayesRRm::runMpiGibbs() {
     sigmaF = s02F;
 
 
+    // Adapt the --thin and --save options such that --save >= --thin and --save%--thin = 0
+    // ------------------------------------------------------------------------------------
+    if (opt.save < opt.thin) {
+        opt.save = opt.thin;
+        if (rank == 0)
+            printf("WARNING: opt.save was lower that opt.thin ; opt.save reset to opt.thin (%d)\n", opt.thin);
+    }
+    if (opt.save%opt.thin != 0) {
+        if (rank == 0)
+            printf("WARNING: opt.save (= %d) was not a multiple of opt.thin (= %d)\n", opt.save, opt.thin);
+        opt.save = int(opt.save/opt.thin) * opt.thin;
+        if (rank == 0)
+            printf("         opt.save reset to %d, the closest multiple of opt.thin (%d)\n", opt.save, opt.thin);
+    }
+
+
+    // A counter on previously saved thinned iterations
+    uint n_thinned_saved = 0;
+
     // Main iteration loop
     // -------------------
-    for (int iteration=0; iteration < max_it; iteration++) {
+    for (uint iteration=0; iteration < max_it; iteration++) {
 
         double start_it = MPI_Wtime();
 
@@ -1314,21 +1338,56 @@ int BayesRRm::runMpiGibbs() {
         offset = (size_t(iteration) * size_t(nranks) + size_t(rank)) * strlen(buff);
         check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
 
+
         // Dump the betas
         // --------------
-        betoff = sizeof(uint) + (size_t(iteration) * size_t(Mtot) + size_t(MrankS[rank])) * sizeof(double);
-        //printf("%d/%d betoff = %d\n", iteration, rank, betoff);
-        check_mpi(MPI_File_write_at_all(betfh, betoff, beta.data(), beta.size(), MPI_DOUBLE, &status), __LINE__, __FILE__);
+        if (iteration%opt.thin == 0) {
+            if (rank == 0) {
+                betoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double));
+                check_mpi(MPI_File_write_at(betfh, betoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                printf("writing iteration %d at %lu\n", iteration, betoff);
+            }
+            betoff = sizeof(uint) + sizeof(uint) 
+                + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double))
+                + size_t(MrankS[rank]) * sizeof(double);
+            //printf("%d/%d betoff = %d\n", iteration, rank, betoff);
+            check_mpi(MPI_File_write_at_all(betfh, betoff, beta.data(), beta.size(), MPI_DOUBLE, &status), __LINE__, __FILE__);
 
-        //EO: to remove once MPI version fully validated; use the check_marker utility to retrieve
-        //    the corresponding value from .bet files
-        // Print a sub-set of non-zero betas, one per rank for validation of the .bet file
-        for (int i=0; i<M; ++i) {
-            if (beta(i) != 0.0) {
-                printf("%4d/%4d beta(%8d -> %8d) = %15.10f\n", iteration, rank, i, rank*M+i, beta(i));
-                break;
+            n_thinned_saved += 1;
+
+            //EO: to remove once MPI version fully validated; use the check_marker utility to retrieve
+            //    the corresponding values from .bet file
+            //    Print a sub-set of non-zero betas, one per rank for validation of the .bet file
+            for (int i=0; i<M; ++i) {
+                if (beta(i) != 0.0) {
+                    printf("%4d/%4d beta(%8d -> %8d) = %15.10f\n", iteration, rank, i, rank*M+i, beta(i));
+                    break;
+                }
             }
         }
+
+        // Dump the epsilon vector
+        // Note: single line overwritten at each saving iteration
+        // Format: uint, uint, double{0 -> N-1}
+        //         it,   N,    epsilon[i] i~[0,N-1]
+        // ------------------------------------------------------
+        if (iteration%opt.save == 0) {
+            if (rank == 0) {
+                epsoff  = size_t(0);
+                check_mpi(MPI_File_write_at(epsfh, epsoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                epsoff += sizeof(uint);
+                check_mpi(MPI_File_write_at(epsfh, epsoff, &N,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            }
+            epsoff = sizeof(uint) + sizeof(uint) + size_t(IrankS[rank])*sizeof(double);
+            printf("%4d/%4d to write epsilon for %5d indiv from %5d (%lu)\n", iteration, rank, IrankL[rank], IrankS[rank], epsoff);
+            check_mpi(MPI_File_write_at_all(epsfh, epsoff, &epsilon[IrankS[rank]], IrankL[rank], MPI_DOUBLE, &status), __LINE__, __FILE__);
+            //EO: to remove once MPI version fully validated; use the check_epsilon utility to retrieve
+            //    the corresponding values from the .eps file
+            //    Print only first and last value handled by each task
+            printf("%4d/%4d epsilon[%5d] = %15.10f, epsilon[%5d] = %15.10f\n", iteration, rank, IrankS[rank], epsilon[IrankS[rank]], IrankS[rank]+IrankL[rank]-1, epsilon[IrankS[rank]+IrankL[rank]-1]);
+        }
+
+
 
         double end_it = MPI_Wtime();
         if (rank == 0) { printf("Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it); }
@@ -1560,7 +1619,7 @@ int BayesRRm::runGibbs()
         printf("it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq=%15.10f, m0=%10.1f\n", iteration, 0000, v0G+double(m0),(betasqn * double(m0) + v0G*s02G) /(v0G+double(m0)), sigmaG, sigmaE, betasqn, double(m0));
 
         //write samples
-        //if (iteration >= burn_in && iteration % thinning == 0) {
+        //if (iteration >= burn_in && iteration % opt.thin == 0) {
         //        sample << iteration, mu, beta, sigmaE, sigmaG, components, epsilon;
         //        writer.write(sample);
         //    }
