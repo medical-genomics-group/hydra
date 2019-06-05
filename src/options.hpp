@@ -45,7 +45,7 @@ public:
     string phenotypeFile;
     string markerBlocksFile;
     string bedFile;
-    string mcmcSampleFile, mcmcBetFile, mcmcEpsFile;
+    string mcmcOut;
     string sparseDir,      sparseBsn;
     string optionFile;
     string covariateFile;              // for extra covariates.
@@ -72,9 +72,7 @@ public:
         phenotypeFile           = "";
         markerBlocksFile        = "";
         bedFile                 = "";
-        mcmcSampleFile          = "bayesOutput.csv";
-        mcmcBetFile             = "bayesOutput.bet";
-        mcmcEpsFile             = "bayesOutput.eps";
+        mcmcOut                 = "bayesOutput";
         sparseDir               = "";
         sparseBsn               = "";
         optionFile				= "";

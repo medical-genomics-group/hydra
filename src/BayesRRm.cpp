@@ -28,7 +28,7 @@ BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
 , opt(opt)
 , bedFile(opt.bedFile + ".bed")
 , memPageSize(memPageSize)
-, outputFile(opt.mcmcSampleFile)
+, outputFile(opt.mcmcOut + ".csv")
 , seed(opt.seed)
 , max_iterations(opt.chainLength)
 , burn_in(opt.burnin)
@@ -724,10 +724,10 @@ int BayesRRm::runMpiGibbs() {
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File   bedfh, outfh, betfh, epsfh;
+    MPI_File   bedfh, outfh, betfh, epsfh, cpnfh;
     MPI_Status status;
     MPI_Info   info;
-    MPI_Offset offset, betoff, epsoff;
+    MPI_Offset offset, betoff, cpnoff, epsoff;
 
     // Set up processing options
     // -------------------------
@@ -792,7 +792,7 @@ int BayesRRm::runMpiGibbs() {
     double              dNm1   = (double)(N - 1);
     double              dN     = (double) N;
     std::vector<int>    markerI;
-    VectorXd            components(M);
+    VectorXi            components(M);
     double              mu;              // mean or intercept
     double              sigmaG;          // genetic variance
     double              sigmaE;          // residuals variance
@@ -823,21 +823,34 @@ int BayesRRm::runMpiGibbs() {
 
     // Opne BED and output files
     std::string bedfp = opt.bedFile;
-    std::string outfp = opt.mcmcSampleFile;
-    std::string betfp = opt.mcmcBetFile;
-    std::string epsfp = opt.mcmcEpsFile;
+    std::string outfp = opt.mcmcOut + ".csv";
+    std::string betfp = opt.mcmcOut + ".bet";
+    std::string epsfp = opt.mcmcOut + ".eps";
+    std::string cpnfp = opt.mcmcOut + ".cpn";
+
+    // Delete old files
+    if (rank == 0) {
+        MPI_File_delete(outfp.c_str(), MPI_INFO_NULL);
+        MPI_File_delete(betfp.c_str(), MPI_INFO_NULL);
+        MPI_File_delete(epsfp.c_str(), MPI_INFO_NULL);
+        MPI_File_delete(cpnfp.c_str(), MPI_INFO_NULL);
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
 
     bedfp += ".bed";
     check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh),  __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, outfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &outfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, betfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &betfh), __LINE__, __FILE__);
-    if (rank == 0) { MPI_File_delete(epsfp.c_str(), MPI_INFO_NULL); } //EO: do not check_mpi this one!
-    MPI_Barrier(MPI_COMM_WORLD);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, epsfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &epsfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, cpnfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &cpnfh), __LINE__, __FILE__);
 
     // First element of the .bet file is the total number of processed markers
+    // Idem for .cpn file
     betoff = size_t(0);
-    if (rank == 0) { check_mpi(MPI_File_write_at(betfh, betoff, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__); }
+    if (rank == 0) { 
+        check_mpi(MPI_File_write_at(betfh, betoff, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_write_at(cpnfh, betoff, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    }
 
     // Alloc memory for raw BED data
     // -----------------------------
@@ -1323,7 +1336,7 @@ int BayesRRm::runMpiGibbs() {
 
         sigmaE  = dist.inv_scaled_chisq_rng(v0E+double(N),(e_sqn + v0E*s02E) /(v0E+double(N)));
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, N, sigmaE);
-        printf("it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq=%15.10f, m0=%10.1f\n", iteration, rank, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, m0);
+        printf("it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %d\n", iteration, rank, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
         fflush(stdout);
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
@@ -1334,24 +1347,38 @@ int BayesRRm::runMpiGibbs() {
 
         pi = dist.dirichilet_rng(v.array() + 1.0);
 
-        left = snprintf(buff, LENBUF, "%5d, %4d, %15.10f, %15.10f, %15.10f\n", iteration, rank, sigmaE, sigmaG, sigmaG/(sigmaE+sigmaG));
-        offset = (size_t(iteration) * size_t(nranks) + size_t(rank)) * strlen(buff);
-        check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
 
-
-        // Dump the betas
-        // --------------
+        // Write output files
+        // ------------------
         if (iteration%opt.thin == 0) {
+
+            left = snprintf(buff, LENBUF, "%5d, %4d, %15.10f, %15.10f, %15.10f, %15.10f, %7d, %2d", iteration, rank, mu, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), int(m0), pi.size());
+            //if (rank == 0) { cout << "left on buff: " << left << endl; }
+
+            for (int ii=0; ii<pi.size(); ++ii) {
+                left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), ", %15.10f", pi(ii));
+                //if (rank == 0) { cout << "left on buff " << ii << ": " << left << endl; }
+            }
+            left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), "\n");
+
+            offset = (size_t(n_thinned_saved) * size_t(nranks) + size_t(rank)) * strlen(buff);
+            check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+
             if (rank == 0) {
                 betoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double));
                 check_mpi(MPI_File_write_at(betfh, betoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-                printf("writing iteration %d at %lu\n", iteration, betoff);
+                cpnoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int));
+                check_mpi(MPI_File_write_at(cpnfh, cpnoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             }
             betoff = sizeof(uint) + sizeof(uint) 
                 + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double))
                 + size_t(MrankS[rank]) * sizeof(double);
-            //printf("%d/%d betoff = %d\n", iteration, rank, betoff);
-            check_mpi(MPI_File_write_at_all(betfh, betoff, beta.data(), beta.size(), MPI_DOUBLE, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at_all(betfh, betoff, beta.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
+
+            cpnoff = sizeof(uint) + sizeof(uint)
+                + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int))
+                + size_t(MrankS[rank]) * sizeof(int);
+            check_mpi(MPI_File_write_at_all(cpnfh, cpnoff, components.data(), M, MPI_INTEGER, &status), __LINE__, __FILE__);
 
             n_thinned_saved += 1;
 
@@ -1360,7 +1387,7 @@ int BayesRRm::runMpiGibbs() {
             //    Print a sub-set of non-zero betas, one per rank for validation of the .bet file
             for (int i=0; i<M; ++i) {
                 if (beta(i) != 0.0) {
-                    printf("%4d/%4d beta(%8d -> %8d) = %15.10f\n", iteration, rank, i, rank*M+i, beta(i));
+                    printf("%4d/%4d global beta[%8d] = %15.10f, components[%8d] = %2d\n", iteration, rank, MrankS[rank]+i, beta(i), MrankS[rank]+i, components(i));
                     break;
                 }
             }
@@ -1379,15 +1406,13 @@ int BayesRRm::runMpiGibbs() {
                 check_mpi(MPI_File_write_at(epsfh, epsoff, &N,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             }
             epsoff = sizeof(uint) + sizeof(uint) + size_t(IrankS[rank])*sizeof(double);
-            printf("%4d/%4d to write epsilon for %5d indiv from %5d (%lu)\n", iteration, rank, IrankL[rank], IrankS[rank], epsoff);
+            //printf("%4d/%4d to write epsilon for %5d indiv from %5d (%lu)\n", iteration, rank, IrankL[rank], IrankS[rank], epsoff);
             check_mpi(MPI_File_write_at_all(epsfh, epsoff, &epsilon[IrankS[rank]], IrankL[rank], MPI_DOUBLE, &status), __LINE__, __FILE__);
             //EO: to remove once MPI version fully validated; use the check_epsilon utility to retrieve
             //    the corresponding values from the .eps file
             //    Print only first and last value handled by each task
             printf("%4d/%4d epsilon[%5d] = %15.10f, epsilon[%5d] = %15.10f\n", iteration, rank, IrankS[rank], epsilon[IrankS[rank]], IrankS[rank]+IrankL[rank]-1, epsilon[IrankS[rank]+IrankL[rank]-1]);
         }
-
-
 
         double end_it = MPI_Wtime();
         if (rank == 0) { printf("Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it); }
@@ -1398,6 +1423,7 @@ int BayesRRm::runMpiGibbs() {
     check_mpi(MPI_File_close(&outfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&betfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&epsfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&cpnfh), __LINE__, __FILE__);
 
     // Release memory
     free(y);
@@ -1449,7 +1475,7 @@ int BayesRRm::runGibbs()
     //specify how to write samples
     if (1==0) {
         SampleWriter writer;
-        writer.setFileName(outputFile);
+        writer.setFileName(opt.mcmcOut + ".csv");
         writer.setMarkerCount(M);
         writer.setIndividualCount(N);
         writer.open();

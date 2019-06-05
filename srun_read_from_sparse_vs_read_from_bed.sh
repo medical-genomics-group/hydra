@@ -15,6 +15,10 @@ module purge
 module load intel intel-mpi intel-mkl boost eigen zlib
 module list
 
+icc beta_converter.c       -o beta_converter
+icc epsilon_converter.c    -o epsilon_converter
+icc components_converter.c -o components_converter
+
 EXE=./src/mpi_gibbs
 
 # COMPILATION
@@ -49,24 +53,27 @@ echo "S      :" $S
 echo "======================================"
 echo
 
-CL=10
-SEED=5
+CL=100
+SEED=10
 SR=0
-SM=0
+SM=1
 NM=100
 THIN=3
 SAVE=3
-
-N=1
+TOCONV_T=$(($CL / $THIN))
+echo TOCONV_T $TOCONV_T
+N=2
 TPN=3
 
 echo "@@@ Solution reading from  BED file @@@"
 sol=from_bed
-rm $sol.csv
-rm $sol.bet
-rm $sol.eps
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin $THIN --save $SAVE --mcmc-samples $sol.csv --mcmc-betas $sol.bet --mcmc-epsilon $sol.eps --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --covariates scaled_covariates.csv
+srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --covariates scaled_covariates.csv
 #  --number-markers $NM
+
+./beta_converter       $sol".bet" $TOCONV_T > $sol".bet.txt"
+./epsilon_converter    $sol".eps"           > $sol".eps.txt"
+./components_converter $sol".cpn" $TOCONV_T > $sol".cpn.txt"
+
 echo; echo
 
 #echo __EARLY_EXIT__
@@ -74,9 +81,25 @@ echo; echo
 
 
 echo "@@@ Solution reading from SPARSE files @@@"
-sol=from_sparse
-rm $sol.csv
-rm $sol.bet
-rm $sol.eps
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin $THIN --save $SAVE --mcmc-samples $sol.csv --mcmc-betas $sol.bet  --mcmc-epsilon $sol.eps --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --sparse-dir /scratch/orliac/ABC123 --sparse-basename iamsparse3  --covariates scaled_covariates.csv
+sol2=from_sparse
+srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol2 --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --sparse-dir /scratch/orliac/ABC123 --sparse-basename iamsparse3  --covariates scaled_covariates.csv
 # --marker-blocks-file $datadir/${dataset}.blk --number-markers $NM
+
+./beta_converter       $sol2".bet" $TOCONV_T > $sol2".bet.txt"
+./epsilon_converter    $sol2".eps"           > $sol2".eps.txt"
+./components_converter $sol2".cpn" $TOCONV_T > $sol2".cpn.txt"
+
+echo; echo
+
+echo diff bin .bet
+diff $sol".bet" $sol2".bet"
+echo diff bin .eps
+diff $sol".eps" $sol2".eps"
+echo diff bin .cpn
+diff $sol".cpn" $sol2".cpn"
+echo diff txt .bet
+diff $sol".bet.txt" $sol2".bet.txt"
+echo diff txt .eps
+diff $sol".eps.txt" $sol2".eps.txt"
+echo diff txt .cpn
+diff $sol".cpn.txt" $sol2".cpn.txt"

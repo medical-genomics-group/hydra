@@ -60,17 +60,9 @@ void Options::inputOptions(const int argc, const char* argv[]){
             phenotypeFile = argv[++i];
             ss << "--pheno " << argv[i] << "\n";
         }
-        else if (!strcmp(argv[i], "--mcmc-samples")) {
-            mcmcSampleFile = argv[++i];
-            ss << "--mcmc-samples " << argv[i] << "\n";
-        }
-        else if (!strcmp(argv[i], "--mcmc-betas")) {   //EO
-            mcmcBetFile = argv[++i];
-            ss << "--mcmc-betas " << argv[i] << "\n";
-        }
-        else if (!strcmp(argv[i], "--mcmc-epsilon")) {   //EO
-            mcmcEpsFile = argv[++i];
-            ss << "--mcmc-epsilon " << argv[i] << "\n";
+        else if (!strcmp(argv[i], "--mcmc-out")) {
+            mcmcOut = argv[++i];
+            ss << "--mcmc-out " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--shuf-mark")) {    //EO
             shuffleMarkers = atoi(argv[++i]);
@@ -197,12 +189,8 @@ void Options::readFile(const string &file){  // input options from file
             analysisType = value;
         } else if (key == "bayesType") {
             bayesType = value;
-        } else if (key == "mcmcSampleFile") {
-            mcmcSampleFile = value;
-        } else if (key == "mcmcBetFile") {
-            mcmcBetFile = value;
-        } else if (key == "mcmcEpsFile") {
-            mcmcEpsFile = value;
+        } else if (key == "mcmcOut") {
+            mcmcOut = value;
         } else if (key == "shuffleMarkers") {
             shuffleMarkers = stoi(value);
 #ifdef USE_MPI
