@@ -49,7 +49,7 @@ int main(int argc, const char * argv[]) {
         for (uint marker=0; marker<M; ++marker) {
             fseek(fh, sizeof(uint) + sizeof(uint) * (iter+1) + sizeof(double) * (M * iter + marker), SEEK_SET);
             fread(&beta, sizeof(double), 1, fh);
-            printf("%5d/%7d = %20.15f\n", itthin, marker, beta);
+            printf("%5d/%7d = %20.12f\n", itthin, marker, beta);
         }
     }
 

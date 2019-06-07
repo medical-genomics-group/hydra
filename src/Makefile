@@ -9,12 +9,14 @@ EXE       = mpi_gibbs
 CXX       = mpiicpc
 
 CXXFLAGS  = -O3
+#CXXFLAGS  = -O0
 #CXXFLAGS += -g
 CXXFLAGS += -std=c++17
 CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 #CXXFLAGS += -xCORE-AVX2
 #CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
-CXXFLAGS += -D USE_MPI
+CXXFLAGS += -D USE_MPI  
+#CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 
 #EO: set this back when switching to production
 #    This will allow to fully use vectorization on both fidis and gacrux

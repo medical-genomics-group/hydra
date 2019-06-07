@@ -48,8 +48,8 @@ public:
     string mcmcOut;
     string sparseDir,      sparseBsn;
     string optionFile;
-    string covariateFile;              // for extra covariates.
-    bool   covariate = false;          // for extra covatiates.
+    string covariatesFile;              // for extra covariates.
+    bool   covariates = false;          // for extra covatiates.
     bool   compress  = false;
 
     string options_s;

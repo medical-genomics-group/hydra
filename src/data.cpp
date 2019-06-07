@@ -19,16 +19,16 @@ Data::Data()
 
 #ifdef USE_MPI
 
-void Data::sparse_data_get_sizes(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2) {
+void Data::sparse_data_get_sizes(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2, size_t* NM) {
 
     assert(numInds<=NB*4);
 
     // temporary array used for translation
     int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
 
-    size_t NM=0, N0=0;
-    *N1=0;
-    *N2=0;
+    *N1 = 0;
+    *N2 = 0;
+    *NM = 0;
 
     for (int i=0; i<NC; ++i) {
 
@@ -49,8 +49,9 @@ void Data::sparse_data_get_sizes(const char* rawdata, const uint NC, const uint 
         }
 
         for (int ii=0; ii<numInds; ++ii) {
-            if (tmpi[ii] == 1) *N1 += 1;
-            if (tmpi[ii] == 2) *N2 += 1;
+            if      (tmpi[ii] <  0) { *NM += 1; }
+            else if (tmpi[ii] == 1) { *N1 += 1; }
+            else if (tmpi[ii] == 2) { *N2 += 1; }
         }
     }
 
@@ -60,17 +61,17 @@ void Data::sparse_data_get_sizes(const char* rawdata, const uint NC, const uint 
 
 // Read raw data loaded in memory to preprocess them (center, scale and cast to double)
 void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB,
-                                    size_t* N1S, size_t* N1L, size_t* N2S, size_t* N2L,
-                                    size_t N1, size_t N2, size_t* I1, size_t* I2) {
+                                    size_t* N1S, size_t* N1L, size_t* I1,
+                                    size_t* N2S, size_t* N2L, size_t* I2,
+                                    size_t* NMS, size_t* NML, size_t* IM) {
     
     assert(numInds<=NB*4);
 
     // temporary array used for translation
     int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
 
-    size_t NM=0, N0=0, absi, i1=0, i2=0;
-    N1=0;
-    N2=0;
+    size_t i1 = 0, i2 = 0, im = 0;
+    size_t N1 = 0, N2 = 0, NM = 0;
 
     for (int i=0; i<NC; ++i) {
 
@@ -90,14 +91,14 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
             }
         }
 
-        int sum = 0, nmiss = 0;
-        int n0=0, n1=0, n2=0;
-
+        size_t n0 = 0, n1 = 0, n2 = 0, nm = 0;
+        
         for (int ii=0; ii<numInds; ++ii) {
             if (tmpi[ii] < 0) {
-                nmiss += tmpi[ii];
+                IM[im] = size_t(ii);
+                im += 1;
+                nm += -tmpi[ii];
             } else {
-                sum   += tmpi[ii];
                 if        (tmpi[ii] == 0) {
                     n0 += 1;
                 } else if (tmpi[ii] == 1) {
@@ -112,21 +113,14 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
             }
         }
 
-        NM += nmiss;
+        assert(nm + n0 + n1 + n2 == numInds);
 
-        assert(nmiss + n0 + n1 + n2 == numInds);
-
-        //if (i == 0 || i == 1 || i == 343597 || i == 343598)
-        //    printf("marker %6d: %6d %6d %6d %6d (miss, 0, 1 , 2) sparsity = %4.1f %%\n", i, nmiss, n0, n1, n2, (double(n0)/double(numInds))*100);
         N1S[i] = N1;  N1L[i] = n1;  N1 += n1;
         N2S[i] = N2;  N2L[i] = n2;  N2 += n2;
-        //cout << i << ", " << N1S[i] << ", " << N1L[i] << endl;
-        //cout << i << ", " << N2S[i] << ", " << N2L[i] << endl;
+        NMS[i] = NM;  NML[i] = nm;  NM += nm;
     }
 
     free(tmpi);
-
-    //cout << "Total ones " << N1 << ", total twos " << N2 << endl;
 }
 
 
@@ -141,7 +135,7 @@ void Data::compute_markers_statistics(const char* rawdata, const uint M, const u
 
         for (int ii=0; ii<NB; ++ii) {
             for (int iii=0; iii<4; ++iii) {
-                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
+                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;
             }
         }
        
@@ -163,7 +157,7 @@ void Data::compute_markers_statistics(const char* rawdata, const uint M, const u
         }
 
         double mean = double(sum) / double(numInds + nmiss); //EO: nmiss is neg
-        //printf("marker %d  mean = %15.10f stats\n", i, mean);
+        //printf("marker %d  mean = %20.15f stats\n", i, mean);
 
         double sqn = 0.0d;
         uint nzeros = 0;
@@ -197,7 +191,7 @@ void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const 
 
     for (int ii=0; ii<NB; ++ii) {
         for (int iii=0; iii<4; ++iii) {
-            tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
+            tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;
         }
     }
        
@@ -211,22 +205,14 @@ void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const 
     
     for (size_t ii=0; ii<numInds; ++ii) {
         if (tmpi[ii] < 0) {
-            Cx[ii]  = 0.0d;
-            cout << "marker " << marker << " at " << ii << " is 0.0" << endl;
+            Cx[ii]  = 0.0;
         } else {
             Cx[ii] = (double(tmpi[ii]) - mean) * std_;
-        }
-    }
-    for (size_t ii=0; ii<numInds; ++ii) {
-        if (Cx[ii] == 0.0) {
-            cout << "marker " << marker << " at " << ii << " is 0.0" << endl;
         }
     }
 
     free(tmpi);
 }
-
-
 
 
 //void Data::get_normalized_marker_data(const char* rawdata, const uint NB)
@@ -242,7 +228,7 @@ void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const 
 
     for (int ii=0; ii<NB; ++ii) {
         for (int iii=0; iii<4; ++iii) {
-            tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;   // ADJUST ON RANK & NC
+            tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;
         }
     }
        
@@ -284,12 +270,12 @@ void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const 
     for (size_t ii=0; ii<numInds; ++ii) {
         sqn += Cx[ii] * Cx[ii];
     }
-    //if (marker < 3)
-    //    printf("marker %d  sqn = %20.15f\n", marker, sqn);
+    if (marker < 1)
+        printf("marker %d  sqn = %20.15f\n", marker, sqn);
 
     double std_ = sqrt(double(numInds - 1) / sqn);
-    //if (marker < 3)
-    //    printf("marker %d  std_ = %20.15f\n", marker, std_);
+    if (marker < 1)
+        printf("marker %d  std_ = %20.15f\n", marker, std_);
 
     for (size_t ii=0; ii<numInds; ++ii)
         Cx[ii] *= std_;
@@ -746,10 +732,11 @@ void Data::readBedFile_noMPI(const string &bedFile){
         //float sqn = Z.col(j).squaredNorm();
         //float std_ = 1.f / (sqrt(sqn / float(numInds)));
         double sqn = Z.col(j).squaredNorm();
-        double std_ = 1.0 / (sqrt(sqn / double(numInds - 1)));
-        //if (j < 3)
-        //    printf("OFF: marker %d has mean = %20.15f sqn = %20.15f  std_ = %20.15f\n",
-        //           j, mean, sqn, std_);
+        //double std_ = 1.0 / (sqrt(sqn / double(numInds - 1)));
+        double std_ = sqrt(double(numInds - 1) / sqn);
+
+        //if (j < 1)
+        //    printf("OFF: marker %d has mean = %20.15f sqn = %20.15f  std_ = %20.15f\n", j, mean, sqn, std_);
 
         Z.col(j).array() *= std_;
 

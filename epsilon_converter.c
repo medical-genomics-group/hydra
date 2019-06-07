@@ -39,7 +39,7 @@ int main(int argc, const char * argv[]) {
     for (uint i=0; i<N; ++i) {
         fseek(fh, sizeof(uint) + sizeof(uint) + sizeof(double) * i, SEEK_SET);
         fread(&eps, sizeof(double), 1, fh);
-        printf("%5d/%7d = %20.15f\n", iter, i, eps);
+        printf("%5d/%7d = %20.12f\n", iter, i, eps);
     }
     
     fclose(fh);

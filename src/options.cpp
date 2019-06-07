@@ -152,8 +152,8 @@ void Options::inputOptions(const int argc, const char* argv[]){
             ss << "--thread-spawned " << argv[i] << "\n";
         }
         else if(!strcmp(argv[i], "--covariates")) {
-            covariate = true;
-            covariateFile = argv[++i];
+            covariates = true;
+            covariatesFile = argv[++i];
             ss << "--covariates " << argv[i] << "\n";
         }
         else {
