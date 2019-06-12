@@ -16,27 +16,27 @@
 
 class BayesRRm
 {
-    Data            &data; // data matrices
-    Options         &opt;
-    const string    bedFile; // bed file
-    const long      memPageSize; // size of memory
-    const string    outputFile;
+    Data               &data; // data matrices
+    Options            &opt;
+    const string       bedFile; // bed file
+    const long         memPageSize; // size of memory
+    const string       outputFile;
     const unsigned int seed;
     const unsigned int max_iterations;
     const unsigned int burn_in;
-    const double	sigma0  = 0.0001;
-    const double	v0E     = 0.0001;
-    const double    s02E    = 0.0001;
-    const double    v0G     = 0.0001;
-    const double    s02G    = 0.0001;
-    Eigen::VectorXd cva;
+    const double	   sigma0  = 0.0001;
+    const double	   v0E     = 0.0001;
+    const double       s02E    = 0.0001;
+    const double       v0G     = 0.0001;
+    const double       s02G    = 0.0001;
+    Eigen::VectorXd    cva;
     Distributions_boost dist;
     bool usePreprocessedData;
     bool showDebug;
     double betasqn;
 
-    MatrixXd X;         //"fixed effects" matrix.
-    VectorXd gamma;     //fixed effects coefficients
+    MatrixXd X;         // "fixed effects" matrix.
+    VectorXd gamma;     // fixed effects coefficients
 
     // Component variables
     VectorXd priorPi;   // prior probabilities for each component
@@ -70,7 +70,7 @@ public:
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();
 
-    int runGibbs(); // where we run Gibbs sampling over the parametrised model
+    int  runGibbs(); // where we run Gibbs sampling over the parametrised model
     void setDebugEnabled(bool enabled) { showDebug = enabled; }
     bool isDebugEnabled() const { return showDebug; }
 
@@ -83,7 +83,7 @@ public:
                                 int* MrankS, int* MrankL, const int rank);
     int  runMpiGibbs();
 #endif
-    inline void sampleFixedEffects(double s02F, double N);
+
 private:
     void init(int K, unsigned int markerCount, unsigned int individualCount);
     VectorXd getSnpData(unsigned int marker) const;

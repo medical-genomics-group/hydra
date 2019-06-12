@@ -47,7 +47,7 @@ echo "S      :" $S
 echo "======================================"
 echo
 
-CL=20
+CL=10
 SEED=5
 SR=0
 SM=0
@@ -61,7 +61,7 @@ echo
 echo
 echo "@@@ Official (sequential) solution (reading from BED file) @@@"
 echo
-$EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out ref --shuf-mark $SM --seed $SEED --S $S --number-markers $NM 
+srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out ref --shuf-mark $SM --seed $SEED --S $S --number-markers $NM 
 #--covariates $datadir/scaled_covariates.csv
 
 echo

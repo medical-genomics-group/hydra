@@ -91,7 +91,7 @@ public:
     PpBedIndex ppbedIndex;
 
     // Original data
-    MatrixXf X;              // coefficient matrix for fixed effects
+    MatrixXd X;              // coefficient matrix for fixed effects
     //MatrixXf Z;              // coefficient matrix for SNP effects
     MatrixXd Z;
     VectorXf D;              // 2pqn
@@ -129,12 +129,13 @@ public:
     vector<vector<SnpInfo*> > mldmVec;
 
     unsigned numFixedEffects;
+
     unsigned numSnps;
     unsigned numInds;
 
     vector<int> blocksStarts;
     vector<int> blocksEnds;
-    uint        numBlocks;
+    uint        numBlocks = 0;
 
 
 #ifdef USE_MPI
@@ -143,7 +144,7 @@ public:
                                   size_t* N1S, size_t* N1L, size_t* I1,
                                   size_t* N2S, size_t* N2L, size_t* I2,
                                   size_t* NMS, size_t* NML, size_t* IM);
-    void compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum);
+    //void compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum);
     void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx);
     void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx, const double mean, const double std_);
     void preprocess_data(const char* data, const uint NC, const uint NB, double* ppdata, const int rank);
@@ -163,6 +164,9 @@ public:
     void readBedFile_noMPI(const string &bedFile);
     void readPhenotypeFile(const string &phenFile);
     void readGroupFile(const string &groupFile);
+    template<typename M>
+    M    readCSVFile(const string &covariateFile);
+    void readCovariateFile(const string &covariateFile);
 };
 
 #endif /* data_hpp */

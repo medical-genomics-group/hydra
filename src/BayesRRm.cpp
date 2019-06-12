@@ -109,6 +109,10 @@ void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCoun
     betasqn    = 0.0;
     epsilonsum = 0.0;
     ytildesum  = 0.0;
+    //gamma      = VectorXd(data.fixedEffectsCount);
+    gamma      = VectorXd(data.numFixedEffects);
+    gamma.setZero();
+    X = data.X; //fixed effects matrix
 }
 
 
@@ -358,7 +362,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) { //CHECK_ALLOC
 
     int rank, nranks, result;
 
-    MPI_Init(NULL, NULL);
+    //MPI_Init(NULL, NULL);
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_File   bedfh, si1fh, sl1fh, ss1fh, si2fh, sl2fh, ss2fh, simfh, slmfh, ssmfh;
@@ -399,7 +403,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) { //CHECK_ALLOC
     // Get bed file directory and basename
     std::string sparseOut = mpi_get_sparse_output_filebase();
     if (rank == 0)
-        printf("Info: will write sparse output files as: %s.{ss1, sl1, si1, ss2, sl2, si2}\n", sparseOut.c_str());
+        printf("INFO   : will write sparse output files as: %s.{ss1, sl1, si1, ss2, sl2, si2}\n", sparseOut.c_str());
 
     // Open bed file for reading
     std::string bedfp = opt.bedFile;
@@ -622,11 +626,11 @@ void BayesRRm::write_sparse_data_files(const uint bpr) { //CHECK_ALLOC
     const auto dt2 = et2 - st2;
     const auto du2 = std::chrono::duration_cast<std::chrono::milliseconds>(dt2).count();
     if (rank == 0)
-        std::cout << "Time to convert the data: " << du2 / double(1000.0) << " seconds." << std::endl;
+        std::cout << "INFO   : time to convert the data: " << du2 / double(1000.0) << " seconds." << std::endl;
 
 
     // Finalize the MPI environment
-    MPI_Finalize();
+    //MPI_Finalize();
 }
 
 
@@ -666,7 +670,7 @@ void BayesRRm::read_sparse_data_files(size_t*& N1S, size_t*& N1L, size_t*& I1,
     // Get bed file directory and basename
     std::string sparseOut = mpi_get_sparse_output_filebase();
     if (rank == 0)
-        printf("Info: will read from sparse files with basename: %s\n", sparseOut.c_str());
+        printf("INFO   : will read from sparse files with basename: %s\n", sparseOut.c_str());
 
     const std::string si1 = sparseOut + ".si1";
     const std::string sl1 = sparseOut + ".sl1";
@@ -705,7 +709,7 @@ void BayesRRm::read_sparse_data_files(size_t*& N1S, size_t*& N1L, size_t*& I1,
     size_t N1 = N1S[M-1] + N1L[M-1] - n1soff;
     size_t N2 = N2S[M-1] + N2L[M-1] - n2soff;
     size_t NM = NMS[M-1] + NML[M-1] - nmsoff;
-    printf("rank %d: N1 = %20lu, N2 = %20lu, NM = %20lu\n", rank, N1, N2, NM);
+    //printf("rank %d: N1 = %20lu, N2 = %20lu, NM = %20lu\n", rank, N1, N2, NM);
 
     // Check for integer overflow
     check_int_overflow(N1, __LINE__, __FILE__);
@@ -751,19 +755,28 @@ void mpi_assign_blocks_to_tasks(int* MrankS, int* MrankL, const uint numBlocks, 
 
     if (numBlocks > 0) {
 
-        if (rank == 0)
-            printf("INFO: Using distribution over tasks.\n");
-
         if (nranks != numBlocks) {
-            printf("FATAL: block definition does not match number of tasks (%d versus %d).\n", numBlocks, nranks);
-            printf("      => Provide each task with a block definition\n");
+            if (rank == 0) {
+                printf("FATAL  : block definition does not match number of tasks (%d versus %d).\n", numBlocks, nranks);
+                printf("        => Provide each task with a block definition\n");
+            }
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
-        // Make sure last marker is not greater than Mtot
-        if (blocksEnds[numBlocks-1] > Mtot) {
-            printf("FATAL: block definition goes beyond the number of markers to be processed (%d > Mtot = %d).\n", blocksEnds[numBlocks-1], Mtot);
-            printf("      => Adjust block definition file\n");
+        // First and last markers (continuity is garanteed from reading)
+        if (blocksStarts[0] != 1) {
+            if (rank == 0) {
+                printf("FATAL  : first marker in block definition file should be 1 but is %d\n", blocksStarts[0]);
+                printf("        => Adjust block definition file\n");
+            }
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+
+        if (blocksEnds[numBlocks-1] != Mtot) {
+            if (rank == 0) {
+                printf("FATAL  : last marker in block definition file should be Mtot = %d whereas is %d\n", Mtot, blocksEnds[numBlocks-1]+1);
+                printf("        => Adjust block definition file\n");
+            }
             MPI_Abort(MPI_COMM_WORLD, 1);
         }
 
@@ -775,7 +788,7 @@ void mpi_assign_blocks_to_tasks(int* MrankS, int* MrankL, const uint numBlocks, 
 
     } else {
         if (rank == 0)
-            printf("INFO: no marker block definition file used. Will go for even distribution over tasks.\n");
+            printf("INFO   : no marker block definition file used. Will go for even distribution over tasks.\n");
         mpi_define_blocks_of_markers(Mtot, MrankS, MrankL, nranks);
     }
 }
@@ -792,7 +805,7 @@ int BayesRRm::runMpiGibbs() {
     int  nranks, rank, name_len, result;
     double dalloc = 0.0;
 
-    MPI_Init(NULL, NULL);
+    //MPI_Init(NULL, NULL);
 
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -822,13 +835,18 @@ int BayesRRm::runMpiGibbs() {
     const unsigned int N      = data.numInds;
     unsigned int       Mtot   = data.numSnps;
 
-    if (rank == 0)
-        printf("Full dataset includes %d markers and %d individuals.\n", Mtot, N);
-    if (opt.numberMarkers > 0 && opt.numberMarkers < Mtot)
+    if (rank == 0) printf("INFO   : Full dataset includes %d markers and %d individuals.\n", Mtot, N);
+    
+    // Block marker definition has precedence over requested number of markers
+    if (opt.markerBlocksFile != "" && opt.numberMarkers > 0) {
+        opt.numberMarkers = 0;
+        if (rank == 0) printf("WARNING: --number-markers option ignored, a marker block definition file was passed!\n");
+    }        
+    
+    if (opt.numberMarkers > 0 && opt.numberMarkers < Mtot) {
         Mtot = opt.numberMarkers;
-    if (rank == 0)
-        printf("Option passed to process only %d markers!\n", Mtot);
-
+        if (rank == 0) printf("Option passed to process only %d markers!\n", Mtot);
+    }
 
     // Define blocks of individuals (for dumping epsilon)
     // Note: hack the marker block definition function to this end
@@ -843,14 +861,18 @@ int BayesRRm::runMpiGibbs() {
     mpi_assign_blocks_to_tasks(MrankS, MrankL, data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot);
 
 
-    int lmax = 0;
-    for (int i=0; i<nranks; ++i)
-        if (MrankL[i]>lmax) { lmax = MrankL[i]; }
-    if (rank == 0)
-        printf("Longest tasks has %d markers.\n", lmax);
+    int lmax = 0, lmin = 1E9;
+    for (int i=0; i<nranks; ++i) {
+        if (MrankL[i]>lmax) lmax = MrankL[i];
+        if (MrankL[i]<lmin) lmin = MrankL[i];
+    }
+    if (rank == 0) {
+        printf("INFO   : longest  task has %d markers.\n", lmax);
+        printf("INFO   : smallest task has %d markers.\n", lmin);
+    }
 
     int M = MrankL[rank];
-    printf("rank %4d will handle a block of %6d markers starting at %d\n", rank, MrankL[rank], MrankS[rank]);
+    //printf("rank %4d will handle a block of %6d markers starting at %d\n", rank, MrankL[rank], MrankS[rank]);
 
 
     const double        sigma0 = 0.0001;
@@ -887,12 +909,17 @@ int BayesRRm::runMpiGibbs() {
     dalloc += M * sizeof(double) / 1E9; // for components
     dalloc += M * sizeof(double) / 1E9; // for beta
 
+    //gamma = VectorXd(data.fixedEffectsCount);
+    gamma = VectorXd(data.numFixedEffects);
+    gamma.setZero();
+    X = data.X; //fixed effects matrix
+
     //VectorXd            sample(2*M+4+N); // varible containg a sample of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
 
 
     // Length of a column in bytes
     const size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
-    if (rank==0) { printf("snpLenByt = %zu bytes.\n", snpLenByt); }
+    if (rank==0) printf("INFO   : marker length in bytes (snpLenByt) = %zu bytes.\n", snpLenByt);
 
     // Opne BED and output files
     std::string bedfp = opt.bedFile;
@@ -910,8 +937,6 @@ int BayesRRm::runMpiGibbs() {
     }
     MPI_Barrier(MPI_COMM_WORLD);
 
-    bedfp += ".bed";
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh),  __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, outfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &outfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, betfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &betfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, epsfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &epsfh), __LINE__, __FILE__);
@@ -920,78 +945,10 @@ int BayesRRm::runMpiGibbs() {
     // First element of the .bet file is the total number of processed markers
     // Idem for .cpn file
     betoff = size_t(0);
-    if (rank == 0) { 
+    if (rank == 0) {
         check_mpi(MPI_File_write_at(betfh, betoff, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
         check_mpi(MPI_File_write_at(cpnfh, betoff, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     }
-
-    // Alloc memory for raw BED data
-    // -----------------------------
-    const size_t rawdata_n = size_t(M) * size_t(snpLenByt) * sizeof(char);
-    char* rawdata = (char*) malloc(rawdata_n);  check_malloc(rawdata, __LINE__, __FILE__);
-    dalloc += rawdata_n / 1E9;
-    //printf("rank %d allocation %zu bytes (%.3f GB) for the raw data.\n",           rank, rawdata_n, double(rawdata_n/1E9));
-
-    //EO: leftover from previous implementation, but keep it in for now
-    //EO  can be useful for checks
-    //-----------------------------------------------------------------
-    //const size_t ppdata_n  = size_t(M) * size_t(data.numInds) * sizeof(double);
-    //double* ppdata    = (double*)malloc(ppdata_n);  if (ppdata  == NULL) { printf("malloc ppdata failed.\n");  exit (1); }    
-    //printf("rank %d allocation %zu bytes (%.3f GB) for the pre-processed data.\n", rank, ppdata_n,  double(ppdata_n/1E9));
-
-    // Compute the offset of the section to read from the BED file
-    // -----------------------------------------------------------
-    offset = size_t(3) + size_t(MrankS[rank]) * size_t(snpLenByt) * sizeof(char);
-
-    // Read the BED file
-    // -----------------
-    MPI_Barrier(MPI_COMM_WORLD);
-    const auto st1 = std::chrono::high_resolution_clock::now();
-
-    // Check how many calls are needed (limited by the int type of the number of elements to read!)
-    uint nmpiread = 1;
-    if (rawdata_n >= pow(2,(sizeof(int)*8)-1)) {   
-        printf("MPI_file_read_at capacity exceeded. Asking to read %zu elements vs max %12.0f\n", 
-               rawdata_n, pow(2,(sizeof(int)*8)-1));
-        nmpiread = ceil(double(rawdata_n) / double(pow(2,(sizeof(int)*8)-1)));       
-    }
-    assert(nmpiread >= 1);
-    //cout << "Will need " << nmpiread << " calls to MPI_file_read_at to load all the data." << endl;
-
-    if (nmpiread == 1) {
-        check_mpi(result = MPI_File_read_at(bedfh, offset, rawdata, rawdata_n, MPI_CHAR, &status), __LINE__, __FILE__);
-    } else {
-        cout << "rawdata_n = " << rawdata_n << endl;
-        size_t chunk    = size_t(double(rawdata_n)/double(nmpiread));
-        size_t checksum = 0;
-        for (int i=0; i<nmpiread; ++i) {
-            size_t chunk_ = chunk;        
-            if (i==nmpiread-1)
-                chunk_ = rawdata_n - (i * chunk);
-            checksum += chunk_;
-            printf("rank %03d: chunk %02d: read at %zu a chunk of %zu.\n", rank, i, i*chunk*sizeof(char), chunk_);
-            check_mpi(MPI_File_read_at(bedfh, offset + size_t(i)*chunk*sizeof(char), &rawdata[size_t(i)*chunk], chunk_, MPI_CHAR, &status), __LINE__, __FILE__);        }
-        if (checksum != rawdata_n) {
-            cout << "FATAL!! checksum not equal to rawdata_n: " << checksum << " vs " << rawdata_n << endl;
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-    }
-
-    MPI_Barrier(MPI_COMM_WORLD);
-    const auto et1 = std::chrono::high_resolution_clock::now();
-    const auto dt1 = et1 - st1;
-    const auto du1 = std::chrono::duration_cast<std::chrono::milliseconds>(dt1).count();
-    //std::cout << "rank " << rank << ", time to read the BED file: " << du1 / double(1000.0) << " s." << std::endl;
-    if (rank == 0)
-        std::cout << "Time to read the BED file: " << du1 / double(1000.0) << " seconds." << std::endl;
-
-
-    // Close BED file
-    check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
-
-    //EO: leftover from previous implementation but keep it in for now
-    //data.preprocess_data(rawdata, M, snpLenByt, ppdata, rank);
-
 
     // Preprocess the data
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1001,6 +958,78 @@ int BayesRRm::runMpiGibbs() {
     size_t *N1S, *N1L, *I1,  *N2S, *N2L, *I2, *NMS, *NML, *IM;
 
     if (opt.readFromBedFile) {
+
+        bedfp += ".bed";
+        check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh),  __LINE__, __FILE__);
+
+        // Alloc memory for raw BED data
+        // -----------------------------
+        const size_t rawdata_n = size_t(M) * size_t(snpLenByt) * sizeof(char);
+        char* rawdata = (char*) malloc(rawdata_n);  check_malloc(rawdata, __LINE__, __FILE__);
+        dalloc += rawdata_n / 1E9;
+        //printf("rank %d allocation %zu bytes (%.3f GB) for the raw data.\n",           rank, rawdata_n, double(rawdata_n/1E9));
+
+        //EO: leftover from previous implementation, but keep it in for now
+        //EO  can be useful for checks
+        //-----------------------------------------------------------------
+        //const size_t ppdata_n  = size_t(M) * size_t(data.numInds) * sizeof(double);
+        //double* ppdata    = (double*)malloc(ppdata_n);  if (ppdata  == NULL) { printf("malloc ppdata failed.\n");  exit (1); }    
+        //printf("rank %d allocation %zu bytes (%.3f GB) for the pre-processed data.\n", rank, ppdata_n,  double(ppdata_n/1E9));
+
+        // Compute the offset of the section to read from the BED file
+        // -----------------------------------------------------------
+        offset = size_t(3) + size_t(MrankS[rank]) * size_t(snpLenByt) * sizeof(char);
+
+        // Read the BED file
+        // -----------------
+        MPI_Barrier(MPI_COMM_WORLD);
+        const auto st1 = std::chrono::high_resolution_clock::now();
+
+        // Check how many calls are needed (limited by the int type of the number of elements to read!)
+        uint nmpiread = 1;
+        if (rawdata_n >= pow(2,(sizeof(int)*8)-1)) {   
+            printf("MPI_file_read_at capacity exceeded. Asking to read %zu elements vs max %12.0f\n", 
+                   rawdata_n, pow(2,(sizeof(int)*8)-1));
+            nmpiread = ceil(double(rawdata_n) / double(pow(2,(sizeof(int)*8)-1)));       
+        }
+        assert(nmpiread >= 1);
+        //cout << "Will need " << nmpiread << " calls to MPI_file_read_at to load all the data." << endl;
+
+        if (nmpiread == 1) {
+            check_mpi(result = MPI_File_read_at(bedfh, offset, rawdata, rawdata_n, MPI_CHAR, &status), __LINE__, __FILE__);
+        } else {
+            cout << "rawdata_n = " << rawdata_n << endl;
+            size_t chunk    = size_t(double(rawdata_n)/double(nmpiread));
+            size_t checksum = 0;
+            for (int i=0; i<nmpiread; ++i) {
+                size_t chunk_ = chunk;        
+                if (i==nmpiread-1)
+                    chunk_ = rawdata_n - (i * chunk);
+                checksum += chunk_;
+                printf("rank %03d: chunk %02d: read at %zu a chunk of %zu.\n", rank, i, i*chunk*sizeof(char), chunk_);
+                check_mpi(MPI_File_read_at(bedfh, offset + size_t(i)*chunk*sizeof(char), &rawdata[size_t(i)*chunk], chunk_, MPI_CHAR, &status), __LINE__, __FILE__);
+            }            
+            if (checksum != rawdata_n) {
+                cout << "FATAL!! checksum not equal to rawdata_n: " << checksum << " vs " << rawdata_n << endl;
+                MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+        }
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        const auto et1 = std::chrono::high_resolution_clock::now();
+        const auto dt1 = et1 - st1;
+        const auto du1 = std::chrono::duration_cast<std::chrono::milliseconds>(dt1).count();
+        //std::cout << "rank " << rank << ", time to read the BED file: " << du1 / double(1000.0) << " s." << std::endl;
+        if (rank == 0)
+            std::cout << "INFO   : time to read the BED file: " << du1 / double(1000.0) << " seconds." << std::endl;
+
+        // Close BED file
+        check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
+
+
+        //EO: leftover from previous implementation but keep it in for now
+        //data.preprocess_data(rawdata, M, snpLenByt, ppdata, rank);
+
     
         //cout << " *** READ FROM BED FILE" << endl;
         N1S = (size_t*)malloc(size_t(M) * sizeof(size_t));  check_malloc(N1S, __LINE__, __FILE__);
@@ -1025,7 +1054,12 @@ int BayesRRm::runMpiGibbs() {
                                       N1S, N1L, I1,
                                       N2S, N2L, I2,
                                       NMS, NML, IM);
+        
+        //EO: to clean
+        //data.compute_markers_statistics(rawdata, M, snpLenByt, mave, mstd, msum);
 
+        free(rawdata);
+        
     } else {
         
         //cout << " *** READ FROM SPARSE REPRESENTATION FILES" << endl;
@@ -1035,23 +1069,33 @@ int BayesRRm::runMpiGibbs() {
                                MrankS, MrankL, rank);
     }
 
-    // Compute markers' statistics
+
+    // Compute statistics (from sparse info)
+    // -------------------------------------
     double *mave, *mstd;
-    uint   *msum;
     mave = (double*)malloc(size_t(M) * sizeof(double));  check_malloc(mave, __LINE__, __FILE__);
     mstd = (double*)malloc(size_t(M) * sizeof(double));  check_malloc(mstd, __LINE__, __FILE__);
-    msum = (uint*)  malloc(size_t(M) * sizeof(uint));    check_malloc(msum, __LINE__, __FILE__);
     dalloc += 2 * size_t(M) * sizeof(double) / 1E9;
     dalloc +=     size_t(M) * sizeof(uint)   / 1E9;
     
-    data.compute_markers_statistics(rawdata, M, snpLenByt, mave, mstd, msum);
-    
+    double tmp0, tmp1, tmp2;
+    for (int i=0; i<M; ++i) {
+        mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (double(N) - double(NML[i]));
+        //if (rank == 0 && i < 3)
+        //    printf("mave[%d] = %20.15f\n", i, mave[i]);
+        tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
+        tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
+        tmp0 = double(N - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
+        mstd[i] = sqrt(double(N - 1) / (tmp0+tmp1+tmp2));
+    }
+
+
     MPI_Barrier(MPI_COMM_WORLD);
     const auto et2 = std::chrono::high_resolution_clock::now();
     const auto dt2 = et2 - st2;
     const auto du2 = std::chrono::duration_cast<std::chrono::milliseconds>(dt2).count();
     if (rank == 0)
-        std::cout << "Time to preprocess the data: " << du2 / double(1000.0) << " seconds." << std::endl;
+        std::cout << "INFO   : time to preprocess the data: " << du2 / double(1000.0) << " seconds." << std::endl;
 
 
     // Build list of markers    
@@ -1079,7 +1123,7 @@ int BayesRRm::runMpiGibbs() {
     double totalloc = 0.0;
     //printf("rank %02d dalloc = %.3f GB\n", rank, dalloc);
     MPI_Reduce(&dalloc, &totalloc, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-    if (rank == 0) { printf("OVERALL ALLOC %.3f GB\n", totalloc); }
+    if (rank == 0) printf("INFO   : overall allocation %.3f GB\n", totalloc);
 
     priorPi[0] = 0.5;
     cVa[0]     = 0.0;
@@ -1399,31 +1443,34 @@ int BayesRRm::runMpiGibbs() {
         // ---------------------
         if (opt.covariates) {
 
-            cout << "COVARIATES ON" << endl;
+            if (rank == 0) {
 
-        	std::shuffle(xI.begin(), xI.end(), dist.rng);
-            double gamma_old, num_f, denom_f;
-            double sigE_sigF = sigmaE / sigmaF;
-            cout << "data.X.cols " << data.X.cols() << endl;
-        	for (int i=0; i<data.X.cols(); i++) {
-                gamma_old = gamma(xI[i]);
-                num_f     = 0.0;
-                denom_f   = 0.0;
-                for (int k=0; k<N; k++)
-                    num_f += data.X(k, xI[i]) * (epsilon[k] + gamma_old * data.X(k, xI[i]));
-                denom_f = dNm1 + sigE_sigF;
-                gamma(i) = dist.norm_rng(num_f/denom_f, sigmaE/denom_f);
-                
-                for (int k = 0; k<N ; k++) {
-                    epsilon[k] = epsilon[k] + (gamma_old - gamma(xI[i])) * data.X(k, xI[i]);
-                    cout << "adding " << (gamma_old - gamma(xI[i])) * data.X(k, xI[i]) << endl;
+                std::shuffle(xI.begin(), xI.end(), dist.rng);
+                double gamma_old, num_f, denom_f;
+                double sigE_sigF = sigmaE / sigmaF;
+                //cout << "data.X.cols " << data.X.cols() << endl;
+                for (int i=0; i<data.X.cols(); i++) {
+                    gamma_old = gamma(xI[i]);
+                    num_f     = 0.0;
+                    denom_f   = 0.0;
+                    
+                    for (int k=0; k<N; k++)
+                        num_f += data.X(k, xI[i]) * (epsilon[k] + gamma_old * data.X(k, xI[i]));
+                    denom_f = dNm1 + sigE_sigF;
+                    gamma(i) = dist.norm_rng(num_f/denom_f, sigmaE/denom_f);
+                    
+                    for (int k = 0; k<N ; k++) {
+                        epsilon[k] = epsilon[k] + (gamma_old - gamma(xI[i])) * data.X(k, xI[i]);
+                        //cout << "adding " << (gamma_old - gamma(xI[i])) * data.X(k, xI[i]) << endl;
+                    }
                 }
+                //the next line should be uncommented if we want to use ridge for the other covariates.
+                //sigmaF = inv_scaled_chisq_rng(0.001 + F, (gamma.squaredNorm() + 0.001)/(0.001+F));
+                sigmaF = s02F;
             }
-        	//the next line should be uncommented if we want to use ridge for the other covariates.
-        	//sigmaF = inv_scaled_chisq_rng(0.001 + F, (gamma.squaredNorm() + 0.001)/(0.001+F));
-        	sigmaF = s02F;
         }
 
+        MPI_Barrier(MPI_COMM_WORLD);
 
         e_sqn = 0.0d;
         for (int i=0; i<N; ++i)
@@ -1527,10 +1574,8 @@ int BayesRRm::runMpiGibbs() {
     free(deltaEps);
     free(dEpsSum);
     free(deltaSum);
-    free(rawdata);
     free(mave);
     free(mstd);
-    free(msum);
     free(N1S);
     free(N1L);
     free(I1);
@@ -1543,12 +1588,13 @@ int BayesRRm::runMpiGibbs() {
     
 
     // Finalize the MPI environment
-    MPI_Finalize();
+    //MPI_Finalize();
 
     const auto et3 = std::chrono::high_resolution_clock::now();
     const auto dt3 = et3 - st3;
     const auto du3 = std::chrono::duration_cast<std::chrono::milliseconds>(dt3).count();
-    std::cout << "rank " << rank << ", time to process the data: " << du3 / double(1000.0) << " s." << std::endl;
+    if (rank == 0)
+        printf("INFO   : rank %4d, time to process the data: %.3f sec.\n", rank, du3 / double(1000.0));
 
     return 0;
 }

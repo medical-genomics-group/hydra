@@ -5,9 +5,11 @@
 #include <fcntl.h>
 #include <iterator>
 #include "compression.h"
-
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
+#ifdef USE_MPI
+#include <mpi.h>
+#endif
 
 Data::Data()
     : ppBedFd(-1)
@@ -123,7 +125,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
     free(tmpi);
 }
 
-
+/*
 void Data::compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum) {
 
     // temporary array used for translation
@@ -176,7 +178,7 @@ void Data::compute_markers_statistics(const char* rawdata, const uint M, const u
     }
     free(tmpi);
 }
-
+*/
 
 //void Data::get_normalized_marker_data(const char* rawdata, const uint NB)
 void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx, const double mean, const double std_) {
@@ -554,6 +556,9 @@ void Data::unmapCompressedPreprocessedBedFile()
 // Gaps are allowed; Overlaps are forbiden
 // --------------------------------------------------
 void Data::readMarkerBlocksFile(const string &markerBlocksFile) {
+    
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     ifstream in(markerBlocksFile.c_str());
     if (!in) throw ("Error: can not open the file [" + markerBlocksFile + "] to read.");
@@ -578,18 +583,25 @@ void Data::readMarkerBlocksFile(const string &markerBlocksFile) {
     numBlocks = (unsigned) blocksStarts.size();
     //cout << "Found definitions for " << nbs << " marker blocks." << endl;
 
-    // Gaps allowed, overlaps not
+    // Neither gaps or overlaps are accepted
+    // -------------------------------------
     for (int i=0; i<numBlocks; ++i) {
+
         if (blocksStarts[i] > blocksEnds[i]) {
-            printf("Error: block starts beyond end [%d, %d].\n", blocksStarts[i], blocksEnds[i]);
-            printf("       => you must correct your marker blocks definition file %s\n", markerBlocksFile.c_str());
-            exit(1);
+            if (rank == 0) {
+                printf("FATAL  : block starts beyond end [%d, %d].\n", blocksStarts[i], blocksEnds[i]);
+                printf("         => you must correct your marker blocks definition file %s\n", markerBlocksFile.c_str());
+            }
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
+
         int j=i+1;
-        if (j < numBlocks && blocksEnds[i] >= blocksStarts[j]) {
-            printf("Error: block overlap detected between block %d ([%d, %d]) and block %d ([%d, %d]).\n", i, blocksStarts[i], blocksEnds[i], j, blocksStarts[i], blocksEnds[j]);
-            printf("       => you must correct your marker blocks definition file %s\n", markerBlocksFile.c_str());
-            exit(1);
+        if (j < numBlocks && blocksStarts[j] != blocksEnds[i] + 1) {
+            if (rank == 0) {
+                printf("FATAL  : block %d ([%d, %d]) and block %d ([%d, %d]) are not contiguous!\n", i, blocksStarts[i], blocksEnds[i], j, blocksStarts[j], blocksEnds[j]);
+                printf("         => you must correct your marker blocks definition file %s\n", markerBlocksFile.c_str());
+            }
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
     }
 }
@@ -790,6 +802,8 @@ void Data::readPhenotypeFile(const string &phenFile) {
 
     in.close();
 }
+
+
 //TODO Finish function to read the group file
 void Data::readGroupFile(const string &groupFile) {
     // NA: missing phenotype
@@ -804,4 +818,30 @@ void Data::readGroupFile(const string &groupFile) {
     G=(Eigen::Map<Eigen::VectorXi>(ptr,numbers.size()));
 
     cout << "Groups read from file" << endl;
+}
+
+template<typename M>
+M Data::readCSVFile (const string &path) {
+    std::ifstream indata;
+    indata.open(path);
+    std::string line;
+    std::vector<double> values;
+    uint rows = 0;
+    while (std::getline(indata, line)) {
+        std::stringstream lineStream(line);
+        std::string cell;
+        while (std::getline(lineStream, cell, ',')) {
+            values.push_back(std::stod(cell));
+        }
+        ++rows;
+    }
+    //cout << "rows = " << rows << " vs numInds " << numInds << endl; 
+    if (rows != numInds)
+        throw(" Error: covariate file has different number of individuals as BED file");
+    numFixedEffects = values.size()/rows;
+    return Map<const Matrix<typename M::Scalar, Dynamic, Dynamic, RowMajor>>(values.data(), rows, values.size()/rows);
+}
+
+void Data::readCovariateFile(const string &covariateFile ) {
+	X = readCSVFile<MatrixXd>(covariateFile);
 }

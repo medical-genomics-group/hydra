@@ -37,6 +37,9 @@ fi
 datadir=./test/data
 dataset=uk10k_chr1_1mb
 phen=test
+sparsedir=$datadir
+sparsebsn=$dataset
+
 S="1.0,0.1"
 
 datadir=/scratch/orliac/testM100K_N5K_missing
@@ -61,55 +64,63 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=100
+CL=2
 SEED=10
 SR=0
 SM=1
-NM=1000
+NM=3000
 THIN=3
 SAVE=3
 TOCONV_T=$(($CL / $THIN))
+TOCONV_T=$(($TOCONV_T+1))
 echo TOCONV_T $TOCONV_T
 N=1
-TPN=17
+TPN=3
 
-echo "@@@ Solution reading from  BED file @@@"
-sol=from_bed
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file 
-# --covariates scaled_covariates.csv
-# --number-markers $NM
+run_bed=1
+run_sparse=1
+run_comp=1
 
-./beta_converter       $sol".bet" $TOCONV_T > $sol".bet.txt"
-./epsilon_converter    $sol".eps"           > $sol".eps.txt"
-./components_converter $sol".cpn" $TOCONV_T > $sol".cpn.txt"
+if [ $run_bed == 1 ]; then
+    echo; echo
+    echo "@@@ Solution reading from  BED file @@@"
+    echo
+    sol=from_bed
+    srun -N $N --ntasks-per-node=$TPN  $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --covariates $datadir/scaled_covariates.csv --marker-blocks-file $datadir/${dataset}.blk  --number-markers $NM || exit 1
+    # --number-markers $NM
+    rm $sol".bet.txt" $sol".eps.txt" $sol".cpn.txt"
+    ./beta_converter       $sol".bet" $TOCONV_T > $sol".bet.txt"
+    ./epsilon_converter    $sol".eps"           > $sol".eps.txt"
+    ./components_converter $sol".cpn" $TOCONV_T > $sol".cpn.txt"
+fi
+
+
+if [ $run_sparse == 1 ]; then
+    echo; echo
+    echo "@@@ Solution reading from SPARSE files @@@"
+    echo
+    sol2=from_sparse
+    srun -N $N --ntasks-per-node=$TPN  $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol2 --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --sparse-dir $sparsedir  --sparse-basename $sparsebsn --covariates $datadir/scaled_covariates.csv --marker-blocks-file $datadir/${dataset}.blk --number-markers $NM || exit 1
+    
+    rm $sol2".bet.txt" $sol2".eps.txt" $sol2".cpn.txt" 
+    ./beta_converter       $sol2".bet" $TOCONV_T > $sol2".bet.txt"
+    ./epsilon_converter    $sol2".eps"           > $sol2".eps.txt"
+    ./components_converter $sol2".cpn" $TOCONV_T > $sol2".cpn.txt"
+fi
 
 echo; echo
 
-#echo __EARLY_EXIT__
-#exit 0
-
-echo "@@@ Solution reading from SPARSE files @@@"
-sol2=from_sparse
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol2 --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --sparse-dir $sparsedir  --sparse-basename $sparsebsn  
-# --covariates scaled_covariates.csv
-# --marker-blocks-file $datadir/${dataset}.blk --number-markers $NM
-
-./beta_converter       $sol2".bet" $TOCONV_T > $sol2".bet.txt"
-./epsilon_converter    $sol2".eps"           > $sol2".eps.txt"
-./components_converter $sol2".cpn" $TOCONV_T > $sol2".cpn.txt"
-
-#exit
-#echo; echo
-
-echo diff bin .bet
-diff $sol".bet" $sol2".bet"
-echo diff bin .eps
-diff $sol".eps" $sol2".eps"
-echo diff bin .cpn
-diff $sol".cpn" $sol2".cpn"
-echo diff txt .bet
-diff $sol".bet.txt" $sol2".bet.txt"
-echo diff txt .eps
-diff $sol".eps.txt" $sol2".eps.txt"
-echo diff txt .cpn
-diff $sol".cpn.txt" $sol2".cpn.txt"
+if [ $run_comp == 1 ] && [ $run_bed == 1 ] && [ $run_sparse == 1 ]; then
+    echo diff bin .bet
+    diff $sol".bet" $sol2".bet"
+    echo diff bin .eps
+    diff $sol".eps" $sol2".eps"
+    echo diff bin .cpn
+    diff $sol".cpn" $sol2".cpn"
+    echo diff txt .bet
+    diff $sol".bet.txt" $sol2".bet.txt"
+    echo diff txt .eps
+    diff $sol".eps.txt" $sol2".eps.txt"
+    echo diff txt .cpn
+    diff $sol".cpn.txt" $sol2".cpn.txt"
+fi
