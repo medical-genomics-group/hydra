@@ -9,6 +9,7 @@
 #include <boost/algorithm/string/classification.hpp>
 #ifdef USE_MPI
 #include <mpi.h>
+#include "mpi_utils.hpp"
 #endif
 
 Data::Data()
@@ -21,7 +22,7 @@ Data::Data()
 
 #ifdef USE_MPI
 
-void Data::sparse_data_get_sizes(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2, size_t* NM) {
+void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2, size_t* NM) {
 
     assert(numInds<=NB*4);
 
@@ -63,9 +64,9 @@ void Data::sparse_data_get_sizes(const char* rawdata, const uint NC, const uint 
 
 // Read raw data loaded in memory to preprocess them (center, scale and cast to double)
 void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB,
-                                    size_t* N1S, size_t* N1L, size_t* I1,
-                                    size_t* N2S, size_t* N2L, size_t* I2,
-                                    size_t* NMS, size_t* NML, size_t* IM) {
+                                    size_t* N1S, size_t* N1L, uint* I1,
+                                    size_t* N2S, size_t* N2L, uint* I2,
+                                    size_t* NMS, size_t* NML, uint* IM) {
     
     assert(numInds<=NB*4);
 
@@ -95,20 +96,20 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
 
         size_t n0 = 0, n1 = 0, n2 = 0, nm = 0;
         
-        for (int ii=0; ii<numInds; ++ii) {
+        for (uint ii=0; ii<numInds; ++ii) {
             if (tmpi[ii] < 0) {
-                IM[im] = size_t(ii);
+                IM[im] = ii;
                 im += 1;
                 nm += -tmpi[ii];
             } else {
                 if        (tmpi[ii] == 0) {
                     n0 += 1;
                 } else if (tmpi[ii] == 1) {
-                    I1[i1] = size_t(ii);
+                    I1[i1] = ii;
                     i1 += 1;
                     n1 += 1;
                 } else if (tmpi[ii] == 2) {
-                    I2[i2] = size_t(ii);
+                    I2[i2] = ii;
                     i2 += 1;
                     n2 += 1;
                 }
@@ -125,60 +126,120 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
     free(tmpi);
 }
 
-/*
-void Data::compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum) {
 
-    // temporary array used for translation
-    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+void Data::sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
+                                             size_t* N2S, size_t* N2L,
+                                             size_t* NMS, size_t* NML,
+                                             const int* MrankS, const int* MrankL, const int rank,
+                                             const std::string sparseOut,
+                                             size_t& N1, size_t& N2, size_t& NM) {
+    
+    MPI_Offset offset;
+    MPI_Status status;
 
-    for (int i=0; i<M; i++) {
+    // Number of markers in block handled by task
+    const uint M = MrankL[rank];
 
-        char* locraw = (char*)&rawdata[size_t(i) * size_t(NB)];
+    // Read sparse data files
+    // Each task is in charge of M markers starting from MrankS[rank]
+    // So first we read si1 to get where to read in 
+    MPI_File ss1fh, sl1fh, si1fh;
+    MPI_File ss2fh, sl2fh, si2fh;
+    MPI_File ssmfh, slmfh, simfh;
 
-        for (int ii=0; ii<NB; ++ii) {
-            for (int iii=0; iii<4; ++iii) {
-                tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;
-            }
-        }
-       
-        for (int ii=0; ii<numInds; ++ii) {
-            if (tmpi[ii] == 1) {
-                tmpi[ii] = -1;
-            } else {
-                tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
-            }
-        }
+    // Get bed file directory and basename
+    //std::string sparseOut = mpi_get_sparse_output_filebase();
+    if (rank == 0)
+        printf("INFO   : will read from sparse files with basename: %s\n", sparseOut.c_str());
 
-        int sum = 0, nmiss = 0;
-        for (int ii=0; ii<numInds; ++ii) {
-            if (tmpi[ii] < 0) {
-                nmiss += tmpi[ii];
-            } else {
-                sum   += tmpi[ii];
-            }
-        }
+    const std::string sl1 = sparseOut + ".sl1";
+    const std::string ss1 = sparseOut + ".ss1";
+    const std::string sl2 = sparseOut + ".sl2";
+    const std::string ss2 = sparseOut + ".ss2";
+    const std::string slm = sparseOut + ".slm";
+    const std::string ssm = sparseOut + ".ssm";
 
-        double mean = double(sum) / double(numInds + nmiss); //EO: nmiss is neg
-        //printf("marker %d  mean = %20.15f stats\n", i, mean);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, sl1.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &sl1fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, ss1.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &ss1fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, sl2.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &sl2fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, ss2.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &ss2fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, slm.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &slmfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, ssm.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &ssmfh), __LINE__, __FILE__);
 
-        double sqn = 0.0d;
-        uint nzeros = 0;
-        for (size_t ii=0; ii<numInds; ++ii) {
-            if (tmpi[ii] >= 0)
-                sqn += (double(tmpi[ii]) - mean) * (double(tmpi[ii]) - mean);
-            if (tmpi[ii] == 0)
-                nzeros += 1;
-        }
-        //if (i < 3)
-        //    printf("marker %d  sqn = %20.15f  std_ = %20.15f stats; nzeros = %d; nmiss = %d\n", i, sqn, sqrt(double(numInds - 1) / sqn), nzeros, -nmiss);
+    // Compute the lengths of ones and twos vectors for all markers in the block
+    offset =  MrankS[rank] * sizeof(size_t);
+    check_mpi(MPI_File_read_at_all(sl1fh, offset, N1L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+    check_mpi(MPI_File_read_at_all(ss1fh, offset, N1S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+    check_mpi(MPI_File_read_at_all(sl2fh, offset, N2L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+    check_mpi(MPI_File_read_at_all(ss2fh, offset, N2S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+    check_mpi(MPI_File_read_at_all(slmfh, offset, NML, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+    check_mpi(MPI_File_read_at_all(ssmfh, offset, NMS, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
 
-        msum[i] = sum;
-        mave[i] = mean;
-        mstd[i] = sqrt(double(numInds - 1) / sqn);
-    }
-    free(tmpi);
+    // Absolute offsets in 0s, 1s, and 2s
+    const size_t n1soff = N1S[0];
+    const size_t n2soff = N2S[0];
+    const size_t nmsoff = NMS[0];
+
+    N1 = N1S[M-1] + N1L[M-1] - n1soff;
+    N2 = N2S[M-1] + N2L[M-1] - n2soff;
+    NM = NMS[M-1] + NML[M-1] - nmsoff;
+
+    // Make starts relative to start of block in each task
+    //for (int i=0; i<M; ++i) { N1S[i] -= n1soff; }
+    //for (int i=0; i<M; ++i) { N2S[i] -= n2soff; }
+    //for (int i=0; i<M; ++i) { NMS[i] -= nmsoff; }
+
+    // Close bed and sparse files
+    check_mpi(MPI_File_close(&sl1fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&ss1fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&sl2fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&ss2fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&slmfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&ssmfh), __LINE__, __FILE__);
 }
-*/
+
+
+void Data::sparse_data_read_files(const size_t N1, const size_t N1SOFF, uint* I1, 
+                                  const size_t N2, const size_t N2SOFF, uint* I2,
+                                  const size_t NM, const size_t NMSOFF, uint* IM,
+                                  const std::string sparseOut,
+                                  const int* MrankS, const int* MrankL, const int rank) {
+    
+    MPI_Offset offset;
+    MPI_Status status;
+
+    // Number of markers in block handled by task
+    const uint M = MrankL[rank];
+
+    MPI_File  si1fh, si2fh, simfh;
+
+    const std::string si1 = sparseOut + ".si1";
+    const std::string si2 = sparseOut + ".si2";
+    const std::string sim = sparseOut + ".sim";
+
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, si1.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si1fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, si2.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si2fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, sim.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &simfh), __LINE__, __FILE__);
+
+    // Check for integer overflow
+    check_int_overflow(N1, __LINE__, __FILE__);
+    check_int_overflow(N2, __LINE__, __FILE__);
+    check_int_overflow(NM, __LINE__, __FILE__);
+
+    // Read the indices of 1s and 2s
+    offset =  N1SOFF * sizeof(uint);
+    check_mpi(MPI_File_read_at_all(si1fh, offset, I1, N1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    offset =  N2SOFF * sizeof(uint);
+    check_mpi(MPI_File_read_at_all(si2fh, offset, I2, N2, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    offset =  NMSOFF * sizeof(uint);
+    check_mpi(MPI_File_read_at_all(simfh, offset, IM, NM, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+
+    // Close files
+    check_mpi(MPI_File_close(&si1fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&si2fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&simfh), __LINE__, __FILE__);
+}
+
 
 //void Data::get_normalized_marker_data(const char* rawdata, const uint NB)
 void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx, const double mean, const double std_) {

@@ -139,11 +139,26 @@ public:
 
 
 #ifdef USE_MPI
-    void sparse_data_get_sizes(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2, size_t* NM);
+    void sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2, size_t* NM);
+
     void sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB,
-                                  size_t* N1S, size_t* N1L, size_t* I1,
-                                  size_t* N2S, size_t* N2L, size_t* I2,
-                                  size_t* NMS, size_t* NML, size_t* IM);
+                                  size_t* N1S, size_t* N1L, uint* I1,
+                                  size_t* N2S, size_t* N2L, uint* I2,
+                                  size_t* NMS, size_t* NML, uint* IM);
+
+    void sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
+                                           size_t* N2S, size_t* N2L,
+                                           size_t* NMS, size_t* NML,
+                                           const int* MrankS, const int* MrankL, const int rank,
+                                           const std::string sparseOut,
+                                           size_t& N1, size_t& N2, size_t& NM);
+    
+    void sparse_data_read_files(const size_t N1, const size_t N1SOFF, uint* I1,
+                                const size_t N2, const size_t N2SOFF, uint* I2,
+                                const size_t NM, const size_t NMSOFF, uint* IM,
+                                const std::string sparseOut,
+                                const int* MrankS, const int* MrankL, const int rank);
+
     //void compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum);
     void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx);
     void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx, const double mean, const double std_);

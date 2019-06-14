@@ -38,7 +38,7 @@ int main(int argc, const char * argv[]) {
     uint   itthin;
     size_t offset;
 
-    for (uint iter=0; iter<niter; ++iter) {
+    for (uint iter=0; iter<=niter; ++iter) {
 
         // Read iteration number (potentially decimated by --thin option)
         offset = sizeof(uint) + iter * (sizeof(uint) + M * sizeof(int));

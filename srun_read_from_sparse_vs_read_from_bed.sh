@@ -15,9 +15,13 @@ module purge
 module load intel intel-mpi intel-mkl boost eigen zlib
 module list
 
-icc beta_converter.c       -o beta_converter
-icc epsilon_converter.c    -o epsilon_converter
-icc components_converter.c -o components_converter
+if [ 1  == 1 ]; then 
+    echo compiling utilities
+    icc beta_converter.c       -o beta_converter
+    icc epsilon_converter.c    -o epsilon_converter
+    icc components_converter.c -o components_converter
+    echo end utilities compilation
+fi    
 
 EXE=./src/mpi_gibbs
 
@@ -38,20 +42,23 @@ datadir=./test/data
 dataset=uk10k_chr1_1mb
 phen=test
 sparsedir=$datadir
-sparsebsn=$dataset
-
-S="1.0,0.1"
+sparsebsn=${dataset}_uint
 
 datadir=/scratch/orliac/testM100K_N5K_missing
 dataset=memtest_M100K_N5K_missing0.01
 phen=memtest_M100K_N5K_missing0.01
-sparsedir=/scratch/orliac/CTGG/memtest_M100K_N5K_missing0_01
-sparsebsn=memtest_M100K_N5K_missing0_01
+##sparsedir=/scratch/orliac/CTGG/memtest_M100K_N5K_missing0_01
+##sparsebsn=memtest_M100K_N5K_missing0_01
+sparsedir=$datadir
+sparsebsn=${dataset}_uint
 
-#datadir=/scratch/orliac/testN500K
-#dataset=testN500K
-#phen=$dataset
-#S="1.0,0.1"
+datadir=/scratch/orliac/testN500K
+dataset=testN500K
+phen=$dataset
+sparsedir=$datadir
+sparsebsn=${dataset}_uint
+
+S="1.0,0.1"
 
 echo 
 echo "======================================"
@@ -64,15 +71,15 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=2
+CL=5
 SEED=10
 SR=0
 SM=1
-NM=3000
+NM=100000
 THIN=3
 SAVE=3
-TOCONV_T=$(($CL / $THIN))
-TOCONV_T=$(($TOCONV_T+1))
+
+TOCONV_T=$((($CL - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
 TPN=3
@@ -81,12 +88,20 @@ run_bed=1
 run_sparse=1
 run_comp=1
 
+COV="--covariates $datadir/scaled_covariates.csv"
+COV=""
+BLK="--marker-blocks-file $datadir/${dataset}.blk"
+BLK=""
+NM="--number-markers $NM"
+#NM=""
+echo $NM
+
 if [ $run_bed == 1 ]; then
     echo; echo
     echo "@@@ Solution reading from  BED file @@@"
     echo
     sol=from_bed
-    srun -N $N --ntasks-per-node=$TPN  $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --covariates $datadir/scaled_covariates.csv --marker-blocks-file $datadir/${dataset}.blk  --number-markers $NM || exit 1
+    srun -N $N --ntasks-per-node=$TPN  $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK $NM || exit 1
     # --number-markers $NM
     rm $sol".bet.txt" $sol".eps.txt" $sol".cpn.txt"
     ./beta_converter       $sol".bet" $TOCONV_T > $sol".bet.txt"
@@ -100,7 +115,7 @@ if [ $run_sparse == 1 ]; then
     echo "@@@ Solution reading from SPARSE files @@@"
     echo
     sol2=from_sparse
-    srun -N $N --ntasks-per-node=$TPN  $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol2 --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --sparse-dir $sparsedir  --sparse-basename $sparsebsn --covariates $datadir/scaled_covariates.csv --marker-blocks-file $datadir/${dataset}.blk --number-markers $NM || exit 1
+    srun -N $N --ntasks-per-node=$TPN  $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol2 --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --sparse-dir $sparsedir  --sparse-basename $sparsebsn $COV $BLK $NM || exit 1
     
     rm $sol2".bet.txt" $sol2".eps.txt" $sol2".cpn.txt" 
     ./beta_converter       $sol2".bet" $TOCONV_T > $sol2".bet.txt"

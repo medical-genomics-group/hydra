@@ -33,7 +33,14 @@ INCLUDE += -I../tbb/include
 
 LIBS     = -lz #-lstdc++fs #-lboost_system -lboost_filesystem
 
-SRC = data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
+#HDR = \
+	data.hpp    BayesRRm.h       gadgets.hpp     distributions_boost.hpp \
+	options.cpp samplewriter.cpp compression.cpp \
+	mpi_utils.hpp
+
+SRC = \
+	main.cpp	data.cpp    BayesRRm.cpp     gadgets.cpp     distributions_boost.cpp \
+	options.cpp samplewriter.cpp compression.cpp
 
 OBJ = $(SRC:.cpp = .o)
 

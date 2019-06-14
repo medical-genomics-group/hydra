@@ -25,14 +25,19 @@ fi
 # DATASET
 datadir=./test/data
 dataset=uk10k_chr1_1mb
+sparsedir=$datadir
+sparsebsn=${dataset}_uint
 phen=test
 S="1.0,0.1"
 
 datadir=/scratch/orliac/testM100K_N5K_missing
 dataset=memtest_M100K_N5K_missing0.01
 phen=memtest_M100K_N5K_missing0.01
-sparsedir=/scratch/orliac/CTGG/memtest_M100K_N5K_missing0_01
-sparsebsn=memtest_M100K_N5K_missing0_01
+#sparsedir=/scratch/orliac/CTGG/memtest_M100K_N5K_missing0_01
+#sparsebsn=memtest_M100K_N5K_missing0_01
+sparsedir=$datadir
+sparsebsn=${dataset}_uint
+
 
 #datadir=/scratch/orliac/testM100K_N5K_missing
 #dataset=memtest_M100K_N5K_missing0.01
@@ -47,11 +52,11 @@ echo "S      :" $S
 echo "======================================"
 echo
 
-CL=10
+CL=3
 SEED=5
 SR=0
 SM=0
-NM=120000
+NM=1200000
 
 # If you change those, do not expect compatibility
 N=1
