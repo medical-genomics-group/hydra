@@ -12,6 +12,10 @@
 #include <Eigen/Sparse>
 #include <boost/format.hpp>
 #include "gadgets.hpp"
+#ifdef USE_MPI
+#include <mpi.h>
+#include "mpi_utils.hpp"
+#endif
 
 
 using namespace std;
@@ -130,8 +134,8 @@ public:
 
     unsigned numFixedEffects;
 
-    unsigned numSnps;
-    unsigned numInds;
+    unsigned numSnps = 0;
+    unsigned numInds = 0;
 
     vector<int> blocksStarts;
     vector<int> blocksEnds;
@@ -139,7 +143,7 @@ public:
 
 
 #ifdef USE_MPI
-    void sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2, size_t* NM);
+    void sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t& N1, size_t& N2, size_t& NM);
 
     void sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB,
                                   size_t* N1S, size_t* N1L, uint* I1,
@@ -158,6 +162,122 @@ public:
                                 const size_t NM, const size_t NMSOFF, uint* IM,
                                 const std::string sparseOut,
                                 const int* MrankS, const int* MrankL, const int rank);
+
+
+    // MPI_File_read_at_all handling count argument larger than INT_MAX
+    template <typename T>
+    void mpi_file_read_at_all_test(const size_t N, MPI_Offset offset, MPI_File fh, MPI_Datatype MPI_DT, T buffer) {
+
+        int rank, dtsize;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Type_size(MPI_DT, &dtsize);
+        assert(dtsize == sizeof(buffer[0]));
+
+        int SPLIT_ON = INT_MAX;
+        SPLIT_ON = 150000;
+        uint nmpiread = ceil( double(N) / double(SPLIT_ON) );
+        assert(nmpiread >= 0);
+        
+        if (nmpiread == 0) return;
+
+        if (rank == 0) printf("INFO   : tasks will need %d MPI_File_read calls\n", nmpiread);
+
+        int    count    = SPLIT_ON;
+        size_t checksum = 0;
+
+        MPI_Status status;
+
+        for (uint i=0; i<nmpiread; ++i) {
+
+            const size_t iim = size_t(i) * size_t(SPLIT_ON);
+
+            // Last iteration takes only the leftover
+            if (i == nmpiread-1) count = check_int_overflow(N - iim, __LINE__, __FILE__);
+            check_mpi(MPI_File_read_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
+            checksum += size_t(count);
+        }
+        if (checksum != N) {
+            cout << "FATAL!! checksum not equal to rawdata_n: " << checksum << " vs " << N << endl;
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+
+    // MPI_File_read_at_all handling count argument larger than INT_MAX
+    template <typename T>
+    void mpi_file_read_at_all(const size_t N, MPI_Offset offset, MPI_File fh, MPI_Datatype MPI_DT, T buffer) {
+
+        int rank, dtsize;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Type_size(MPI_DT, &dtsize);
+        assert(dtsize == sizeof(buffer[0]));
+
+        int SPLIT_ON = INT_MAX;
+        //SPLIT_ON = 50000000;
+        uint nmpiread = ceil( double(N) / double(SPLIT_ON) );
+        assert(nmpiread >= 0);
+        
+        if (nmpiread == 0) return;
+
+        if (rank == 0) printf("INFO   : tasks will need %d MPI_File_read calls\n", nmpiread);
+
+        int    count    = SPLIT_ON;
+        size_t checksum = 0;
+
+        MPI_Status status;
+
+        for (uint i=0; i<nmpiread; ++i) {
+
+            const size_t iim = size_t(i) * size_t(SPLIT_ON);
+
+            // Last iteration takes only the leftover
+            if (i == nmpiread-1) count = check_int_overflow(N - iim, __LINE__, __FILE__);
+            check_mpi(MPI_File_read_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
+            checksum += size_t(count);
+        }
+        if (checksum != N) {
+            cout << "FATAL!! checksum not equal to rawdata_n: " << checksum << " vs " << N << endl;
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+
+
+    // MPI_File_write_at_all handling count argument larger than INT_MAX
+    template <typename T>
+    void mpi_file_write_at_all(const size_t N, MPI_Offset offset, MPI_File fh, MPI_Datatype MPI_DT, T buffer) 
+    {
+        int rank, dtsize;
+        MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+        MPI_Type_size(MPI_DT, &dtsize);
+        assert(dtsize == sizeof(buffer[0]));
+
+        uint nmpiread = ceil( double(N) / double(INT_MAX) );
+        assert(nmpiread >= 0);
+        
+        if (nmpiread == 0) return;
+
+        int    count    = INT_MAX;
+        size_t checksum = 0;
+
+        MPI_Status status;
+
+        for (uint i=0; i<nmpiread; ++i) {
+
+            const size_t iim = size_t(i) * size_t(INT_MAX);
+
+            // Last iteration takes only the leftover
+            if (i == nmpiread-1) count = check_int_overflow(N - iim, __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
+
+            checksum += size_t(count);
+        }
+        if (checksum != N) {
+            cout << "FATAL!! checksum not equal to rawdata_n: " << checksum << " vs " << N << endl;
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+    }
+
+
+    void sparse_data_mpi_read_files(const size_t N, const size_t NSOFF, const MPI_File sifh, uint* I);
 
     //void compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum);
     void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx);
@@ -178,6 +298,7 @@ public:
     void readBimFile(const string &bimFile);
     void readBedFile_noMPI(const string &bedFile);
     void readPhenotypeFile(const string &phenFile);
+    void readPhenotypeFile(const string &phenFile, const int numberIndividuals);
     void readGroupFile(const string &groupFile);
     template<typename M>
     M    readCSVFile(const string &covariateFile);

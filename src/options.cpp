@@ -90,6 +90,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             numberMarkers = atoi(argv[++i]);
             ss << "--number-markers " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--number-individuals")) {    //EO
+            numberIndividuals = atoi(argv[++i]);
+            ss << "--number-individuals " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--chain-length")) {
             chainLength = atoi(argv[++i]);
             ss << "--chain-length " << argv[i] << "\n";
@@ -202,8 +206,9 @@ void Options::readFile(const string &file){  // input options from file
 #endif
         else if (key == "numberMarkers") {
             numberMarkers = stoi(value);
-        }
-        else if (key == "chainLength") {
+        } else if (key == "numberIndividuals") {
+            numberIndividuals = stoi(value);
+        } else if (key == "chainLength") {
             chainLength = stoi(value);
         } else if (key == "burnin") {
             burnin = stoi(value);

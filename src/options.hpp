@@ -20,19 +20,20 @@ const unsigned Megabase = 1e6;
 class Options {
 public:
 
-    unsigned shuffleMarkers  =  1;
+    unsigned shuffleMarkers    =  1;
 #ifdef USE_MPI
-    unsigned MPISyncRate     =  1;
-    bool     bedToSparse     =  false;
-    bool     readFromBedFile =  false; //EO: by default read from sparse representation files
-    unsigned blocksPerRank   =  1;     //EO: for bed -> sparse conversion, to split blocks if too large
+    unsigned MPISyncRate       =  1;
+    bool     bedToSparse       =  false;
+    bool     readFromBedFile   =  false; //EO: by default read from sparse representation files
+    unsigned blocksPerRank     =  1;     //EO: for bed -> sparse conversion, to split blocks if too large
 #endif
-    unsigned numberMarkers   =  0;
+    unsigned numberMarkers     =  0;
+    unsigned numberIndividuals =  0;
     unsigned chainLength;
     unsigned burnin;
     unsigned seed;
     unsigned numThread;
-    int numThreadSpawned     = 0;      // Default to 0, let TBB do its thing
+    int numThreadSpawned       = 0;      // Default to 0, let TBB do its thing
     unsigned thin;                     // save every this th sampled value in MCMC
     unsigned save;                     // sampling rate of the epsilon vector
     vector<float> S;                   // variance components

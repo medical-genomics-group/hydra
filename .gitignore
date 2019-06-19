@@ -12,3 +12,4 @@ brr
 slurm-*.out
 bayesOutput_??.*
 /tbb/
+/test/

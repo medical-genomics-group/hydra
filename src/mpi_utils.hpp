@@ -12,13 +12,15 @@ inline void check_mpi(const int error, const int linenumber, const char* filenam
     }
 }
 
-// Check for integer overflow
-// --------------------------
-inline void check_int_overflow(const int n, const int linenumber, const char* filename) {
+// Check if size_can be casted to int or would overflow
+// ------------------------------------------------------
+inline int check_int_overflow(const size_t n, const int linenumber, const char* filename) {
+
     if (n > pow(2,(sizeof(int)*8)-1)) {
-        fprintf(stderr, "Fatal: integer overflow detected on line %d of %s\n", linenumber, filename);
+        fprintf(stderr, "Fatal: integer overflow detected on line %d of %s. %lu does not fit in type int.\n", linenumber, filename, n);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
+    return static_cast<int>(n);
 }
 
 

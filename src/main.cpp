@@ -40,10 +40,6 @@ int main(int argc, const char * argv[]) {
 
         Data data;
 
-        // Read in the data for every possible option
-        data.readFamFile(opt.bedFile + ".fam");
-        data.readBimFile(opt.bedFile + ".bim");
-
         // Read in covariates file if passed
         if (opt.covariates) {
             data.readCovariateFile(opt.covariatesFile);
@@ -52,22 +48,28 @@ int main(int argc, const char * argv[]) {
 #ifdef USE_MPI
 
         if (opt.bedToSparse == true) {
-            
-            data.readPhenotypeFile(opt.phenotypeFile);
+            data.readFamFile(opt.bedFile + ".fam");
+            data.readBimFile(opt.bedFile + ".bim");
+            //data.readPhenotypeFile(opt.phenotypeFile);
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
             analysis.write_sparse_data_files(opt.blocksPerRank);
 
         } else if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
-            // Read phenotype file
-            data.readPhenotypeFile(opt.phenotypeFile);
-            //EO to remove
-            //data.readBedFile_noMPI(opt.bedFile+".bed");
+            
+            if (opt.readFromBedFile) {
+                data.readFamFile(opt.bedFile + ".fam");
+                data.readBimFile(opt.bedFile + ".bim");
+                data.readPhenotypeFile(opt.phenotypeFile);
+            } else {
+                data.readPhenotypeFile(opt.phenotypeFile, opt.numberIndividuals);
+            }
+
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
 
             if (opt.markerBlocksFile != "") {
                 data.readMarkerBlocksFile(opt.markerBlocksFile);
             } else {
-                if (rank == 0) cout << "INFO   : No request to read a block markers definition file." << endl;
+                if (rank == 0) cout << "INFO   : no request to read a block markers definition file." << endl;
             }
 
             analysis.runMpiGibbs();

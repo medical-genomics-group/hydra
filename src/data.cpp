@@ -22,18 +22,21 @@ Data::Data()
 
 #ifdef USE_MPI
 
-void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t* N1, size_t* N2, size_t* NM) {
+void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t& N1, size_t& N2, size_t& NM) {
 
     assert(numInds<=NB*4);
 
     // temporary array used for translation
-    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(char));
 
-    *N1 = 0;
-    *N2 = 0;
-    *NM = 0;
+    N1 = 0;
+    N2 = 0;
+    NM = 0;
+    size_t N0 = 0;
 
-    for (int i=0; i<NC; ++i) {
+    for (uint i=0; i<NC; ++i) {
+
+        uint c0 = 0, c1 = 0, c2 = 0, cm = 0;
 
         char* locraw = (char*)&rawdata[size_t(i)*size_t(NB)];
 
@@ -52,10 +55,15 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
         }
 
         for (int ii=0; ii<numInds; ++ii) {
-            if      (tmpi[ii] <  0) { *NM += 1; }
-            else if (tmpi[ii] == 1) { *N1 += 1; }
-            else if (tmpi[ii] == 2) { *N2 += 1; }
+            if      (tmpi[ii] <  0) { cm += 1; NM += 1; }
+            else if (tmpi[ii] == 0) { c0 += 1; N0 += 1; }
+            else if (tmpi[ii] == 1) { c1 += 1; N1 += 1; }
+            else if (tmpi[ii] == 2) { c2 += 1; N2 += 1; }
         }
+        
+        assert(cm+c0+c1+c2 == numInds);
+        //cout << cm << ", " << c0 << ", " << c1 << ", " << c2 << endl;
+        //cout << "numInds = " << numInds << endl;
     }
 
     free(tmpi);
@@ -168,6 +176,7 @@ void Data::sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
 
     // Compute the lengths of ones and twos vectors for all markers in the block
     offset =  MrankS[rank] * sizeof(size_t);
+    printf("rank %4d: offset = %20lu Bytes MrankS = %lu, M = %lu\n", rank, offset, MrankS[rank], M);
     check_mpi(MPI_File_read_at_all(sl1fh, offset, N1L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(ss1fh, offset, N1S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(sl2fh, offset, N2L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
@@ -175,14 +184,35 @@ void Data::sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
     check_mpi(MPI_File_read_at_all(slmfh, offset, NML, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(ssmfh, offset, NMS, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
 
+    // Sanity checks
+    // -------------
+    for (int i=0; i<M-1; i++) {
+        if (N1S[i] > N1S[i+1]) {
+            printf("rank %4d: Cannot be N1S[%lu] > N1S[%lu] (%20lu > %20lu)\n", rank, i, i+1, N1S[i], N1S[i+1]);
+            exit(1);
+        }
+        if (N2S[i] > N2S[i+1]) {
+            printf("rank %4d: Cannot be N2S[%lu] > N2S[%lu] (%20lu > %20lu)\n", rank, i, i+1, N2S[i], N2S[i+1]);
+            exit(1);
+        }
+        if (NMS[i] > NMS[i+1]) {
+            printf("rank %4d: Cannot be NMS[%lu] > NMS[%lu] (%20lu > %20lu)\n", rank, i, i+1, NMS[i], NMS[i+1]);
+            exit(1);
+        }
+    }
+
+
     // Absolute offsets in 0s, 1s, and 2s
     const size_t n1soff = N1S[0];
+    printf("rank %4d N1S[0] = %20lu\n", rank, N1S[0]);
     const size_t n2soff = N2S[0];
     const size_t nmsoff = NMS[0];
 
     N1 = N1S[M-1] + N1L[M-1] - n1soff;
     N2 = N2S[M-1] + N2L[M-1] - n2soff;
     NM = NMS[M-1] + NML[M-1] - nmsoff;
+    printf("rank %4d N1 = %20lu = %20lu + %20lu - %20lu with M = %d\n", rank, N1, N1S[M-1], N1L[M-1], n1soff, M);
+    //printf("data rank %4d: %20lu, %20lu, %20lu\n", rank, N1, N2, NM);
 
     // Make starts relative to start of block in each task
     //for (int i=0; i<M; ++i) { N1S[i] -= n1soff; }
@@ -221,24 +251,51 @@ void Data::sparse_data_read_files(const size_t N1, const size_t N1SOFF, uint* I1
     check_mpi(MPI_File_open(MPI_COMM_WORLD, si2.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si2fh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, sim.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &simfh), __LINE__, __FILE__);
 
-    // Check for integer overflow
-    check_int_overflow(N1, __LINE__, __FILE__);
-    check_int_overflow(N2, __LINE__, __FILE__);
-    check_int_overflow(NM, __LINE__, __FILE__);
+    /*
+    sparse_data_mpi_read_files(N1, N1SOFF, si1fh, I1);
+    sparse_data_mpi_read_files(N2, N2SOFF, si2fh, I2);
+    sparse_data_mpi_read_files(NM, NMSOFF, simfh, IM);
+    */
+    mpi_file_read_at_all<uint*>(N1, offset, si1fh, MPI_UNSIGNED, I1);
+    mpi_file_read_at_all<uint*>(N2, offset, si2fh, MPI_UNSIGNED, I2);
+    mpi_file_read_at_all<uint*>(NM, offset, simfh, MPI_UNSIGNED, IM);
 
-    // Read the indices of 1s and 2s
-    offset =  N1SOFF * sizeof(uint);
-    check_mpi(MPI_File_read_at_all(si1fh, offset, I1, N1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    offset =  N2SOFF * sizeof(uint);
-    check_mpi(MPI_File_read_at_all(si2fh, offset, I2, N2, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    offset =  NMSOFF * sizeof(uint);
-    check_mpi(MPI_File_read_at_all(simfh, offset, IM, NM, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-
-    // Close files
     check_mpi(MPI_File_close(&si1fh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&si2fh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&simfh), __LINE__, __FILE__);
 }
+
+
+/*
+// MPI_File_read_at_all limit by int type of count parameter
+// ---------------------------------------------------------
+void Data::sparse_data_mpi_read_files(const size_t N, const size_t NSOFF, const MPI_File sifh, uint* I) {
+
+    uint nmpiread = ceil( double(N) / double(INT_MAX) );
+    assert(nmpiread >= 0);
+
+    if (nmpiread == 0) {
+        assert(N == 0);
+        return;
+    }
+    
+    MPI_Offset offset =  NSOFF * sizeof(uint);
+    MPI_Status status;
+    int        count = INT_MAX;
+    size_t     checksum = 0;
+
+    for (int i=0; i<nmpiread; ++i) {
+        const size_t byIIM = size_t(i) * size_t(INT_MAX);
+        if (i == nmpiread-1) count = check_int_overflow(N - byIIM, __LINE__, __FILE__);
+        check_mpi(MPI_File_read_at_all(sifh, offset + byIIM * sizeof(uint), &I[byIIM], count, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+        checksum += size_t(count);
+    }
+    if (checksum != N) {
+        cout << "FATAL!! checksum not equal to N: " << checksum << " vs " << N << endl;
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+}
+*/
 
 
 //void Data::get_normalized_marker_data(const char* rawdata, const uint NB)
@@ -830,6 +887,30 @@ void Data::readBedFile_noMPI(const string &bedFile){
 #endif
 }
 
+//EO: overload function setting numInds in case not reading from fam file before
+void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals) {
+    numInds = numberIndividuals;
+    ifstream in(phenFile.c_str());
+    if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
+#ifndef USE_MPI
+    cout << "Reading phenotypes from [" + phenFile + "]." << endl;
+#endif
+    unsigned line=0;
+    Gadget::Tokenizer colData;
+    string inputStr;
+    string sep(" \t");
+    y.setZero(numInds);
+    while (getline(in,inputStr)) {
+        colData.getTokens(inputStr, sep);
+        if (colData[1+1] != "NA") {
+            y[line] = double( atof(colData[1+1].c_str()) );
+            ++line;
+        }
+    }
+    in.close();
+    assert(line == numInds);
+}
+
 void Data::readPhenotypeFile(const string &phenFile) {
     // NA: missing phenotype
     ifstream in(phenFile.c_str());
@@ -844,9 +925,9 @@ void Data::readPhenotypeFile(const string &phenFile) {
     string sep(" \t");
     string id;
     unsigned line=0;
+    double tmp = 0.0;
     //correct loop to go through numInds
     y.setZero(numInds);
-
     while (getline(in,inputStr)) {
         colData.getTokens(inputStr, sep);
         id = colData[0] + ":" + colData[1];
@@ -854,14 +935,14 @@ void Data::readPhenotypeFile(const string &phenFile) {
         // First one corresponded to mphen variable (1+1)
         if (it != end && colData[1+1] != "NA") {
             ind = it->second;
-            ind->phenotype = atof(colData[1+1].c_str());
-            //fill in phenotype y vector
-            y[line] = double(ind->phenotype);
+            tmp = double(atof(colData[1+1].c_str()));
+            ind->phenotype = tmp;
+            y[line]        = tmp;
             ++line;
         }
     }
-
     in.close();
+    assert(line == numInds);
 }
 
 

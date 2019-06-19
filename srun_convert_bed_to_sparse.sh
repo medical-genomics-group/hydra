@@ -10,33 +10,47 @@ EXE=./src/mpi_gibbs
 
 # COMPILATION
 cd ./src
+echo REMOVE THAT ONE
+touch main.cpp 
 B='-B'
 B=''
 make $B -f Makefile || exit 1;
 cd ..
 
 # DATASET
-datadir=./test/data
-dataset=uk10k_chr1_1mb
-sparsedir=$datadir
-sparsebsn=${dataset}_uint
-phen=test
+datadir=""
+dataset=""
+sparsedir=""
+sparsebsn=""
+phen=""
 
-datadir=/scratch/orliac/testM100K_N5K_missing
-dataset=memtest_M100K_N5K_missing0.01
-sparsedir=$datadir
-sparsebsn=${dataset}_uint
-phen=memtest_M100K_N5K_missing0.01
+DS=2
 
-datadir=/scratch/orliac/testN500K
-dataset=testN500K
-phen=$dataset
-sparsedir=$datadir
-sparsebsn=${dataset}_uint
+if [ $DS == 0 ]; then 
+    datadir=./test/data
+    dataset=uk10k_chr1_1mb
+    sparsedir=$datadir
+    sparsebsn=${dataset}_uint
+    phen=test
+elif [ $DS == 1 ]; then
+    datadir=/scratch/orliac/testM100K_N5K_missing
+    dataset=memtest_M100K_N5K_missing0.01
+    sparsedir=$datadir
+    sparsebsn=${dataset}_uint
+    phen=memtest_M100K_N5K_missing0.01
+elif [ $DS == 2 ]; then
+    datadir=/scratch/orliac/testN500K
+    dataset=testN500K
+    phen=$dataset
+    sparsedir=$datadir
+    sparsebsn=${dataset}_uint_test
+fi
+
+echo datadir: $datadir
 
 N=1
-TPN=36
-BPR=3
+TPN=30
+BPR=5
 
 echo
 echo Convert BED to SPARSE

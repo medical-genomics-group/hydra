@@ -66,6 +66,8 @@ class BayesRRm
     double epsilonsum;
     double ytildesum;
 
+    const size_t LENBUF = 200;
+
 public:
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();

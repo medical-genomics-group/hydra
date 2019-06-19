@@ -6,46 +6,74 @@ use File::Path qw(make_path remove_tree);
 
 # Info on dataset to process
 # --------------------------
-my $DATADIR = "$ENV{HOME}/CADMOS/Matthew/BayesRRcmd/test/data/testdata_msp_constpop_Ne10K_M100K_N10K";
-my $DATASET = "testdata_msp_constpop_Ne10K_M100K_N10K";
-my $PHEN    = $DATASET;
-my $S="1.0,0.1";
+my ($datadir, $dataset, $phen, $S, $sparsedir, $sparsebsn, $numinds, $numsnps) = ("", "", "", "0.1,1.0");
 
-$DATADIR = "/scratch/orliac/memtest_M1000K_N50K";
-$DATASET = "memtest_M1000K_N50K";
-$PHEN    = $DATASET;
-$S="0.1,0.01";
+# Select dataset here
+my $DS = 3;
+my $frombed=0;
 
-$DATADIR = "/scratch/orliac/testN500K";
-$DATASET = "testN500K";
-$PHEN    = $DATASET;
-$S="0.1,0.01";
+if ($DS == 0) {
+    $datadir="./test/data";
+    $dataset="uk10k_chr1_1mb";
+    $phen="test";
+    $sparsedir=$datadir;
+    $sparsebsn=${dataset}."_uint";
+    $numinds=3642;
+    $numsnps=6717;
+} elsif ($DS == 1) {
+    $datadir="/scratch/orliac/testM100K_N5K_missing";
+    $dataset="memtest_M100K_N5K_missing0.01";
+    $phen="memtest_M100K_N5K_missing0.01";
+    $sparsedir=$datadir;
+    $sparsebsn=${dataset}."_uint";
+    $numinds=5000;
+    $numsnps=117148;
+} elsif ($DS == 2) {
+    $datadir="/scratch/orliac/testN500K";
+    $dataset="testN500K";
+    $phen=$dataset;
+    $sparsedir=$datadir;
+    $sparsebsn=${dataset}."_uint";
+} elsif ($DS == 3) {
+    $sparsedir="/scratch/orliac/UKBgen/";
+    $sparsebsn="epfl_test_data_sparse_V2";
+    $phen="epfl_test_data";
+    $numinds=457810;
+    $numsnps=8430446;
+    $numsnps=100000;
+    $S="0.00001,0.0001,0.001,0.01"
+} else {
+    die "Unknown dataset selected: $DS!";
+}
 
+my $dir = $frombed == 1 ? $datadir : $sparsedir;
+my $set = $frombed == 1 ? $dataset : $sparsebsn;
 
-my $M       = 114560;      # Number of markers
-$M          = 894417;
-$M          = 1270420;
-my $N       = 500000;       # Number of individuals
-my $CL      = 20000;       # Number of iterations (chain length)
-my $SM      = 1;           # Marker shuffling switch
+my $COV       = "--covariates $dir/scaled_covariates.csv"; 
+$COV          = "";
+my $BLK       = "--marker-blocks-file $dir/${dataset}.blk";
+$BLK          = "";
 
-my $MEMGB   = 180;         # Helvetios
+my $CL        = 2;        # Number of iterations (chain length)
+my $THIN      = 10;
+my $SAVE      = 10;
+my $SM        = 1;          # Marker shuffling switch
+my $MEMGB     = 180;        # Helvetios
+my $EXE       = "/home/orliac/DCSR/CTGG/BayesRRcmd/src/mpi_gibbs";
 
-#my $EXE     = "/home/orliac/DCSR/CTGG/BayesRRcmd/src/mpi_gibbs"; # Binary to run
-my $EXE     = "/home/orliac/DCSR/CTGG/BayesRRcmd/src/mpi_gibbs_devel";
-die unless -d $DATADIR;
+die unless -d $dir;
 die unless (-f $EXE && -e $EXE);
 
 # Benchmark plan & processing setup
 # ---------------------------------
-my $nickname = "large_10K_it_cinq"; #!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! CHANGE THIS ONE !!!!!!!
+my $nickname = "UKBgenV01";
 
-my $DIR    = "/scratch/orliac/test_sparse/benchmarks/$nickname";
+my $DIR    = "/scratch/orliac/UKBgen/runs/$nickname";
 unless (-d $DIR) { make_path($DIR) or die "mkdir($DIR): $!"; }
-my @NNODES = qw(32 16);
-my @NTPN   = qw(36);
+my @NNODES = qw(1);
+my @NTPN   = qw(100);
 my @SYNCR  = qw(5);
-my @SEEDS  = qw(5432);
+my @SEEDS  = qw(4321);
 
 my $PARTITION = 'parallel';
 #$PARTITION = 'debug';
@@ -72,30 +100,17 @@ foreach my $nnodes (@NNODES) {
                 #printf("nodes: $nnodes, tasks per node: $ntpn, syncr: $syncr\n");
                 my $basename = sprintf("${nickname}__nodes_%02d__tpn_%02d__tasks_%02d__cl_${CL}__syncr_%03d__seed_%02d", $nnodes, $ntpn, $ntasks, $syncr, $SEED);
                 
-                # Delete output file if already existing
-                my $csv = "$DIR/$basename".'.csv';
-                if (-f $csv) {
-                    unlink $csv;
-                    print "INFO: deleted file $csv\n";
-                }
-
-                my $bet = "$DIR/$basename".'.bet';
-                if (-f $bet) {
-                    unlink $bet;
-                    print "INFO: deleted file $bet\n";
-                }
-                
                 open F, ">$DIR/$basename.sh" or die $!;
 
                 print F "#!/bin/bash\n\n";
-                print F "#SBATCH --nodes $nnodes\n";
+                print F "#SBATCH --account ext-unil-ctgg\n";
+                #print F "#SBATCH --nodes $nnodes\n";
                 print F "#SBATCH --exclusive\n";
                 print F "#SBATCH --mem ${mem_per_node}G\n";
-                print F "#SBATCh --ntasks $ntasks\n";
-                print F "#SBATCH --ntasks-per-node $ntpn\n";
+                print F "#SBATCH --ntasks $ntasks\n";
+                #print F "#SBATCH --ntasks-per-node $ntpn\n";
                 print F "#SBATCH --cpus-per-task 1\n";
-                print F "#SBATCH --time 3-00:00:00\n";
-                #print F "#SBATCH --time 06:00:00\n";
+                print F "#SBATCH --time 0-00:30:00\n";
                 print F "#SBATCH --partition $PARTITION\n";
                 #print F "#SBATCH --constraint=E5v4\n";
                 print F "#SBATCH --output ${basename}__jobid\%J.out\n";
@@ -106,8 +121,11 @@ foreach my $nnodes (@NNODES) {
                 print F "\n";
                 print F "start_time=\"\$(date -u +\%s)\"\n";
                 print F "\n";
-                #print F "srun $EXE --bfile $DATADIR/$DATASET --pheno $DATADIR/$DATASET.phen --chain-length $CL --seed $SEED --shuf-mark $SM --mpi-sync-rate $syncr --number-markers $M --mcmc-samples ${basename}.csv\n";
-                print F "srun $EXE --mpibayes bayesMPI --bfile $DATADIR/$DATASET --pheno $DATADIR/${PHEN}.phen2 --chain-length $CL --burn-in 0 --thin 1 --mcmc-samples $csv --mcmc-betas $bet --seed $SEED --shuf-mark $SM --mpi-sync-rate $syncr --number-markers $M --S $S\n";
+                if ($frombed == 0) {
+                    print F "srun $EXE --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $basename --seed $SEED --shuf-mark $SM --mpi-sync-rate $syncr --S $S --sparse-dir $sparsedir  --sparse-basename $sparsebsn $COV $BLK  --number-individuals $numinds --number-markers $numsnps || exit 1\n";
+                } else { 
+                    die "Adapt for from bed!";
+                }
                 print F "\n";
                 print F "end_time=\"\$(date -u +\%s)\"\n";
                 print F "elapsed=\"\$((\$end_time-\$start_time))\"\n";
