@@ -1141,8 +1141,8 @@ int BayesRRm::runMpiGibbs() {
                 }
                 //printf("acum = %15.10f\n", acum);
                 
-                for (int k=0; k<K; k++) {
-                    if (p <= acum) {
+                for (int k=0; k < K; k++) {
+		  if (p <= acum || k == km1) { //if we p is less than acum or if we are already in the last mixt.
                         if (k==0) {
                             beta(marker) = 0.0;
                         } else {
@@ -1158,10 +1158,10 @@ int BayesRRm::runMpiGibbs() {
                             printf("iteration %d, marker = %d, p = %15.10f, acum = %15.10f\n", iteration, marker, p, acum);
                             cout << "????????????" << k+1 << endl;
                         }
-                        if (((logL.segment(1,km1).array()-logL[k+1]).abs().array() > 700.0d ).any() ){
-                            acum += 0.0d;
+                        if (((logL.segment(k+1,K-(k+1)).array()-logL[k+1]).abs().array() > 700.0d ).any() ){
+			  acum += 0.0d;// we compare next mixture to the others, if to big diff we skip
                         } else{
-                        acum += 1.0d / ((logL.array()-logL[k+1]).exp().sum());
+			  acum += 1.0d / ((logL.array()-logL[k+1]).exp().sum()); //if not , sample
                         }
                     }
                 }
