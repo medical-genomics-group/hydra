@@ -80,6 +80,7 @@ public:
     std::string mpi_get_sparse_output_filebase(void);
     void write_sparse_data_files(const uint bpr);
     int  runMpiGibbs();
+    void check_whole_array_was_set(const uint* array, const size_t size, const int linenumber, const char* filename);
 #endif
     
 private:

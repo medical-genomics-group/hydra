@@ -62,15 +62,17 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
         }
         
         assert(cm+c0+c1+c2 == numInds);
-        //cout << cm << ", " << c0 << ", " << c1 << ", " << c2 << endl;
-        //cout << "numInds = " << numInds << endl;
     }
 
     free(tmpi);
 }
 
 
-// Read raw data loaded in memory to preprocess them (center, scale and cast to double)
+// Screen the raw BED data and count and register number of ones, twos and missing information
+// N*S: store the "S"tart of each marker representation 
+// N*L: store the "L"ength of each marker representation
+// I* : store the indices of the elements
+// -------------------------------------------------------------------------------------------
 void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB,
                                     size_t* N1S, size_t* N1L, uint* I1,
                                     size_t* N2S, size_t* N2L, uint* I2,
@@ -134,7 +136,43 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
     free(tmpi);
 }
 
+size_t Data::get_number_of_elements_from_sparse_files(const std::string basename, const std::string id, const int* MrankS, const int* MrankL,
+                                                      size_t* S, size_t* L) {
 
+    MPI_Status status;
+    MPI_File   ssfh, slfh;
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    // Number of markers in block handled by task
+    const uint M = MrankL[rank];
+
+    const std::string sl = basename + ".sl" + id;
+    const std::string ss = basename + ".ss" + id;
+
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, ss.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &ssfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, sl.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &slfh), __LINE__, __FILE__);
+
+    // Compute the lengths of ones and twos vectors for all markers in the block
+    MPI_Offset offset =  MrankS[rank] * sizeof(size_t);
+    
+    check_mpi(MPI_File_read_at_all(ssfh, offset, S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+    check_mpi(MPI_File_read_at_all(slfh, offset, L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+
+    // Absolute offsets in 0s, 1s, and 2s
+    const size_t nsoff = S[0];
+
+    size_t N = S[M-1] + L[M-1] - nsoff;
+
+    // Close bed and sparse files
+    check_mpi(MPI_File_close(&ssfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&slfh), __LINE__, __FILE__);
+
+    return N;
+}
+
+/*
 void Data::sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
                                              size_t* N2S, size_t* N2L,
                                              size_t* NMS, size_t* NML,
@@ -156,9 +194,7 @@ void Data::sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
     MPI_File ssmfh, slmfh, simfh;
 
     // Get bed file directory and basename
-    //std::string sparseOut = mpi_get_sparse_output_filebase();
-    if (rank == 0)
-        printf("INFO   : will read from sparse files with basename: %s\n", sparseOut.c_str());
+    if (rank == 0) printf("INFO   : will read from sparse files with basename: %s\n", sparseOut.c_str());
 
     const std::string sl1 = sparseOut + ".sl1";
     const std::string ss1 = sparseOut + ".ss1";
@@ -176,48 +212,40 @@ void Data::sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
 
     // Compute the lengths of ones and twos vectors for all markers in the block
     offset =  MrankS[rank] * sizeof(size_t);
-    printf("rank %4d: offset = %20lu Bytes MrankS = %lu, M = %lu\n", rank, offset, MrankS[rank], M);
+    //printf("rank %4d: offset = %20lu Bytes MrankS = %lu, M = %lu\n", rank, offset, MrankS[rank], M);
     check_mpi(MPI_File_read_at_all(sl1fh, offset, N1L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(ss1fh, offset, N1S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(sl2fh, offset, N2L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(ss2fh, offset, N2S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(slmfh, offset, NML, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(ssmfh, offset, NMS, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
-
+    
     // Sanity checks
     // -------------
     for (int i=0; i<M-1; i++) {
         if (N1S[i] > N1S[i+1]) {
             printf("rank %4d: Cannot be N1S[%lu] > N1S[%lu] (%20lu > %20lu)\n", rank, i, i+1, N1S[i], N1S[i+1]);
-            exit(1);
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
         if (N2S[i] > N2S[i+1]) {
             printf("rank %4d: Cannot be N2S[%lu] > N2S[%lu] (%20lu > %20lu)\n", rank, i, i+1, N2S[i], N2S[i+1]);
-            exit(1);
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
         if (NMS[i] > NMS[i+1]) {
             printf("rank %4d: Cannot be NMS[%lu] > NMS[%lu] (%20lu > %20lu)\n", rank, i, i+1, NMS[i], NMS[i+1]);
-            exit(1);
+            MPI_Abort(MPI_COMM_WORLD, 1);
         }
     }
 
 
     // Absolute offsets in 0s, 1s, and 2s
     const size_t n1soff = N1S[0];
-    printf("rank %4d N1S[0] = %20lu\n", rank, N1S[0]);
     const size_t n2soff = N2S[0];
     const size_t nmsoff = NMS[0];
 
     N1 = N1S[M-1] + N1L[M-1] - n1soff;
     N2 = N2S[M-1] + N2L[M-1] - n2soff;
     NM = NMS[M-1] + NML[M-1] - nmsoff;
-    printf("rank %4d N1 = %20lu = %20lu + %20lu - %20lu with M = %d\n", rank, N1, N1S[M-1], N1L[M-1], n1soff, M);
-    //printf("data rank %4d: %20lu, %20lu, %20lu\n", rank, N1, N2, NM);
-
-    // Make starts relative to start of block in each task
-    //for (int i=0; i<M; ++i) { N1S[i] -= n1soff; }
-    //for (int i=0; i<M; ++i) { N2S[i] -= n2soff; }
-    //for (int i=0; i<M; ++i) { NMS[i] -= nmsoff; }
 
     // Close bed and sparse files
     check_mpi(MPI_File_close(&sl1fh), __LINE__, __FILE__);
@@ -226,76 +254,29 @@ void Data::sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
     check_mpi(MPI_File_close(&ss2fh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&slmfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&ssmfh), __LINE__, __FILE__);
-}
 
-
-void Data::sparse_data_read_files(const size_t N1, const size_t N1SOFF, uint* I1, 
-                                  const size_t N2, const size_t N2SOFF, uint* I2,
-                                  const size_t NM, const size_t NMSOFF, uint* IM,
-                                  const std::string sparseOut,
-                                  const int* MrankS, const int* MrankL, const int rank) {
-    
-    MPI_Offset offset;
-    MPI_Status status;
-
-    // Number of markers in block handled by task
-    const uint M = MrankL[rank];
-
-    MPI_File  si1fh, si2fh, simfh;
-
-    const std::string si1 = sparseOut + ".si1";
-    const std::string si2 = sparseOut + ".si2";
-    const std::string sim = sparseOut + ".sim";
-
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, si1.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si1fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, si2.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si2fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, sim.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &simfh), __LINE__, __FILE__);
-
-    /*
-    sparse_data_mpi_read_files(N1, N1SOFF, si1fh, I1);
-    sparse_data_mpi_read_files(N2, N2SOFF, si2fh, I2);
-    sparse_data_mpi_read_files(NM, NMSOFF, simfh, IM);
-    */
-    mpi_file_read_at_all<uint*>(N1, offset, si1fh, MPI_UNSIGNED, I1);
-    mpi_file_read_at_all<uint*>(N2, offset, si2fh, MPI_UNSIGNED, I2);
-    mpi_file_read_at_all<uint*>(NM, offset, simfh, MPI_UNSIGNED, IM);
-
-    check_mpi(MPI_File_close(&si1fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&si2fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&simfh), __LINE__, __FILE__);
-}
-
-
-/*
-// MPI_File_read_at_all limit by int type of count parameter
-// ---------------------------------------------------------
-void Data::sparse_data_mpi_read_files(const size_t N, const size_t NSOFF, const MPI_File sifh, uint* I) {
-
-    uint nmpiread = ceil( double(N) / double(INT_MAX) );
-    assert(nmpiread >= 0);
-
-    if (nmpiread == 0) {
-        assert(N == 0);
-        return;
-    }
-    
-    MPI_Offset offset =  NSOFF * sizeof(uint);
-    MPI_Status status;
-    int        count = INT_MAX;
-    size_t     checksum = 0;
-
-    for (int i=0; i<nmpiread; ++i) {
-        const size_t byIIM = size_t(i) * size_t(INT_MAX);
-        if (i == nmpiread-1) count = check_int_overflow(N - byIIM, __LINE__, __FILE__);
-        check_mpi(MPI_File_read_at_all(sifh, offset + byIIM * sizeof(uint), &I[byIIM], count, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        checksum += size_t(count);
-    }
-    if (checksum != N) {
-        cout << "FATAL!! checksum not equal to N: " << checksum << " vs " << N << endl;
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
+    MPI_Barrier(MPI_COMM_WORLD);
 }
 */
+
+
+void Data::read_sparse_data_file(const std::string filename, const size_t N, const size_t OFF, const int NREADS, uint* out) {
+
+    MPI_Offset offset;
+    MPI_Status status;
+    MPI_File   fh;
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
+
+    offset = OFF * sizeof(uint);
+
+    mpi_file_read_at_all<uint*>(N, offset, fh, MPI_UNSIGNED, NREADS, out);
+
+    check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
+}
 
 
 //void Data::get_normalized_marker_data(const char* rawdata, const uint NB)
@@ -778,8 +759,11 @@ void Data::readBimFile(const string &bimFile) {
 }
 
 
-void Data::readBedFile_noMPI(const string &bedFile){
+void Data::readBedFile_noMPI(const string &bedFile) {
+
     unsigned i = 0, j = 0, k = 0;
+
+    cout << "readBedFile_noMPI will read numSnps = " << numSnps << endl;
 
     if (numSnps == 0) throw ("Error: No SNP is retained for analysis.");
     if (numInds == 0) throw ("Error: No individual is retained for analysis.");

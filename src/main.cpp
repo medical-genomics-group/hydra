@@ -6,7 +6,7 @@
 #ifndef USE_MPI
 #include "BayesRRmz.hpp"
 #endif
-#include "tbb/task_scheduler_init.h"
+//#include "tbb/task_scheduler_init.h"
 #ifdef USE_MPI
 #include <mpi.h>
 #endif
@@ -82,8 +82,15 @@ int main(int argc, const char * argv[]) {
 #endif
             clock_t start = clock();
 
-            // Read phenotype file and bed file for the option specified
+            // Read input files
+            data.readFamFile(opt.bedFile + ".fam");
+            data.readBimFile(opt.bedFile + ".bim");
             data.readPhenotypeFile(opt.phenotypeFile);
+
+            // Limit number of markers to process
+            if (opt.numberMarkers > 0 && opt.numberMarkers < data.numSnps)
+                data.numSnps = opt.numberMarkers;
+
             data.readBedFile_noMPI(opt.bedFile+".bed");
 
             // Option bayesType="bayesMmap" is going to be deprecated
