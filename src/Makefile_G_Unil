@@ -1,0 +1,38 @@
+#
+# Purpose: Makefile for compile the MPI based asynchronous Gibbs sampler
+# Author : E. Orliac
+# Date   : 22.01.2019
+#
+
+EXE       = mpi_gibbs
+
+CXX       = mpic++
+
+CXXFLAGS  = -O3
+#CXXFLAGS += g
+CXXFLAGS += -std=c++17
+CXXFLAGS += -march=native
+CXXFLAGS += -D USE_MPI
+
+#CXXFLAGS +=  -fopt-info-vec-optimized
+
+#INCLUDE  = -I/home/orliac/external_soft/pcg-c/include
+#INCLUDE += -I$(EIGEN_ROOT)/include/eigen3
+#INCLUDE += -I$(BOOST_ROOT)/include
+#INCLUDE += -I$(MVAPICH2_ROOT)/include
+
+LIBS     = -lz
+
+SRC = data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
+
+OBJ = $(SRC:.cpp = .o)
+
+all:	$(EXE)
+
+$(EXE):	$(OBJ)
+		$(CXX) $(CXXFLAGS) $(INCLUDE) $(LIBS) -o $(EXE) $(OBJ)
+
+clean:
+	/usr/bin/rm -rvf	\
+	*.o
+
