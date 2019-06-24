@@ -182,6 +182,8 @@ public:
         MPI_Type_size(MPI_DT, &dtsize);
         assert(dtsize == sizeof(buffer[0]));
 
+        if (NREADS == 0) return;
+
         int SPLIT_ON = check_int_overflow(size_t(ceil(double(N)/double(NREADS))), __LINE__, __FILE__);
         int count = SPLIT_ON;
 
@@ -207,6 +209,8 @@ public:
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Type_size(MPI_DT, &dtsize);
         assert(dtsize == sizeof(buffer[0]));
+
+        if (NWRITES == 0) return;
 
         int SPLIT_ON = check_int_overflow(size_t(ceil(double(N)/double(NWRITES))), __LINE__, __FILE__);
         int count = SPLIT_ON;
