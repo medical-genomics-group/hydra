@@ -997,7 +997,7 @@ int BayesRRm::runMpiGibbs() {
         int NREADS1 = check_int_overflow(size_t(ceil(double(N1max)/double(INT_MAX/2))), __LINE__, __FILE__);
         int NREADS2 = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))), __LINE__, __FILE__);
         int NREADSM = check_int_overflow(size_t(ceil(double(NMmax)/double(INT_MAX/2))), __LINE__, __FILE__);
-        if (rank == 0) printf("INFO   : NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", NREADS1, NREADS2, NREADSM, );
+        if (rank == 0) printf("INFO   : NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", NREADS1, NREADS2, NREADSM);
 
         data.read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);
         data.read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], NREADS2, I2);
