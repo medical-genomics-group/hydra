@@ -28,7 +28,7 @@ EXE=./src/mpi_gibbs
 # COMPILATION
 cd ./src
 B='-B'
-B=''
+#B=''
 make $B -f Makefile || exit 1;
 cd ..
 
@@ -39,7 +39,7 @@ fi
 
 S="1.0,0.1"
 
-DS=2
+DS=3
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -68,11 +68,11 @@ elif [ $DS == 2 ]; then
     NUMSNPS=10000
 elif [ $DS == 3 ]; then
     sparsedir=/scratch/orliac/UKBgen/
-    sparsebsn=epfl_test_data_sparse_V2
+    sparsebsn=epfl_test_data_sparse
     phen=epfl_test_data
     NUMINDS=457810
     NUMSNPS=8430446
-    NUMSNPS=500000
+    NUMSNPS=34000
     S="0.00001,0.0001,0.001,0.01"
 fi
 
@@ -97,10 +97,10 @@ SAVE=3
 TOCONV_T=$((($CL - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
-TPN=1
+TPN=18
 
 # Set what to run
-run_bed=1; run_sparse=1; run_comp=1;
+run_bed=0; run_sparse=1; run_comp=0;
 
 COV="--covariates $datadir/scaled_covariates.csv"
 COV=""
