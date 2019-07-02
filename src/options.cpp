@@ -33,6 +33,22 @@ void Options::inputOptions(const int argc, const char* argv[]){
             blocksPerRank = atoi(argv[++i]);
             ss << "--blocks-per-rank " << "\n";
         }
+        else if (!strcmp(argv[i], "--check-RAM")) {
+            checkRam = true;
+            ss << "--check-RAM " << "\n";
+        }
+        else if (!strcmp(argv[i], "--check-RAM-tasks")) {
+            int tmp = atoi(argv[++i]);
+            if (tmp < 0) { printf("FATAL: --check-RAM-tasks passed a negative number!\n"); exit(1); }
+            checkRamTasks = tmp;
+            ss << "--check-RAM-tasks " << "\n";
+        }
+        else if (!strcmp(argv[i], "--check-RAM-tasks-per-node")) {
+            int tmp = atoi(argv[++i]);
+            if (tmp < 0) { printf("FATAL: --check-RAM-tasks-per-node passed a negative number!\n"); exit(1); }
+            checkRamTpn = tmp;
+            ss << "--check-RAM-tasks-per-node " << "\n";
+        }
 #endif
         else if (!strcmp(argv[i], "--ppbayes")) {
             analysisType = "PPBayes";

@@ -4,11 +4,12 @@
 # Date   : 22.01.2019
 #
 
-EXE       = mpi_gibbs
+EXE ?= mpi_gibbs
 
 CXX       = mpiicpc
 
-CXXFLAGS  = -O3
+#CXXFLAGS  = -O3
+CXXFLAGS = -Ofast
 #CXXFLAGS  = -O0
 #CXXFLAGS += -g
 CXXFLAGS += -std=c++17
@@ -29,7 +30,7 @@ CXXFLAGS += -D USE_MPI
 
 INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
-INCLUDE += -I../tbb/include
+#INCLUDE += -I../tbb/include
 
 LIBS     = -lz #-lstdc++fs #-lboost_system -lboost_filesystem
 
@@ -44,7 +45,7 @@ SRC = \
 
 OBJ = $(SRC:.cpp = .o)
 
-all:	$(EXE)
+all: $(EXE) 
 
 $(EXE):	$(OBJ)
 		$(CXX) $(CXXFLAGS) $(INCLUDE) $(LIBS) -o $(EXE) $(OBJ)

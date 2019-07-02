@@ -125,7 +125,7 @@ void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCoun
 // ---------------------------
 inline void check_malloc(const void* ptr, const int linenumber, const char* filename) {
     if (ptr == NULL) {
-        fprintf(stderr, "Fatal: malloc failed on line %d of %s\n", linenumber, filename);
+        fprintf(stderr, "#FATAL#: malloc failed on line %d of %s\n", linenumber, filename);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
@@ -669,11 +669,7 @@ size_t get_file_size(const std::string& filename) {
 
 
 
-void mpi_assign_blocks_to_tasks(int* MrankS, int* MrankL, const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot) {
-
-    int rank, nranks;
-    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+void mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL) {
 
     if (numBlocks > 0) {
 
@@ -726,9 +722,18 @@ int BayesRRm::runMpiGibbs() {
     double dalloc = 0.0;
 
     //MPI_Init(NULL, NULL);
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int  processor_name_len;
 
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if (opt.checkRam && nranks != 1) {
+        printf("#FATAL#: --check-RAM option runs only in single task mode (SIMULATION of --check-RAM-tasks with max --check-RAM-tasks-per-node tasks per node)!\n");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    MPI_Get_processor_name(processor_name, &processor_name_len);
 
     MPI_File   bedfh, outfh, betfh, epsfh, cpnfh;
     MPI_Status status;
@@ -770,6 +775,150 @@ int BayesRRm::runMpiGibbs() {
         if (rank == 0) printf("Option passed to process only %d markers!\n", Mtot);
     }
 
+    // Get name of sparse files to read from (default case)
+    // ----------------------------------------------------
+    std::string sparseOut = mpi_get_sparse_output_filebase();
+
+
+    // Alloc memory for sparse representation
+    size_t *N1S, *N1L,  *N2S, *N2L,  *NMS, *NML;
+    uint   *I1,         *I2,         *IM;
+    size_t  N1=0, N2=0, NM=0;
+
+    N1S = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N1S, __LINE__, __FILE__);
+    N1L = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N1L, __LINE__, __FILE__);
+    N2S = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N2S, __LINE__, __FILE__);
+    N2L = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N2L, __LINE__, __FILE__);
+    NMS = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(NMS, __LINE__, __FILE__);
+    NML = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(NML, __LINE__, __FILE__);
+    dalloc += 6.0 * double(Mtot) * sizeof(size_t) / 1E9;
+
+
+    // Estimate RAM usage
+    // ------------------
+    if (opt.checkRam) {
+        if (opt.checkRamTasks <= 0) {
+            printf("#FATAL#: --check-RAM-tasks must be strictly positive! Was %d\n", opt.checkRamTasks);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        if (opt.checkRamTpn <= 0) {
+            printf("#FATAL#: --check-RAM-tasks-per-node must be strictly positive! Was %d\n", opt.checkRamTpn);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+
+        MPI_File slfh;
+
+        // Read length files once for all
+        string sl;
+        sl = sparseOut + ".sl1";
+        check_mpi(MPI_File_open(MPI_COMM_WORLD, sl.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &slfh), __LINE__, __FILE__);
+        check_mpi(MPI_File_read_at_all(slfh, 0, N1L, Mtot, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_close(&slfh), __LINE__, __FILE__);
+        sl = sparseOut + ".sl2";
+        check_mpi(MPI_File_open(MPI_COMM_WORLD, sl.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &slfh), __LINE__, __FILE__);
+        check_mpi(MPI_File_read_at_all(slfh, 0, N2L, Mtot, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_close(&slfh), __LINE__, __FILE__);
+        sl = sparseOut + ".slm";
+        check_mpi(MPI_File_open(MPI_COMM_WORLD, sl.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &slfh), __LINE__, __FILE__);
+        check_mpi(MPI_File_read_at_all(slfh, 0, NML, Mtot, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_close(&slfh), __LINE__, __FILE__);
+        
+
+        // Given
+        int tpn = opt.checkRamTpn;
+
+        int nranks = opt.checkRamTasks;
+        if (opt.markerBlocksFile != "") nranks = data.numBlocks;
+
+        int nnodes = int(ceil(double(nranks)/double(tpn)));
+        printf("INFO  : will simulate %d ranks on %d nodes with max %d tasks per node.\n", nranks, nnodes, tpn);
+
+        int proctasks = 0;
+                
+        printf("Estimation RAM usage when dataset is processed with %2d nodes and %2d tasks per node\n", nnodes, tpn);
+        
+        int MrankS[nranks], MrankL[nranks];
+        mpi_assign_blocks_to_tasks(data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot, nranks, rank, MrankS, MrankL);
+        //mpi_define_blocks_of_markers(Mtot, MrankS, MrankL, nranks);
+        
+        int lmax = 0, lmin = 1E9;
+        for (int i=0; i<nranks; ++i) {
+            if (MrankL[i]>lmax) lmax = MrankL[i];
+            if (MrankL[i]<lmin) lmin = MrankL[i];
+        }
+        printf("INFO   : longest  task has %d markers.\n", lmax);
+        printf("INFO   : smallest task has %d markers.\n", lmin);
+        double min = 1E9, max = 0.0;
+        int nodemin = 0, nodemax = 0;
+
+        // Replicate SLURM block task assignment strategy
+        // ----------------------------------------------
+        const int nfull = nranks + nnodes * (1 - tpn);
+        printf("INFO   : number of nodes fully loaded: %d\n", nfull);
+
+        // Save max
+        const int tpnmax = tpn;
+
+        for (int node=0; node<nnodes; node++) {
+            
+            double ramnode = 0.0;
+            
+            if (node >= nfull) tpn = tpnmax - 1;
+
+            // Array of pointers allocated memory
+            uint *allocs1[tpn], *allocs2[tpn], *allocsm[tpn];
+            
+            for (int i=0; i<tpn; i++) {
+                size_t n1 = 0, n2 = 0, nm = 0;
+                for (int m=0; m<MrankL[node*tpn + i]; m++) {
+                    n1 += N1L[MrankS[node*tpn + i] + m];
+                    n2 += N2L[MrankS[node*tpn + i] + m];
+                    nm += NML[MrankS[node*tpn + i] + m];                
+                }
+                double GB = double((n1+n2+nm)*sizeof(uint))*1E-9;
+                ramnode += GB;
+                printf("   - t %3d  n %2d will attempt to alloc %.3f + %.3f + %.3f GB of RAM\n", i, node, n1*sizeof(uint)*1E-9,  n2*sizeof(uint)*1E-9,  nm*sizeof(uint)*1E-9);
+
+                allocs1[i] = (uint*) malloc(n1 * sizeof(uint));  check_malloc(allocs1[i], __LINE__, __FILE__);
+                allocs2[i] = (uint*) malloc(n2 * sizeof(uint));  check_malloc(allocs2[i], __LINE__, __FILE__);
+                allocsm[i] = (uint*) malloc(nm * sizeof(uint));  check_malloc(allocsm[i], __LINE__, __FILE__);
+
+                printf("   - t %3d  n %2d sm %7d  l %6d markers. Number of 1s: %15lu, 2s: %15lu, ms: %15lu => RAM: %7.3f GB; RAM on node: %7.3f with %d tasks\n", i, node, MrankS[node*tpn + i], MrankL[node*tpn + i], n1, n2, nm, GB, ramnode, tpn);
+
+                proctasks++;
+            }
+            
+            // free memory on the node
+            for (int i=0; i<tpn; i++) { 
+                free(allocs1[i]);
+                free(allocs2[i]);
+                free(allocsm[i]);
+            }
+            
+            if (ramnode < min) { min = ramnode; nodemin = node; }
+            if (ramnode > max) { max = ramnode; nodemax = node; }
+
+        }
+
+        if (proctasks != nranks) {
+            printf("#FATAL#: Cannot fit %d tasks on %d nodes with %d x %d + %d x %d tasks per node! Ended up with %d.\n", nranks, nnodes, nfull, tpnmax, nnodes-nfull, tpn, proctasks);
+        }
+        
+        printf("\n");
+        printf("    => max RAM required on a node will be %7.3f GB on node %d\n", max, nodemax);
+        printf("    => setting up your sbatch with %d tasks and %d tasks per node should work; Will require %d nodes!\n", nranks, tpnmax, nnodes);
+        printf("\n");
+        
+        // Free previously allocated memory
+        free(N1S); free(N1L);
+        free(N2S); free(N2L);
+        free(NMS); free(NML);
+
+        // Do no process anything
+        return 0;
+    }
+
+
 
     // Define blocks of individuals (for dumping epsilon)
     // Note: hack the marker block definition function to this end
@@ -781,7 +930,8 @@ int BayesRRm::runMpiGibbs() {
     // Define global marker indexing
     // -----------------------------
     int MrankS[nranks], MrankL[nranks];
-    mpi_assign_blocks_to_tasks(MrankS, MrankL, data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot);
+    //mpi_assign_blocks_to_tasks(MrankS, MrankL, data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot);
+    mpi_assign_blocks_to_tasks(data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot, nranks, rank, MrankS, MrankL);
 
 
     int lmax = 0, lmin = 1E9;
@@ -876,24 +1026,7 @@ int BayesRRm::runMpiGibbs() {
     // Preprocess the data
     MPI_Barrier(MPI_COMM_WORLD);
     const auto st2 = std::chrono::high_resolution_clock::now();
-
-    // Alloc memory for sparse representation
-    size_t *N1S, *N1L,  *N2S, *N2L,  *NMS, *NML;
-    uint   *I1,         *I2,         *IM;
-    size_t  N1=0, N2=0, NM=0;
-
-    N1S = (size_t*)malloc(size_t(M) * sizeof(size_t));  check_malloc(N1S, __LINE__, __FILE__);
-    N1L = (size_t*)malloc(size_t(M) * sizeof(size_t));  check_malloc(N1L, __LINE__, __FILE__);
-    N2S = (size_t*)malloc(size_t(M) * sizeof(size_t));  check_malloc(N2S, __LINE__, __FILE__);
-    N2L = (size_t*)malloc(size_t(M) * sizeof(size_t));  check_malloc(N2L, __LINE__, __FILE__);
-    NMS = (size_t*)malloc(size_t(M) * sizeof(size_t));  check_malloc(NMS, __LINE__, __FILE__);
-    NML = (size_t*)malloc(size_t(M) * sizeof(size_t));  check_malloc(NML, __LINE__, __FILE__);
-    dalloc += 6.0 * double(M) * sizeof(size_t) / 1E9;
-
-    std::string sparseOut = mpi_get_sparse_output_filebase();
-
-    size_t *AllRawdata_n = (size_t*) malloc(nranks * sizeof(size_t));  check_malloc(AllRawdata_n, __LINE__, __FILE__);
-
+    
 
     // READING FROM BED FILE
     // ---------------------
@@ -919,6 +1052,7 @@ int BayesRRm::runMpiGibbs() {
         const auto st1 = std::chrono::high_resolution_clock::now();
 
         // Gather the sizes to determine common number of reads
+        size_t *AllRawdata_n = (size_t*) malloc(nranks * sizeof(size_t));  check_malloc(AllRawdata_n, __LINE__, __FILE__);
         check_mpi(MPI_Allgather(&rawdata_n, 1, MPI_UNSIGNED_LONG_LONG, AllRawdata_n, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
         size_t rawdata_n_max = 0;
         for (int i; i<nranks; i++) {
@@ -977,12 +1111,21 @@ int BayesRRm::runMpiGibbs() {
         check_mpi(MPI_Allgather(&NM, 1, MPI_UNSIGNED_LONG_LONG, AllNM, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
 
         size_t N1max = 0, N2max = 0, NMmax = 0;
+        size_t N1tot = 0, N2tot = 0, NMtot = 0;
         for (int i=0; i<nranks; i++) {
+            N1tot += AllN1[i];
+            N2tot += AllN2[i];
+            NMtot += AllNM[i];
             if (AllN1[i] > N1max) N1max = AllN1[i];
             if (AllN2[i] > N2max) N2max = AllN2[i];
             if (AllNM[i] > NMmax) NMmax = AllNM[i];
         }
-        if (rank == 0) printf("INFO   : N1max = %lu, N2max = %lu, NMmax = %lu\n", N1max, N2max, NMmax);
+        if (rank == 0) printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
+        if (rank == 0) printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
+        if (rank == 0) printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1+N2+NM)*sizeof(uint)/1E9);
+        fflush(stdout);
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (rank == 0) printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", (N1tot+N2tot+NMtot)*sizeof(uint)/1E9);
 
         I1 = (uint*) malloc(N1 * sizeof(uint));  check_malloc(I1, __LINE__, __FILE__);
         I2 = (uint*) malloc(N2 * sizeof(uint));  check_malloc(I2, __LINE__, __FILE__);
@@ -997,7 +1140,7 @@ int BayesRRm::runMpiGibbs() {
         int NREADS1 = check_int_overflow(size_t(ceil(double(N1max)/double(INT_MAX/2))), __LINE__, __FILE__);
         int NREADS2 = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))), __LINE__, __FILE__);
         int NREADSM = check_int_overflow(size_t(ceil(double(NMmax)/double(INT_MAX/2))), __LINE__, __FILE__);
-        if (rank == 0) printf("INFO   : NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", NREADS1, NREADS2, NREADSM);
+        if (rank == 0) printf("INFO   : number of call to read the sparse files: NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", NREADS1, NREADS2, NREADSM);
 
         data.read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);
         data.read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], NREADS2, I2);
@@ -1458,9 +1601,9 @@ int BayesRRm::runMpiGibbs() {
         }
 
         double end_it = MPI_Wtime();
-        //if (rank == 0) { printf("Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it); }
+        if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
 
-        MPI_Barrier(MPI_COMM_WORLD);      
+        MPI_Barrier(MPI_COMM_WORLD);
     }
 
 

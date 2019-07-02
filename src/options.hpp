@@ -20,15 +20,18 @@ const unsigned Megabase = 1e6;
 class Options {
 public:
 
-    unsigned shuffleMarkers    =  1;
+    unsigned shuffleMarkers    = 1;
 #ifdef USE_MPI
-    unsigned MPISyncRate       =  1;
-    bool     bedToSparse       =  false;
-    bool     readFromBedFile   =  false; //EO: by default read from sparse representation files
-    unsigned blocksPerRank     =  1;     //EO: for bed -> sparse conversion, to split blocks if too large
+    unsigned MPISyncRate       = 1;
+    bool     bedToSparse       = false;
+    bool     readFromBedFile   = false; //EO: by default read from sparse representation files
+    unsigned blocksPerRank     = 1;     //EO: for bed -> sparse conversion, to split blocks if too large
+    bool     checkRam          = false;
+    unsigned checkRamTasks     = 0;
+    unsigned checkRamTpn       = 0;
 #endif
-    unsigned numberMarkers     =  0;
-    unsigned numberIndividuals =  0;
+    unsigned numberMarkers     = 0;
+    unsigned numberIndividuals = 0;
     unsigned chainLength;
     unsigned burnin;
     unsigned seed;
