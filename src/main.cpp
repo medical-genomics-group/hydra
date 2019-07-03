@@ -40,11 +40,6 @@ int main(int argc, const char * argv[]) {
 
         Data data;
 
-        // Read in covariates file if passed
-        if (opt.covariates) {
-            data.readCovariateFile(opt.covariatesFile);
-        }
-
 #ifdef USE_MPI
 
         if (opt.bedToSparse == true) {
@@ -60,8 +55,19 @@ int main(int argc, const char * argv[]) {
                 data.readFamFile(opt.bedFile + ".fam");
                 data.readBimFile(opt.bedFile + ".bim");
                 data.readPhenotypeFile(opt.phenotypeFile);
+                // Read in covariates file if passed
+               if (opt.covariates) {
+		 std::cout << "reading covariates file: "  << opt.covariatesFile;
+                   data.readCovariateFile(opt.covariatesFile);
+               }
             } else {
                 data.readPhenotypeFile(opt.phenotypeFile, opt.numberIndividuals);
+                if (opt.covariates) {
+
+                   std::cout << "reading covariates file: "  << opt.covariatesFile;
+                    data.readCovariateFile(opt.covariatesFile);
+                }
+
             }
 
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
