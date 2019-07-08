@@ -84,7 +84,7 @@ public:
 #endif
     
 private:
-    void init(int K, unsigned int markerCount, unsigned int individualCount);
+    void init(int K, unsigned int markerCount, unsigned int individualCount, unsigned int missingPhenCount);
     VectorXd getSnpData(unsigned int marker) const;
     void printDebugInfo() const;
 };

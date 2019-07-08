@@ -46,80 +46,7 @@ BayesRRm::~BayesRRm()
 {
 }
 
-void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCount)
-{
-    // Component variables
-    priorPi = VectorXd(K);      // prior probabilities for each component
-    pi      = VectorXd(K);      // mixture probabilities
-    cVa     = VectorXd(K);      // component-specific variance
-    cVaI    = VectorXd(K);      // inverse of the component variances
-    logL    = VectorXd(K);      // log likelihood of component
-    muk     = VectorXd(K);      // mean of k-th component marker effect size
-    denom   = VectorXd(K - 1);  // temporal variable for computing the inflation of the effect variance for a given non-zero component
-    m0      = 0;                // total number of markers in model
-    v       = VectorXd(K);      // variable storing the component assignment
-
-    // Mean and residual variables
-    mu     = 0.0;   // mean or intercept
-    sigmaG = 0.0;   // genetic variance
-    sigmaE = 0.0;   // residuals variance
-
-    // Linear model variables
-    beta    = VectorXd(markerCount);        // effect sizes
-    y_tilde = VectorXd(individualCount);    // variable containing the adjusted residuals to exclude the effects of a given marker
-    epsilon = VectorXd(individualCount);    // variable containing the residuals
-
-    //phenotype vector
-    y = VectorXd(individualCount);
-
-    //SNP column vector
-    Cx = VectorXd(individualCount);
-
-    // Init the working variables
-    const int km1 = K - 1;
-    cVa[0] = 0.0;
-    cVa.segment(1, km1) = cva;
-
-    //vector with component class for each marker
-    components=VectorXd(markerCount);
-    components.setZero();
-
-    //set priors for pi parameters
-    priorPi[0] = 0.5;
-    priorPi.segment(1, km1) = priorPi[0] * cVa.segment(1, km1).array() / cVa.segment(1, km1).sum();
-
-    y_tilde.setZero();
-
-    cVaI[0] = 0;
-    cVaI.segment(1, km1) = cVa.segment(1, km1).cwiseInverse();
-    beta.setZero();
-
-    //sample from beta distribution
-    sigmaG = dist.beta_rng(1.0, 1.0);
-    //printf("First sigmaG = %15.10f\n", sigmaG);
-
-    pi = priorPi;
-
-    //scale phenotype vector stored in data.y
-    y = (data.y.cast<double>().array() - data.y.cast<double>().mean());
-    y /= sqrt(y.squaredNorm() / (double(individualCount - 1)));
-    //printf(" >>>> ysqn = %15.10f\n", y.squaredNorm());
-
-    //initialize epsilon vector as the phenotype vector
-    epsilon    = (y).array() - mu;
-    sigmaE     = epsilon.squaredNorm() / individualCount * 0.5;
-    betasqn    = 0.0;
-    epsilonsum = 0.0;
-    ytildesum  = 0.0;
-    //gamma      = VectorXd(data.fixedEffectsCount);
-    gamma      = VectorXd(data.numFixedEffects);
-    gamma.setZero();
-    X = data.X; //fixed effects matrix
-}
-
-
 #ifdef USE_MPI
-
 
 // Check malloc in MPI context
 // ---------------------------
@@ -133,12 +60,12 @@ inline void check_malloc(const void* ptr, const int linenumber, const char* file
 
 inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, const double* __restrict__ vin2, const double dMULT, const int N) {
 
-    if (dMULT == 0.0) {
-        for (int i=0; i<N; i++) {
-            vout[i] = vin1[i];
-        }
-    } else {
-        for (int i=0; i<N; i++) {
+    if   (dMULT == 0.0) { 
+        for (int i=0; i<N; i++) { 
+            vout[i] = vin1[i]; 
+        } 
+    } else { 
+        for (int i=0; i<N; i++) { 
             vout[i] = vin1[i] + dMULT * vin2[i];
         }
     }
@@ -186,20 +113,25 @@ inline double sparse_dotprod(const double* __restrict__ vin1,
 
     double dp = 0.0, syt = 0.0;
 
-    for (size_t i=N1S; i<N1S+N1L; ++i)
-        dp += vin1[I1[i]];
+    for (size_t i=N1S; i<N1S+N1L; ++i) {
+        //printf("1: %5d %5d %15.10f\n", i, I1[i], vin1[I1[i]]);
+        dp +=       vin1[I1[i]];
+    }
 
-    for (size_t i=N2S; i<N2S+N2L; ++i)
+    for (size_t i=N2S; i<N2S+N2L; ++i) {
+        //printf("2: %5d %5d %15.10f\n", i, I2[i], vin1[I2[i]]);
         dp += 2.0 * vin1[I2[i]];
+    }
 
     dp *= sig_inv;
 
-    for (int i=0; i<N; i++)
-        syt += vin1[i];
+    for (int i=0; i<N; i++) syt += vin1[i];
 
     //EO: ajust for missing values
-    for (size_t i=NMS; i<NMS+NML; ++i)
+    for (size_t i=NMS; i<NMS+NML; ++i) {
+        //printf("M: %5d %5d %15.10f\n", i, IM[i], vin1[IM[i]]);
         syt -= vin1[IM[i]];
+    }
 
     dp -= mu * sig_inv * syt;
 
@@ -757,8 +689,14 @@ int BayesRRm::runMpiGibbs() {
     dist.reset_rng((uint)(opt.seed + rank*1000), rank);
 
     const unsigned int max_it = opt.chainLength;
-    const unsigned int N      = opt.numberIndividuals; //data.numInds;
+    
+    unsigned int N      = opt.numberIndividuals; //data.numInds;
     if (N == 0)    throw("FATAL  : opt.numberIndividuals is zero! Set it via --number-individuals in call.");
+    
+    if (N != data.numInds - data.numNAs) {
+        printf("FATAL  : opt.numberIndividuals set to %d whereas should be %d - %d = %d\n", N, data.numInds, data.numNAs, data.numInds-data.numNAs);
+        //exit(1);
+    }
     unsigned int       Mtot   = opt.numberMarkers;     //data.numSnps;
     if (Mtot == 0) throw("FATAL  : opt.numberMarkers is zero! Set it via --number-markers in call.");
 
@@ -957,8 +895,6 @@ int BayesRRm::runMpiGibbs() {
     const double        s02F   = 1.0;
     const unsigned int  K      = int(cva.size()) + 1;
     const unsigned int  km1    = K - 1;
-    double              dNm1   = (double)(N - 1);
-    double              dN     = (double) N;
     std::vector<int>    markerI;
     VectorXi            components(M);
     double              mu;              // mean or intercept
@@ -1158,9 +1094,69 @@ int BayesRRm::runMpiGibbs() {
     //check_whole_array_was_set(IM, NM, __LINE__, __FILE__);
 
 
+    // Correct each marker for individuals with missing phenotype
+    // ----------------------------------------------------------
+    if (rank == 0) printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", data.NAsInds.size());
+    
+    for (int ii=0; ii<M; ++ii) {
+        
+        size_t beg    = 0, len = 0, end = 0;
+
+        for (int i=0; i<data.NAsInds.size(); ++i) {
+
+            beg = N1S[ii]; len = N1L[ii];
+            if (len > 0) {
+                for (int iii=beg; iii<beg+len; ++iii) {
+                    if (I1[iii] + i == data.NAsInds[i]) { 
+                        N1L[ii] -= 1; 
+                        for (int k = iii; k<beg+N1L[ii]; k++) I1[k] = I1[k + 1] - 1;                        
+                        break;
+                    } else {
+                        if (I1[iii] + i >= data.NAsInds[i]) I1[iii] = I1[iii] - 1;
+                    }
+                }
+            }
+            
+            beg = N2S[ii]; len = N2L[ii];
+            if (len > 0) {
+                for (int iii=beg; iii<beg+len; ++iii) {
+                    if (I2[iii] + i == data.NAsInds[i]) { 
+                        N2L[ii] -= 1;
+                        for (int k = iii; k<beg+N2L[ii]; k++) I2[k] = I2[k + 1] - 1;
+                        break;
+                    } else {
+                        if (I2[iii] + i >= data.NAsInds[i]) I2[iii] = I2[iii] - 1;
+                    }
+                }
+            }
+
+            beg = NMS[ii]; len = NML[ii];
+            if (len > 0) {
+                for (int iii=beg; iii<beg+len; ++iii) {
+                    if (IM[iii] + i == data.NAsInds[i]) { 
+                        NML[ii] -= 1;
+                        for (int k = iii; k<beg+NML[ii]; k++) IM[k] = IM[k + 1] - 1;
+                        break;
+                    } else {
+                        if (IM[iii] + i >= data.NAsInds[i]) IM[iii] = IM[iii] - 1;
+                    }
+                }
+            }
+        }
+    }
+
+
+    // Adjust N upon number of NAs
+    // ---------------------------
+    N -= data.numNAs;
+
+    double dN   = (double) N;
+    double dNm1 = (double)(N - 1);
+
+
     // Compute statistics (from sparse info)
     // -------------------------------------
-    if (rank == 0) printf("INFO   : start computing statistics\n");
+    if (rank == 0) printf("INFO   : start computing statistics on N = %d individuals\n", N);
     double *mave, *mstd;
     mave = (double*)malloc(size_t(M) * sizeof(double));  check_malloc(mave, __LINE__, __FILE__);
     mstd = (double*)malloc(size_t(M) * sizeof(double));  check_malloc(mstd, __LINE__, __FILE__);
@@ -1173,6 +1169,7 @@ int BayesRRm::runMpiGibbs() {
         tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
         tmp0 = double(N - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
         mstd[i] = sqrt(double(N - 1) / (tmp0+tmp1+tmp2));
+        //printf("marker %6d mean %20.15f, std = %20.15f\n", i, mave[i], mstd[i]);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1194,15 +1191,16 @@ int BayesRRm::runMpiGibbs() {
     // ---------------
     const auto st3 = std::chrono::high_resolution_clock::now();
  
-    double *y, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum;
+    double *y, *epsilon, *tmpEps, *previt_eps, *deltaEps, *dEpsSum, *deltaSum;
     const size_t NDB = size_t(N) * sizeof(double);
-    y        = (double*)malloc(NDB);  check_malloc(y,        __LINE__, __FILE__);
-    epsilon  = (double*)malloc(NDB);  check_malloc(epsilon,  __LINE__, __FILE__);
-    tmpEps   = (double*)malloc(NDB);  check_malloc(tmpEps,   __LINE__, __FILE__);
-    deltaEps = (double*)malloc(NDB);  check_malloc(deltaEps, __LINE__, __FILE__);
-    dEpsSum  = (double*)malloc(NDB);  check_malloc(dEpsSum,  __LINE__, __FILE__);
-    deltaSum = (double*)malloc(NDB);  check_malloc(deltaSum, __LINE__, __FILE__);
-    dalloc += NDB * 8 / 1E9;
+    y          = (double*)malloc(NDB);  check_malloc(y,        __LINE__, __FILE__);
+    epsilon    = (double*)malloc(NDB);  check_malloc(epsilon,  __LINE__, __FILE__);
+    tmpEps     = (double*)malloc(NDB);  check_malloc(tmpEps,   __LINE__, __FILE__);
+    previt_eps = (double*)malloc(NDB);  check_malloc(tmpEps,   __LINE__, __FILE__);
+    deltaEps   = (double*)malloc(NDB);  check_malloc(deltaEps, __LINE__, __FILE__);
+    dEpsSum    = (double*)malloc(NDB);  check_malloc(dEpsSum,  __LINE__, __FILE__);
+    deltaSum   = (double*)malloc(NDB);  check_malloc(deltaSum, __LINE__, __FILE__);
+    dalloc += NDB * 7 / 1E9;
 
     double totalloc = 0.0;
     MPI_Reduce(&dalloc, &totalloc, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -1236,7 +1234,7 @@ int BayesRRm::runMpiGibbs() {
         y_mean += y[i];
     }
     y_mean /= N;
-    //printf("rank %4d: y_mean = %20.15f\n", rank, y_mean);
+    //printf("rank %4d: y_mean = %20.15f with N = %d\n", rank, y_mean, N);
 
     for (int i=0; i<N; ++i) {
         y[i] -= y_mean;
@@ -1283,11 +1281,43 @@ int BayesRRm::runMpiGibbs() {
     // A counter on previously saved thinned iterations
     uint n_thinned_saved = 0;
 
+
+    double   previt_m0 = 0.0;
+    double   previt_sg = 0.0;
+    double   previt_mu = 0.0;
+    double   previt_se = 0.0;
+    VectorXd previt_bet(M);
+
+
     // Main iteration loop
     // -------------------
+    bool replay_it = false;
+
     for (uint iteration=0; iteration < max_it; iteration++) {
 
         double start_it = MPI_Wtime();
+        
+        if (replay_it) {
+            printf("INFO: replay iteration with m0=%.0f sigG=%15.10f sigE=%15.10f\n", previt_m0, previt_sg, previt_se);
+            m0        = previt_m0;
+            sigmaG    = previt_sg;
+            sigmaE    = previt_se;
+            mu        = previt_mu;
+            sync_rate = 0;
+            for (int i=0; i<N; ++i) epsilon[i] = previt_eps[i];
+            beta = previt_bet;
+            replay_it = false;
+        }
+
+
+        // Store status of iteration to revert back to it if required
+        // ----------------------------------------------------------
+        previt_m0 = m0;
+        previt_sg = sigmaG;
+        previt_se = sigmaE;
+        previt_mu = mu;
+        for (int i=0; i<N; ++i) previt_eps[i] = epsilon[i];
+        for (int i=0; i<M; ++i) previt_bet(i) = beta(i);
 
         //printf("mu = %15.10f   eps[0] = %15.10f\n", mu, epsilon[0]);
         for (int i=0; i<N; ++i) epsilon[i] += mu;
@@ -1346,7 +1376,8 @@ int BayesRRm::runMpiGibbs() {
                                      mave[marker],    mstd[marker], N, marker);
 
                 num += bet * double(N - 1);
-                
+                //printf("num = %20.15f\n", num);
+
                 //muk for the other components is computed according to equations
                 muk.segment(1, km1) = num / denom.array();           
                 
@@ -1361,11 +1392,11 @@ int BayesRRm::runMpiGibbs() {
                 p = dist.unif_rng();
                 //printf("%d/%d/%d  p = %15.10f\n", iteration, rank, j, p);
                 
-                acum = 0.d;
+                acum = 0.0;
                 if(((logL.segment(1,km1).array()-logL[0]).abs().array() > 700 ).any() ){
-                    acum = 0.0d;
+                    acum = 0.0;
                 } else{
-                    acum = 1.0d / ((logL.array()-logL[0]).exp().sum());
+                    acum = 1.0 / ((logL.array()-logL[0]).exp().sum());
                 }
                 //printf("acum = %15.10f\n", acum);
                 
@@ -1477,9 +1508,45 @@ int BayesRRm::runMpiGibbs() {
             beta_squaredNorm = sum_beta_squaredNorm;
         }
 
-        m0 = double(Mtot) - v[0];
-
+        // Update global parameters
+        // ------------------------
+        m0      = double(Mtot) - v[0];
         sigmaG  = dist.inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0));
+
+        
+        // Check iteration
+        // 
+        // ---------------
+        if (iteration >= 0) {
+            
+            double max_sg = 0.0;
+            MPI_Allreduce(&sigmaG, &max_sg, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+            if (rank == 0) printf("INFO   : max sigmaG of iteration %d is %15.10f with sync rate of %d\n", iteration, max_sg, sync_rate);
+
+            if (max_sg > 1.0) {
+                if (sync_rate == 0) {
+                    if (rank == 0) {
+                        printf("CRITICAL: detected task with sigmaG = %15.10f and sync rate of %d\n", max_sg, sync_rate); 
+                        printf("          => desperate situation, aborting...\n");
+                    }
+                    MPI_Abort(MPI_COMM_WORLD, 1);
+                } else {
+                    if (rank == 0)
+                        printf("          => will do an attempt with setting sync_rate to 0\n");
+                    replay_it = true;
+                    continue;
+                }
+            }
+
+            /*
+            if ( m0 > 1.2 * previt_m0 || m0 < 0.8 * previt_m0) {
+                printf("CRITICAL: divergence detected! Will cancel iteration and set up a lower sync rate\n");
+            }
+            */
+
+        }
+
+        cout << "GO ON CHARLIE" << endl;
 
 
         // For the fixed effects
@@ -1521,7 +1588,8 @@ int BayesRRm::runMpiGibbs() {
 
         sigmaE  = dist.inv_scaled_chisq_rng(v0E+double(N),(e_sqn + v0E*s02E) /(v0E+double(N)));
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, N, sigmaE);
-        printf("it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %d\n", iteration, rank, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
+        if (rank%10==0)
+            printf("it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %d\n", iteration, rank, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
         fflush(stdout);
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
@@ -1617,6 +1685,7 @@ int BayesRRm::runMpiGibbs() {
     free(y);
     free(epsilon);
     free(tmpEps);
+    free(previt_eps);
     free(deltaEps);
     free(dEpsSum);
     free(deltaSum);
@@ -1648,19 +1717,105 @@ int BayesRRm::runMpiGibbs() {
 #endif
 
 
+//
+//  ORIGINAL (SEQUENTIAL) VERSION
+//
+
+void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCount, uint missingPhenCount)
+{
+    // Component variables
+    priorPi = VectorXd(K);      // prior probabilities for each component
+    pi      = VectorXd(K);      // mixture probabilities
+    cVa     = VectorXd(K);      // component-specific variance
+    cVaI    = VectorXd(K);      // inverse of the component variances
+    logL    = VectorXd(K);      // log likelihood of component
+    muk     = VectorXd(K);      // mean of k-th component marker effect size
+    denom   = VectorXd(K - 1);  // temporal variable for computing the inflation of the effect variance for a given non-zero component
+    m0      = 0;                // total number of markers in model
+    v       = VectorXd(K);      // variable storing the component assignment
+
+    // Mean and residual variables
+    mu     = 0.0;   // mean or intercept
+    sigmaG = 0.0;   // genetic variance
+    sigmaE = 0.0;   // residuals variance
+
+    // Linear model variables
+    beta    = VectorXd(markerCount);        // effect sizes
+    y_tilde = VectorXd(individualCount - missingPhenCount);    // variable containing the adjusted residuals to exclude the effects of a given marker
+    epsilon = VectorXd(individualCount - missingPhenCount);    // variable containing the residuals
+
+    //phenotype vector
+    y = VectorXd(individualCount - missingPhenCount);
+
+    //SNP column vector
+    Cx = VectorXd(individualCount - missingPhenCount);
+
+    // Init the working variables
+    const int km1 = K - 1;
+    cVa[0] = 0.0;
+    cVa.segment(1, km1) = cva;
+
+    //vector with component class for each marker
+    components=VectorXd(markerCount);
+    components.setZero();
+
+    //set priors for pi parameters
+    priorPi[0] = 0.5;
+    priorPi.segment(1, km1) = priorPi[0] * cVa.segment(1, km1).array() / cVa.segment(1, km1).sum();
+
+    y_tilde.setZero();
+
+    cVaI[0] = 0;
+    cVaI.segment(1, km1) = cVa.segment(1, km1).cwiseInverse();
+    beta.setZero();
+
+    //sample from beta distribution
+    sigmaG = dist.beta_rng(1.0, 1.0);
+    //printf("First sigmaG = %15.10f\n", sigmaG);
+
+    pi = priorPi;
+
+    //scale phenotype vector stored in data.y
+    printf("OFF y mean = %20.15f on %d elements\n", data.y.mean(), data.y.size());
+    //y = (data.y.cast<double>().array() - data.y.cast<double>().mean());
+    y = (data.y.array() - data.y.mean());
+    y /= sqrt(y.squaredNorm() / (double(individualCount - missingPhenCount - 1)));
+    //printf(" >>>> ysqn = %15.10f\n", y.squaredNorm());
+
+    //initialize epsilon vector as the phenotype vector
+    epsilon    = (y).array() - mu;
+    sigmaE     = epsilon.squaredNorm() / (individualCount - missingPhenCount) * 0.5;
+    printf("OFF sigmaE = %20.15f\n", sigmaE);
+    betasqn    = 0.0;
+    epsilonsum = 0.0;
+    ytildesum  = 0.0;
+    //gamma      = VectorXd(data.fixedEffectsCount);
+    gamma      = VectorXd(data.numFixedEffects);
+    gamma.setZero();
+    X = data.X; //fixed effects matrix
+}
+
+
 int BayesRRm::runGibbs()
 {
-    //const unsigned int M(data.numSnps);
     unsigned int M(data.numSnps);
     if (opt.numberMarkers > 0 && opt.numberMarkers < M)
         M = opt.numberMarkers;
-    const unsigned int N(data.numInds);
-    const double NM1 = double(N - 1);
+    unsigned int N(data.numInds);
+    const unsigned int NA(data.numNAs);
     const int K(int(cva.size()) + 1);
-    const int km1 = K - 1;
 
     //initialize variables with init member function
-    init(K, M, N);
+    printf("INFO   : Calling init with K=%d, M=%d, N=%d, NA=%d\n", K, M, N, NA);
+    init(K, M, N, NA);
+
+    // Adjust N by the number of NAs
+    // -----------------------------
+    N -= NA;
+    printf("INFO   : Adjusted N = %d\n", N);
+
+    const double NM1 = double(N - 1);
+    const int    km1 = K - 1;
 
     //specify how to write samples
     if (1==0) {
@@ -1672,7 +1827,7 @@ int BayesRRm::runGibbs()
     }
 
     // Sampler variables
-    VectorXd sample(2*M+4+N); // variable containg a sample of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
+    //VectorXd sample(2*M+4+N); // variable containg a sample of all variables in the model, M marker effects, M component assigned to markers, sigmaE, sigmaG, mu, iteration number and Explained variance
     std::vector<unsigned int> markerI(M);
     std::iota(markerI.begin(), markerI.end(), 0);
 
@@ -1692,7 +1847,7 @@ int BayesRRm::runGibbs()
         //printf("mu = %15.10f   eps[0] = %15.10f\n", mu, epsilon[0]);
         epsilon = epsilon.array() + mu;//  we substract previous value
         mu = dist.norm_rng(epsilon.sum() / (double)N, sigmaE / (double)N); //update mu
-        //printf("mu = %15.10f\n", mu);
+        printf("mu = %15.10f\n", mu);
         epsilon = epsilon.array() - mu;// we substract again now epsilon =Y-mu-X*beta
  
         //cout << shuf_mark << endl;
@@ -1711,7 +1866,7 @@ int BayesRRm::runGibbs()
             double acum = 0.0;
             const auto marker = markerI[j];
             double beta_old=beta(marker);
-            //printf("beta = %15.10f\n", beta_old);
+            printf("beta = %15.10f\n", beta_old);
 
             //read data for column with member function getSnpData
             Cx = getSnpData(marker);
@@ -1754,12 +1909,12 @@ int BayesRRm::runGibbs()
             //printf("denom[%d] = %20.15f\n", 1, denom(1));
 
             // We compute the dot product to save computations
-            //double c2 = 0.0;
-            //for (int i=0; i<N; i++) {
-            //    c2 += Cx[i] * y_tilde[i];
-            //}
+            double c2 = 0.0;
+            for (int i=0; i<N; i++) {
+                c2 += Cx[i] * y_tilde[i];
+            }
             const double num = Cx.dot(y_tilde);
-            //printf("num = %20.15f REF vs man %20.15f\n", num, c2);
+            printf("num = %20.15f REF vs man %20.15f\n", num, c2);
 
             // muk for the other components is computed according to equations
             muk.segment(1, km1) = num / denom.array();
@@ -1886,7 +2041,9 @@ VectorXd BayesRRm::getSnpData(unsigned int marker) const
 
 void BayesRRm::printDebugInfo() const
 {
-    const unsigned int N(data.numInds);
+    //const unsigned int N(data.numInds);
+    const unsigned int N = data.numInds - data.numNAs;
+
     cout << "inv scaled parameters " << v0G + m0 << "__" << (beta.squaredNorm() * m0 + v0G * s02G) / (v0G + m0);
     cout << "num components: " << opt.S.size();
     cout << "\nMixture components: " << cva[0] << " " << cva[1] << " " << cva[2] << "\n";

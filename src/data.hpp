@@ -136,7 +136,8 @@ public:
 
     unsigned numSnps = 0;
     unsigned numInds = 0;
-
+    unsigned numNAs  = 0;
+    vector<uint> NAsInds;
     vector<int> blocksStarts;
     vector<int> blocksEnds;
     uint        numBlocks = 0;

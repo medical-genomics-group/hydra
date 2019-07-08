@@ -8,13 +8,16 @@ module purge
 module load intel intel-mpi intel-mkl boost eigen zlib
 module list
 
-EXE=./src/mpi_gibbs
+
+NAM=mpi_gibbs_NA
+
+EXE=./src/$NAM
 
 # COMPILATION
 cd ./src
 B='-B'
 B=''
-make $B -f Makefile || exit 1;
+make EXE=$NAM $B -f Makefile || exit 1;
 cd ..
 
 if [ ! -f $EXE ]; then
@@ -25,7 +28,7 @@ fi
 
 S="1.0,0.1"
 
-DS=2
+DS=1
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -39,10 +42,12 @@ elif [ $DS == 1 ]; then
     datadir=/scratch/orliac/testM100K_N5K_missing
     dataset=memtest_M100K_N5K_missing0.01
     phen=memtest_M100K_N5K_missing0.01
+    phenNA=memtest_M100K_N5K_missing0.01_NA
     sparsedir=$datadir
     sparsebsn=${dataset}_uint
     NUMINDS=5000
     NUMSNPS=117148
+    NUMSNPS=2
 elif [ $DS == 2 ]; then
     datadir=/scratch/orliac/testN500K
     dataset=testN500K
@@ -58,7 +63,7 @@ elif [ $DS == 3 ]; then
     phen=epfl_test_data
     NUMINDS=457810
     NUMSNPS=8430446
-    NUMSNPS=50000
+    NUMSNPS=100
     S="0.00001,0.0001,0.001,0.01"
 fi
 
@@ -73,11 +78,11 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=20
+CL=1
 SEED=1222
 SR=0
-SM=1
-NM=1200000
+SM=0
+NM=100
 
 # If you change those, do not expect compatibility
 N=1
@@ -88,18 +93,24 @@ echo
 echo "@@@ Official (sequential) solution (reading from BED file) @@@"
 echo
 srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out ref --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS
+srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phenNA}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out refNA --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS
 #--covariates $datadir/scaled_covariates.csv
+
 
 echo
 echo
-echo "@@@ Solution reading from  BED file @@@"
+echo "@@@ MPI 1-task solution reading from  BED file @@@"
+echo
 sol=mpi1tbed
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS
+srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phenNA}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS
 #--covariates $datadir/scaled_covariates.csv
-echo; echo
 
+exit 0
 
-echo "@@@ Solution reading from SPARSE files @@@"
+echo
+echo
+echo "@@@ MPI 1-task solution reading from SPARSE files @@@"
+echo
 sol=mpi1tsparse
 srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn
 #--marker-blocks-file $datadir/${dataset}.blk_1 

@@ -57,6 +57,7 @@ int main(int argc, const char * argv[]) {
         } else if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
             
             if (opt.readFromBedFile) {
+                printf("INFO   : reading from BED file\n");
                 data.readFamFile(opt.bedFile + ".fam");
                 data.readBimFile(opt.bedFile + ".bim");
                 data.readPhenotypeFile(opt.phenotypeFile);

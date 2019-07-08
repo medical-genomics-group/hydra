@@ -726,9 +726,10 @@ void Data::readFamFile(const string &famFile){
     }
     in.close();
     numInds = (unsigned) indInfoVec.size();
-#ifndef USE_MPI
+
+    //#ifndef USE_MPI
     cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
-#endif
+    //#endif
 }
 
 void Data::readBimFile(const string &bimFile) {
@@ -767,9 +768,9 @@ void Data::readBedFile_noMPI(const string &bedFile) {
 
     if (numSnps == 0) throw ("Error: No SNP is retained for analysis.");
     if (numInds == 0) throw ("Error: No individual is retained for analysis.");
-    cout << numInds << ", " << numSnps << endl;
+    printf("numInds = %d, numNAs = %d, numSnps = %d\n", numInds, numNAs, numSnps);
 
-    Z.resize(numInds, numSnps);
+    Z.resize(numInds-numNAs, numSnps);
     ZPZdiag.resize(numSnps);
     snp2pq.resize(numSnps);
 
@@ -790,9 +791,9 @@ void Data::readBedFile_noMPI(const string &bedFile) {
     //float mean = 0.0;
     double mean = 0.0;
 
-    for (j = 0, snp = 0; j < numSnps; j++) { // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
-        //cout << j << endl;
-
+    // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
+    // --------------------------------------------------------------------------------------------------
+    for (j = 0, snp = 0; j < numSnps; j++) {
         snpInfo = snpInfoVec[j];
         mean = 0.0;
         nmiss = 0;
@@ -800,38 +801,40 @@ void Data::readBedFile_noMPI(const string &bedFile) {
             for (i = 0; i < numInds; i += 4) BIT.read(ch, 1);
             continue;
         }
+        
+        uint nona = 0;
+
         for (i = 0, ind = 0; i < numInds;) {
             BIT.read(ch, 1);
             if (!BIT) throw ("Error: problem with the BED file ... has the FAM/BIM file been changed?");
             b = ch[0];
             k = 0;
             while (k < 7 && i < numInds) {
-                if (!indInfoVec[i]->kept) k += 2;
-                else {
+                if (!indInfoVec[i]->kept) {
+                    k += 2;
+                } else {
                     allele1 = (!b[k++]);
                     allele2 = (!b[k++]);
                     if (allele1 == 0 && allele2 == 1) {  // missing genotype
-                        Z(ind++, snp) = -9;
+                        Z(nona, snp) = -9;
                         ++nmiss;
                     } else {
-                        mean += Z(ind++, snp) = allele1 + allele2;
+                        mean += Z(nona, snp) = allele1 + allele2;
                     }
+                    nona+=1;
                 }
-                i++;
+                i += 1;
             }
         }
-        // fill missing values with the mean
-        //float sum = mean;
-        //mean /= float(numInds-nmiss);
-        //if (j < 3)
-        //    printf("marker %d has mean = %20.15f div by %d\n", j, mean, numInds-nmiss);
 
-        mean /= double(numInds-nmiss);
-        //if (j < 3)
-        //    printf("OFF: marker %d has mean = %20.15f, nmiss = %d\n", j, mean, nmiss);
+        if (j==0) printf("numInds vs nona; numNAs: %d vs %d vs %d\n", numInds, nona, numNAs);
+
+        //EO: account for missing phenotypes
+        //----------------------------------
+        mean /= double(nona-nmiss);
         
         if (nmiss) {
-            for (i=0; i<numInds; ++i) {
+            for (i=0; i<nona; ++i) {
                 if (Z(i,snp) == -9) Z(i,snp) = mean;
             }
         }
@@ -846,11 +849,18 @@ void Data::readBedFile_noMPI(const string &bedFile) {
         //float sqn = Z.col(j).squaredNorm();
         //float std_ = 1.f / (sqrt(sqn / float(numInds)));
         double sqn = Z.col(j).squaredNorm();
+        /*
+        double sqn_ = 0.0;
+        for (i=0; i<nona; ++i) {
+            sqn_ += Z(i,snp) * Z(i,snp);
+        }
+        printf("sqn vs sqn_  %20.15f vs %20.15f\n", sqn, sqn);
+        */
         //double std_ = 1.0 / (sqrt(sqn / double(numInds - 1)));
-        double std_ = sqrt(double(numInds - 1) / sqn);
+        double std_ = sqrt(double(nona - 1) / sqn);
 
         //if (j < 1)
-        //    printf("OFF: marker %d has mean = %20.15f sqn = %20.15f  std_ = %20.15f\n", j, mean, sqn, std_);
+        printf("OFF: marker %d has mean = %20.15f sqn = %20.15f  std_ = %20.15f\n", j, mean, sqn, std_);
 
         Z.col(j).array() *= std_;
 
@@ -879,20 +889,28 @@ void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals
 #ifndef USE_MPI
     cout << "Reading phenotypes from [" + phenFile + "]." << endl;
 #endif
-    unsigned line=0;
+    unsigned line=0, nas=0;
     Gadget::Tokenizer colData;
     string inputStr;
     string sep(" \t");
     y.setZero(numInds);
+    uint nonas = 0;
     while (getline(in,inputStr)) {
         colData.getTokens(inputStr, sep);
         if (colData[1+1] != "NA") {
-            y[line] = double( atof(colData[1+1].c_str()) );
-            ++line;
+            y[nonas] = double( atof(colData[1+1].c_str()) );
+            nonas += 1;
+        } else {
+            //cout << "WARNING: found NA on line/individual " << line << endl;
+            nas += 1;
         }
+        line += 1;
     }
     in.close();
-    assert(line == numInds);
+    assert(nonas + nas == numInds);
+
+    numNAs = nas;
+    y.resize(numInds-nas);
 }
 
 void Data::readPhenotypeFile(const string &phenFile) {
@@ -908,25 +926,38 @@ void Data::readPhenotypeFile(const string &phenFile) {
     string inputStr;
     string sep(" \t");
     string id;
-    unsigned line=0;
     double tmp = 0.0;
     //correct loop to go through numInds
     y.setZero(numInds);
+    uint line = 0, nas = 0, nonas = 0;
+
     while (getline(in,inputStr)) {
         colData.getTokens(inputStr, sep);
         id = colData[0] + ":" + colData[1];
         it = indInfoMap.find(id);
         // First one corresponded to mphen variable (1+1)
-        if (it != end && colData[1+1] != "NA") {
+        if (it != end) {
             ind = it->second;
-            tmp = double(atof(colData[1+1].c_str()));
-            ind->phenotype = tmp;
-            y[line]        = tmp;
-            ++line;
+            if (colData[1+1] != "NA") {
+                tmp = double(atof(colData[1+1].c_str()));
+                ind->phenotype = tmp;
+                y[nonas]       = tmp;
+                nonas += 1;
+            } else {
+                //cout << "WARNING; found NA on line/individual " << line << endl;
+                ind->kept = false;
+                NAsInds.push_back(line);
+                nas += 1;
+            }
+            line += 1;
         }
     }
     in.close();
-    assert(line == numInds);
+    assert(nonas + nas == numInds);
+
+    numNAs = nas;
+    y.resize(numInds-nas);
+
 }
 
 
