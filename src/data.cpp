@@ -860,7 +860,7 @@ void Data::readBedFile_noMPI(const string &bedFile) {
         double std_ = sqrt(double(nona - 1) / sqn);
 
         //if (j < 1)
-        printf("OFF: marker %d has mean = %20.15f sqn = %20.15f  std_ = %20.15f\n", j, mean, sqn, std_);
+        //printf("OFF: marker %d has mean = %20.15f sqn = %20.15f  std_ = %20.15f\n", j, mean, sqn, std_);
 
         Z.col(j).array() *= std_;
 
@@ -881,7 +881,9 @@ void Data::readBedFile_noMPI(const string &bedFile) {
 #endif
 }
 
-//EO: overload function setting numInds in case not reading from fam file before
+// EO: overloaded function to be used when processing sparse data
+//     In such case we do not read from fam file before
+// --------------------------------------------------------------
 void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals) {
     numInds = numberIndividuals;
     ifstream in(phenFile.c_str());
@@ -889,19 +891,20 @@ void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals
 #ifndef USE_MPI
     cout << "Reading phenotypes from [" + phenFile + "]." << endl;
 #endif
-    unsigned line=0, nas=0;
+    uint line = 0, nas = 0, nonas = 0;
     Gadget::Tokenizer colData;
     string inputStr;
     string sep(" \t");
     y.setZero(numInds);
-    uint nonas = 0;
     while (getline(in,inputStr)) {
         colData.getTokens(inputStr, sep);
         if (colData[1+1] != "NA") {
-            y[nonas] = double( atof(colData[1+1].c_str()) );
+            y(nonas) = double( atof(colData[1+1].c_str()) );
+            //if (nonas < 30) printf("read no na on line %d, nonas %d = %15.10f\n", line, nonas, y(nonas));
             nonas += 1;
         } else {
             //cout << "WARNING: found NA on line/individual " << line << endl;
+            NAsInds.push_back(line);
             nas += 1;
         }
         line += 1;
@@ -910,7 +913,7 @@ void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals
     assert(nonas + nas == numInds);
 
     numNAs = nas;
-    y.resize(numInds-nas);
+    y.conservativeResize(numInds-nas);
 }
 
 void Data::readPhenotypeFile(const string &phenFile) {
@@ -956,8 +959,7 @@ void Data::readPhenotypeFile(const string &phenFile) {
     assert(nonas + nas == numInds);
 
     numNAs = nas;
-    y.resize(numInds-nas);
-
+    y.conservativeResize(numInds-nas);
 }
 
 
