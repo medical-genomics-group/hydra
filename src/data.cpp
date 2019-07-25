@@ -899,7 +899,7 @@ void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals
     while (getline(in,inputStr)) {
         colData.getTokens(inputStr, sep);
         if (colData[1+1] != "NA") {
-            y(nonas) = double( atof(colData[1+1].c_str()) );
+            y[nonas] = double( atof(colData[1+1].c_str()) );
             //if (nonas < 30) printf("read no na on line %d, nonas %d = %15.10f\n", line, nonas, y(nonas));
             nonas += 1;
         } else {
