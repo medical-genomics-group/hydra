@@ -1025,9 +1025,9 @@ int BayesRRm::runMpiGibbs() {
         check_mpi(MPI_Allreduce(&NM, &NMmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
 
         size_t N1tot = 0, N2tot = 0, NMtot = 0;
-        check_mpi(MPI_Allreduce(&N1, &N1max, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-        check_mpi(MPI_Allreduce(&N2, &N2max, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-        check_mpi(MPI_Allreduce(&NM, &NMmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+        check_mpi(MPI_Allreduce(&N1, &N1tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+        check_mpi(MPI_Allreduce(&N2, &N2tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+        check_mpi(MPI_Allreduce(&NM, &NMtot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
         if (rank == 0) printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
         if (rank == 0) printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
@@ -1073,6 +1073,8 @@ int BayesRRm::runMpiGibbs() {
     if (rank == 0) printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", data.NAsInds.size());
     
     for (int ii=0; ii<M; ++ii) {
+
+        if (rank == 0 && ii%10000 == 0) printf("INFO   : task %d applying correction to marker %d out of %d\n", rank, ii, M);
         
         size_t beg    = 0, len = 0, end = 0;
 
@@ -1118,6 +1120,7 @@ int BayesRRm::runMpiGibbs() {
             }
         }
     }
+    if (rank == 0) printf("INFO   : finished applying NA corrections.\n");
 
 
     // Adjust N upon number of NAs
@@ -1269,23 +1272,23 @@ int BayesRRm::runMpiGibbs() {
 
     // Main iteration loop
     // -------------------
-    bool replay_it = false;
+    //bool replay_it = false;
 
     for (uint iteration=0; iteration < max_it; iteration++) {
 
         double start_it = MPI_Wtime();
         
-        if (replay_it) {
-            printf("INFO: replay iteration with m0=%.0f sigG=%15.10f sigE=%15.10f\n", previt_m0, previt_sg, previt_se);
-            m0        = previt_m0;
-            sigmaG    = previt_sg;
-            sigmaE    = previt_se;
-            mu        = previt_mu;
-            sync_rate = 0;
-            for (int i=0; i<Ntot; ++i) epsilon[i] = previt_eps[i];
-            Beta      = previt_Beta;
-            replay_it = false;
-        }
+        //if (replay_it) {
+        //    printf("INFO: replay iteration with m0=%.0f sigG=%15.10f sigE=%15.10f\n", previt_m0, previt_sg, previt_se);
+        //    m0        = previt_m0;
+        //    sigmaG    = previt_sg;
+        //    sigmaE    = previt_se;
+        //    mu        = previt_mu;
+        //    sync_rate = 0;
+        //    for (int i=0; i<Ntot; ++i) epsilon[i] = previt_eps[i];
+        //    Beta      = previt_Beta;
+        //    replay_it = false;
+        //}
 
 
         // Store status of iteration to revert back to it if required
@@ -1497,6 +1500,7 @@ int BayesRRm::runMpiGibbs() {
         // Check iteration
         // 
         // ---------------
+        /*
         if (iteration >= 0) {
             
             double max_sg = 0.0;
@@ -1518,14 +1522,11 @@ int BayesRRm::runMpiGibbs() {
                 }
             }
 
-            /*
-            if ( m0 > 1.2 * previt_m0 || m0 < 0.8 * previt_m0) {
-                printf("CRITICAL: divergence detected! Will cancel iteration and set up a lower sync rate\n");
-            }
-            */
-
+            //if ( m0 > 1.2 * previt_m0 || m0 < 0.8 * previt_m0) {
+            //    printf("CRITICAL: divergence detected! Will cancel iteration and set up a lower sync rate\n");
+            //}
         }
-
+        */
 
         // For the fixed effects
         // ---------------------
@@ -1566,7 +1567,7 @@ int BayesRRm::runMpiGibbs() {
         sigmaE  = dist.inv_scaled_chisq_rng(v0E+dN, (e_sqn + v0E*s02E)/(v0E+dN));
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
         if (rank%10==0)
-            printf("it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %d\n", iteration, rank, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
+            printf("RESULT: it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %d\n", iteration, rank, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
         fflush(stdout);
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
