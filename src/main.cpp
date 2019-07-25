@@ -57,18 +57,17 @@ int main(int argc, const char * argv[]) {
                 data.readBimFile(opt.bedFile + ".bim");
                 data.readPhenotypeFile(opt.phenotypeFile);
                 // Read in covariates file if passed
-               if (opt.covariates) {
-		 std::cout << "reading covariates file: "  << opt.covariatesFile;
-                   data.readCovariateFile(opt.covariatesFile);
-               }
-            } else {
-                data.readPhenotypeFile(opt.phenotypeFile, opt.numberIndividuals);
                 if (opt.covariates) {
-
-                   std::cout << "reading covariates file: "  << opt.covariatesFile;
+                    std::cout << "reading covariates file: "  << opt.covariatesFile;
                     data.readCovariateFile(opt.covariatesFile);
                 }
-
+            } else {
+                data.readPhenotypeFile(opt.phenotypeFile, opt.numberIndividuals);
+                
+                if (opt.covariates) {
+                    std::cout << "reading covariates file: "  << opt.covariatesFile;
+                    data.readCovariateFile(opt.covariatesFile);
+                }
             }
 
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
