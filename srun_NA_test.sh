@@ -82,8 +82,8 @@ elif [ $DS == 4 ]; then
     NUMSNPS=50000
     S="0.00001,0.0001,0.001,0.01"
     outdir=$datadir/results
-    sol=$outdir/test_m2
-    sol2=$outdir/test_m2_sparse
+    sol=$outdir/test_mnm4
+    sol2=$outdir/test_mnm4_sparse
 fi
 
 if [ ! -d $outdir ]; then
@@ -112,19 +112,18 @@ TOCONV_T=$((($CL - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
 TPN=1
-BPR=2
+BPR=7
+
+# Selecte what to run
+bed_to_sparse=0;  run_bed=1;  run_sparse=1;  run_comp=1;
 
 # Convert bed to sparse
-bed_to_sparse=0
 if [ $bed_to_sparse == 1 ]; then
     cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bed-to-sparse --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --blocks-per-rank $BPR --sparse-dir $sparsedir --sparse-basename $sparsebsn"
     echo $cmd
     $cmd
 fi
 
-
-# Set what to run
-run_bed=1; run_sparse=1; run_comp=1;
 
 COV="--covariates $datadir/scaled_covariates.csv"
 COV=""
