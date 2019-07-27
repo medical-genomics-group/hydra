@@ -1070,35 +1070,40 @@ int BayesRRm::runMpiGibbs() {
 
     // Correct each marker for individuals with missing phenotype
     // ----------------------------------------------------------
-    if (rank == 0) printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", data.NAsInds.size());
+    MPI_Barrier(MPI_COMM_WORLD);
+
+
+    const int NNAS = data.numNAs;
+
+    if (rank == 0) printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", NNAS);
     
     for (int ii=0; ii<M; ++ii) {
 
-        if (rank == 0 && ii%10000 == 0) printf("INFO   : task %d applying correction to marker %d out of %d\n", rank, ii, M);
+        if (rank >= 0 && ii%100 == 0) printf("INFO   : task %3d applying %3d NA corrections to marker %5d out of %5d\n", rank, NNAS, ii, M);
         
-        size_t beg    = 0, len = 0, end = 0;
+        size_t beg = 0, len = 0, end = 0;
 
-        for (int i=0; i<data.NAsInds.size(); ++i) {
+        for (int i=0; i<NNAS; ++i) {
 
             beg = N1S[ii]; len = N1L[ii];
             if (len > 0) {
-                for (int iii=beg; iii<beg+len; ++iii) {
+                for (size_t iii=beg; iii<beg+len; ++iii) {
                     if (I1[iii] + i == data.NAsInds[i]) { 
                         N1L[ii] -= 1; 
-                        for (int k = iii; k<beg+N1L[ii]; k++) I1[k] = I1[k + 1] - 1;                        
+                        for (size_t k = iii; k<beg+N1L[ii]; k++) I1[k] = I1[k + 1] - 1;                        
                         break;
                     } else {
                         if (I1[iii] + i >= data.NAsInds[i]) I1[iii] = I1[iii] - 1;
                     }
                 }
             }
-            
+
             beg = N2S[ii]; len = N2L[ii];
             if (len > 0) {
-                for (int iii=beg; iii<beg+len; ++iii) {
+                for (size_t iii=beg; iii<beg+len; ++iii) {
                     if (I2[iii] + i == data.NAsInds[i]) { 
                         N2L[ii] -= 1;
-                        for (int k = iii; k<beg+N2L[ii]; k++) I2[k] = I2[k + 1] - 1;
+                        for (size_t k = iii; k<beg+N2L[ii]; k++) I2[k] = I2[k + 1] - 1;
                         break;
                     } else {
                         if (I2[iii] + i >= data.NAsInds[i]) I2[iii] = I2[iii] - 1;
@@ -1108,10 +1113,10 @@ int BayesRRm::runMpiGibbs() {
 
             beg = NMS[ii]; len = NML[ii];
             if (len > 0) {
-                for (int iii=beg; iii<beg+len; ++iii) {
+                for (size_t iii=beg; iii<beg+len; ++iii) {
                     if (IM[iii] + i == data.NAsInds[i]) { 
                         NML[ii] -= 1;
-                        for (int k = iii; k<beg+NML[ii]; k++) IM[k] = IM[k + 1] - 1;
+                        for (size_t k = iii; k<beg+NML[ii]; k++) IM[k] = IM[k + 1] - 1;
                         break;
                     } else {
                         if (IM[iii] + i >= data.NAsInds[i]) IM[iii] = IM[iii] - 1;
@@ -1120,8 +1125,10 @@ int BayesRRm::runMpiGibbs() {
             }
         }
     }
-    if (rank == 0) printf("INFO   : finished applying NA corrections.\n");
 
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (rank == 0) printf("INFO   : finished applying NA corrections.\n");
+    
 
     // Adjust N upon number of NAs
     // ---------------------------
