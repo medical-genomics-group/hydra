@@ -42,6 +42,15 @@ int main(int argc, const char * argv[]) {
 
 #ifdef USE_MPI
 
+        // marion : originally I had something like this to read the annotation and mS file
+        /*
+         * if (opt.bayesType == "bayesG") {
+        	data.readGroupFile(opt.groupFile);
+        	data.readmSFile(opt.mSfile);
+        }
+         */// but maybe we can have something like : if we use --group option then read these files
+
+
         if (opt.bedToSparse == true) {
             data.readFamFile(opt.bedFile + ".fam");
             data.readBimFile(opt.bedFile + ".bim");

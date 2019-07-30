@@ -143,26 +143,20 @@ void Options::inputOptions(const int argc, const char* argv[]){
             }
             ss << "--S " << argv[i] << "\n";
         }
-        //Daniel, include variance components matrix for groups
+
+
+        //marion : include mS for annotations
         else if (!strcmp(argv[i], "--mS")) {
-            Gadget::Tokenizer strvec;
-            Gadget::Tokenizer strT;
-            strvec.getTokens(argv[++i], " ;");
-            strT.getTokens(strvec[0],",");
-            mS=Eigen::MatrixXd(strvec.size(),strT.size());
-            numGroups=strvec.size();
-            for (unsigned j=0; j<strvec.size(); ++j) {
-                strT.getTokens(strvec[j],",");
-                for(unsigned k=0;k<strT.size();++k)
-                    mS(j,k) = stod(strT[k]);
-            }
+        	mSfile = argv[++i];
             ss << "--mS " << argv[i] << "\n";
         }
-        //Daniel group assignment file
+        //marion : include annotation index file
         else if (!strcmp(argv[i], "--group")) {
-            groupFile = argv[++i];
+        	groupFile = argv[++i];
             ss << "--group " << argv[i] << "\n";
         }
+
+
         else if (!strcmp(argv[i], "--thread")) {
             numThread = atoi(argv[++i]);
             ss << "--thread " << argv[i] << "\n";

@@ -96,12 +96,15 @@ public:
 
     // Original data
     MatrixXd X;              // coefficient matrix for fixed effects
-    //MatrixXf Z;              // coefficient matrix for SNP effects
+    //MatrixXf Z;            // coefficient matrix for SNP effects
     MatrixXd Z;
     VectorXf D;              // 2pqn
-    //VectorXf y;              // phenotypes
+    //VectorXf y;            // phenotypes
     VectorXd y;              // phenotypes
-    VectorXi G; // groups
+
+    // marion : vector for annotation file and matrix for mS
+    VectorXi G; 			 // groups
+    MatrixXd mS;			 // mixtures in groups
 
     MatrixXf XPX;            // X'X the MME lhs
     MatrixXf ZPX;            // Z'X the covariance matrix of SNPs and fixed effects
@@ -248,10 +251,15 @@ public:
     void readBedFile_noMPI(const string &bedFile);
     void readPhenotypeFile(const string &phenFile);
     void readPhenotypeFile(const string &phenFile, const int numberIndividuals);
-    void readGroupFile(const string &groupFile);
     template<typename M>
     M    readCSVFile(const string &covariateFile);
     void readCovariateFile(const string &covariateFile);
+
+    // marion : annotation variables
+    unsigned numGroups;	// number of annotations
+    void readGroupFile(const string &groupFile);
+    void readmSFile(const string& mSfile);
+
 };
 
 #endif /* data_hpp */
