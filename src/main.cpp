@@ -168,8 +168,15 @@ int main(int argc, const char * argv[]) {
                 cout << endl;
 
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
-                analysis.runGibbs();
-
+		//here we check if we want to restart a chain
+		if(opt.restart){
+		  //TODO function to read output file
+		  //TODO function to run restarted mpi
+		  
+		}
+		else{
+		  analysis.runGibbs();
+		}
                 data.unmapPreprocessedBedFile();
                 end = clock();
                 printf("OVERALL read+compute time = %.3f sec.\n", double(end - start) / double(CLOCKS_PER_SEC));

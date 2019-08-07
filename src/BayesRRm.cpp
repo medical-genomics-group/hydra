@@ -891,7 +891,8 @@ int BayesRRm::runMpiGibbs() {
     VectorXd            Beta(M);
     VectorXd            Acum(M);
     VectorXd            Gamma(data.numFixedEffects);
-
+    //daniel The following variables are related to the restarting
+    VectorXb adaV;   //daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0
 
     //marion : for annotation code
     /*
@@ -1233,13 +1234,22 @@ int BayesRRm::runMpiGibbs() {
     cVa.segment(1,km1)     = cva;
     cVaI.segment(1,km1)    = cVa.segment(1,km1).cwiseInverse();
     priorPi.segment(1,km1) = priorPi[0] * cVa.segment(1,km1).array() / cVa.segment(1,km1).sum();
-    sigmaG                 = dist.beta_rng(1.0, 1.0);
-    pi                     = priorPi;
-    Beta.setZero();
-    components.setZero();
+    sigmaG                 = dist.beta_rng(1.0, 1.0); 
+    pi                     = priorPi; 
+    Beta.setZero();             
+    components.setZero(); 
+    //daniel it may be clearer to just reset the restarting values after set to 0 than adding an if else
+    //for each case. Much better would be to refactor initialisation into a single function and then
+    //choose between restart or not function. 
+    if(opt.restart){
+      sigmaG = data.rSigmaG; //TODO all these variables  come from a function to read the output files in the data class
+      pi     = data.rPi;
+      Beta   = data.rBeta;
+      components = data.rComponents;
+    }
 
     if (opt.covariates) {
-    	gamma = VectorXd(data.X.cols());
+    	gamma = VectorXd(data.X.cols()); 
     	gamma.setZero();
     }
     
@@ -1260,13 +1270,25 @@ int BayesRRm::runMpiGibbs() {
     //printf("ysqn = %15.10f\n", y_sqn);
 
     sigmaE = 0.0d;
+    //daniel
     for (int i=0; i<Ntot; ++i) {
         y[i]       /= y_sqn;
-        epsilon[i]  = y[i]; // - mu but zero
+        epsilon[i]  = y[i]; // - mu but zero 
+	if(opt.restart) //daniel
+	  epsilon[i] = data.rEpsilon[i]; // in case of restart we load epsilon from file
         sigmaE     += epsilon[i] * epsilon[i];
     }
-    sigmaE = sigmaE / dN * 0.5;
+    sigmaE = sigmaE / dN * 0.5; 
+    if(opt.restart)//daniel
+      {
+	sigmaE  = data.rSigmaE; // in case of restart we load sigmaE from file
+      }
     //printf("sigmaE = %20.10f with epsilon = y-mu %22.15f\n", sigmaE, mu);
+
+    adaV.setOnes();
+    if(opt.restart){
+      adaV = data.rAdaV;
+    }
 
     double   sum_beta_squaredNorm;
     double   sigE_G, sigG_E, i_2sigE;
@@ -1395,11 +1417,19 @@ int BayesRRm::runMpiGibbs() {
         // Loop over (shuffled) markers
         // ----------------------------
         for (int j = 0; j < lmax; j++) {
+	 
+	  if (j < M) {
+	     marker  = markerI[j];
+	     beta =  Beta(marker);
 
-            if (j < M) {
-                marker  = markerI[j];
+	     //daniel, we check if we are in a restarted chain and if the markers is to be sampled
+	    if(adaV[j] || !opt.restart) {
+	      /********************************************************************
+		    Here we sample the effect and perform the expensive dot product
+	      *******************************************************************/
+	                      
                 
-                beta =  Beta(marker);
+                
                 //printf("rank %d, marker %7d: beta = %20.15f, mean = %20.15f, std = %20.15f\n", rank, marker, beta, mave[marker], mstd[marker]);
                 
                 //we compute the denominator in the variance expression to save computations
@@ -1478,8 +1508,8 @@ int BayesRRm::runMpiGibbs() {
                    }
                 */
 
-
-                // Store marker acum for later dump to file
+                 
+                //TODO Store marker acum for later dump to file
                 Acum(marker) = acum;
 
                 for (int k=0; k<K; k++) {
@@ -1506,8 +1536,13 @@ int BayesRRm::runMpiGibbs() {
                         }
                     }
                 }
+
+	    } //end of adapative if daniel
+	    else{
+	      Beta(marker) = 0;
+	      Acum(marker) = 1.0 // probability of beta being 0 equals 1.0
+	    }
                 //printf("acum = %15.10f\n", acum);
-                
                 
                 betaOld   = beta;
                 beta      = Beta(marker);
