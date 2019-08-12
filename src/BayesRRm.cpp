@@ -883,6 +883,16 @@ int BayesRRm::runMpiGibbs() {
     VectorXd            Beta(M);
     VectorXd            Acum(M);
     VectorXd            Gamma(data.numFixedEffects);
+    //daniel The following variables are related to the restarting
+    VectorXb adaV;   //daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0
+
+    //marion : for annotation code
+    /*
+    sigmaGG = VectorXd(groupCount); 	//vector with sigmaG (variance) for each annotation
+    betasqnG = VectorXd(groupCount);	//vector with sum of beta squared for each annotation
+    v = MatrixXd(groupCount,K);         // variable storing the component assignment
+   */
+
 
     dalloc +=     M * sizeof(int)    / 1E9; // for components
     dalloc += 2 * M * sizeof(double) / 1E9; // for Beta and Acum
@@ -1146,18 +1156,50 @@ int BayesRRm::runMpiGibbs() {
     muk[0]     = 0.0;
     mu         = 0.0;
 
+
+    //marion : init prior for each annotation
+    /*
+    m_cVa[0] = 0;
+    m_cVaI[0] = 0;
+
+    for(int i=0; i < groupCount; i++){
+    	m_priorPi.row(i)(0)=0.5;
+        for(int k=1;k<K;k++){
+        	m_priorPi.row(i)(k)=0.5/K;
+        }
+    }
+
+    m_y_tilde.setZero();
+    m_beta.setZero();
+
+    for(int i=0; i<groupCount;i++)
+       m_sigmaGG[i] = m_dist.beta_rng(1,1);
+
+    m_pi = m_priorPi;
+    */
+
+
     for (int i=0; i<Ntot; ++i) dEpsSum[i] = 0.0;
 
     cVa.segment(1,km1)     = cva;
     cVaI.segment(1,km1)    = cVa.segment(1,km1).cwiseInverse();
     priorPi.segment(1,km1) = priorPi[0] * cVa.segment(1,km1).array() / cVa.segment(1,km1).sum();
-    sigmaG                 = dist.beta_rng(1.0, 1.0);
-    pi                     = priorPi;
-    Beta.setZero();
-    components.setZero();
+    sigmaG                 = dist.beta_rng(1.0, 1.0); 
+    pi                     = priorPi; 
+    Beta.setZero();             
+    components.setZero(); 
+    //daniel it may be clearer to just reset the restarting values after set to 0 than adding an if else
+    //for each case. Much better would be to refactor initialisation into a single function and then
+    //choose between restart or not function. 
+    if(opt.restart){
+      sigmaG = data.rSigmaG; //TODO all these variables  come from a function to read the output files in the data class
+      pi     = data.rPi;
+      Beta   = data.rBeta;
+      components = data.rComponents;
+    }
 
     if (opt.covariates) {
-    	gamma = VectorXd(data.X.cols());
+    	gamma = VectorXd(data.X.cols()); 
     	gamma.setZero();
     }
     
@@ -1178,13 +1220,25 @@ int BayesRRm::runMpiGibbs() {
     //printf("ysqn = %15.10f\n", y_sqn);
 
     sigmaE = 0.0d;
+    //daniel
     for (int i=0; i<Ntot; ++i) {
         y[i]       /= y_sqn;
-        epsilon[i]  = y[i]; // - mu but zero
+        epsilon[i]  = y[i]; // - mu but zero 
+	if(opt.restart) //daniel
+	  epsilon[i] = data.rEpsilon[i]; // in case of restart we load epsilon from file
         sigmaE     += epsilon[i] * epsilon[i];
     }
-    sigmaE = sigmaE / dN * 0.5;
+    sigmaE = sigmaE / dN * 0.5; 
+    if(opt.restart)//daniel
+      {
+	sigmaE  = data.rSigmaE; // in case of restart we load sigmaE from file
+      }
     //printf("sigmaE = %20.10f with epsilon = y-mu %22.15f\n", sigmaE, mu);
+
+    adaV.setOnes();
+    if(opt.restart){
+      adaV = data.rAdaV;
+    }
 
     double   sum_beta_squaredNorm;
     double   sigE_G, sigG_E, i_2sigE;
@@ -1251,6 +1305,7 @@ int BayesRRm::runMpiGibbs() {
         // Store status of iteration to revert back to it if required
         // ----------------------------------------------------------
         //previt_m0 = m0;
+        //marion : this should probably be a vector with sigmaGG
         //previt_sg = sigmaG;
         //previt_se = sigmaE;
         //previt_mu = mu;
@@ -1282,6 +1337,20 @@ int BayesRRm::runMpiGibbs() {
         m0 = 0.0d;
         v.setZero();
 
+
+        //marion : for each marker
+        // get sigmaGG : to which annotation the marker belongs
+        // then use this sigmaGG as sigmaG for this marker
+        /*
+        double sigmaG_process; // we could keep sigmaG instead of sigmaG_process
+        sigmaG_process = sigmaGG[data->G(marker->i)];
+
+        // set variable cVa
+        cVa.segment(1, km1) = cva.row(data->G(marker->i));
+        cVaI.segment(1, km1) = cVa.segment(1, km1).cwiseInverse();
+        */
+
+
         sigE_G  = sigmaE / sigmaG;
         sigG_E  = sigmaG / sigmaE;
         i_2sigE = 1.0 / (2.0 * sigmaE);
@@ -1295,11 +1364,19 @@ int BayesRRm::runMpiGibbs() {
         // Loop over (shuffled) markers
         // ----------------------------
         for (int j = 0; j < lmax; j++) {
+	 
+	  if (j < M) {
+	     marker  = markerI[j];
+	     beta =  Beta(marker);
 
-            if (j < M) {
-                marker  = markerI[j];
+	     //daniel, we check if we are in a restarted chain and if the markers is to be sampled
+	    if(adaV[j] || !opt.restart) {
+	      /********************************************************************
+		    Here we sample the effect and perform the expensive dot product
+	      *******************************************************************/
+	                      
                 
-                beta =  Beta(marker);
+                
                 //printf("rank %d, marker %7d: beta = %20.15f, mean = %20.15f, std = %20.15f\n", rank, marker, beta, mave[marker], mstd[marker]);
                 
                 //we compute the denominator in the variance expression to save computations
@@ -1324,6 +1401,18 @@ int BayesRRm::runMpiGibbs() {
                 //muk for the other components is computed according to equations
                 muk.segment(1, km1) = num / denom.array();           
                 
+
+                //marion : update the logL for each component of corresponding annotation
+                /*
+                VectorXd logL(K);
+                const double logLScale = sigmaG_process / m_sigmaE * NM1;
+                logL = m_pi.row(m_data->G(marker->i)).array().log();
+                // First component probabilities remain unchanged
+                logL.segment(1, km1) = logL.segment(1, km1).array()
+                		- 0.5 * ((logLScale * m_cVa.segment(1, km1).array() + 1).array().log())
+                        + 0.5 * (m_muk.segment(1, km1).array() * num) / m_sigmaE;
+                */
+
                 //first component probabilities remain unchanged
                 logL = pi.array().log();
                 
@@ -1343,7 +1432,34 @@ int BayesRRm::runMpiGibbs() {
                 }
                 //printf("acum = %15.10f\n", acum);
                 
-                // Store marker acum for later dump to file
+
+                //marion : store marker acum
+                /*
+                for (int k = 0; k < K; k++) {
+                	if (p <= acum) {
+                	//if zeroth component
+                           if (k == 0) {
+                               beta(marker->i) = 0;
+                           } else {
+                               beta(marker->i) = dist.norm_rng(m_muk[k], sigmaE/denom[k-1]);
+                               betasqnG(data->G(marker->i))+= pow(beta(marker->i),2);
+                           }
+                           v.row(data->G(marker->i))(k)+=1.0;
+                           components[marker->i] = k;
+                           break;
+                       	 } else {
+                           //if too big or too small
+                           if (((logL.segment(1, km1).array() - logL[k+1]).abs().array() > 700).any()) {
+                               acum += 0;
+                           } else {
+                               acum += 1.0 / ((logL.array() - logL[k+1]).exp().sum());
+                           }
+                       }
+                   }
+                */
+
+                 
+                //TODO Store marker acum for later dump to file
                 Acum(marker) = acum;
 
                 for (int k=0; k<K; k++) {
@@ -1370,8 +1486,13 @@ int BayesRRm::runMpiGibbs() {
                         }
                     }
                 }
+
+	    } //end of adapative if daniel
+	    else{
+	      Beta(marker) = 0;
+	      Acum(marker) = 1.0 // probability of beta being 0 equals 1.0
+	    }
                 //printf("acum = %15.10f\n", acum);
-                
                 
                 betaOld   = beta;
                 beta      = Beta(marker);
@@ -1455,8 +1576,18 @@ int BayesRRm::runMpiGibbs() {
         // ------------------------
         m0      = double(Mtot) - v[0];
         sigmaG  = dist.inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0));
-
         
+
+        // marion : update sigmaGG
+        /*
+ 	 	for(int i = 0; i < nGroups; i++){
+            m_m0 = m_v.row(i).sum() - m_v.row(i)(0);
+            m_sigmaGG[i] = m_dist.inv_scaled_chisq_rng(m_v0G + m_m0, (m_betasqnG(i) * m_m0 + m_v0G * m_s02G) / (m_v0G + m_m0));
+            m_pi.row(i) = m_dist.dirichilet_rng(m_v.row(i).array() + 1.0);
+        }
+        */
+
+
         // Check iteration
         // 
         // ---------------

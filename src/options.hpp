@@ -40,9 +40,13 @@ public:
     unsigned thin;                     // save every this th sampled value in MCMC
     unsigned save;                     // sampling rate of the epsilon vector
     vector<float> S;                   // variance components
+
+    //marion : include annotation variables
     unsigned int numGroups;
     Eigen::MatrixXd mS;
     string groupFile;
+    string mSfile;
+
     string title;
     string analysisType;
     string bayesType;
