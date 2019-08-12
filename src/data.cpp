@@ -22,6 +22,107 @@ Data::Data()
 
 #ifdef USE_MPI
 
+
+void Data::sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
+                                      size_t*       N1L,       size_t* N2L,       size_t* NML,
+                                      uint*         I1,        uint*   I2,        uint*   IM,
+                                      const int M) {
+    
+    for (int ii=0; ii<M; ++ii) {
+        
+        size_t beg = 0, len = 0;
+        
+        for (int i=0; i<numNAs; ++i) {
+
+            beg = N1S[ii]; len = N1L[ii];
+            if (len > 0) {
+                for (size_t iii=beg; iii<beg+len; ++iii) {
+                    if (I1[iii] + i == NAsInds[i]) { 
+                        N1L[ii] -= 1; 
+                        for (size_t k = iii; k<beg+N1L[ii]; k++) I1[k] = I1[k + 1] - 1;                        
+                        break;
+                    } else {
+                        if (I1[iii] + i >= NAsInds[i]) I1[iii] = I1[iii] - 1;
+                    }
+                }
+            }
+
+            beg = N2S[ii]; len = N2L[ii];
+            if (len > 0) {
+                for (size_t iii=beg; iii<beg+len; ++iii) {
+                    if (I2[iii] + i == NAsInds[i]) { 
+                        N2L[ii] -= 1;
+                        for (size_t k = iii; k<beg+N2L[ii]; k++) I2[k] = I2[k + 1] - 1;
+                        break;
+                    } else {
+                        if (I2[iii] + i >= NAsInds[i]) I2[iii] = I2[iii] - 1;
+                    }
+                }
+            }
+
+            beg = NMS[ii]; len = NML[ii];
+            if (len > 0) {
+                for (size_t iii=beg; iii<beg+len; ++iii) {
+                    if (IM[iii] + i == NAsInds[i]) { 
+                        NML[ii] -= 1;
+                        for (size_t k = iii; k<beg+NML[ii]; k++) IM[k] = IM[k + 1] - 1;
+                        break;
+                    } else {
+                        if (IM[iii] + i >= NAsInds[i]) IM[iii] = IM[iii] - 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+// EO: Apply corrections to the sparse structures (1,2,m)
+//     Watch out that NAs have to be considered globally accross the structures
+// ---------------------------------------------------------------------------
+void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M) {
+
+    // Alloc one tmp vector large enough
+    uint max = 0;
+    for (int i=0; i<M; ++i)
+        if (NL[i] > max) max = NL[i];
+
+    uint* tmp = (uint*) malloc(max * sizeof(uint));  check_malloc(tmp, __LINE__, __FILE__);
+
+    for (int i=0; i<M; ++i) {
+
+        const size_t beg = NS[i], len = NL[i];
+        size_t k   = 0;
+        uint   nas = 0;
+
+        if (len > 0) {
+
+            // Make a tmp copy of the original data
+            for (size_t iii=beg; iii<beg+len; ++iii) tmp[iii-beg] = I[iii];
+            
+            for (size_t iii=beg; iii<beg+len; ++iii) {
+                bool isna   = false;
+                uint allnas = 0;
+                for (int ii=0; ii<numNAs; ++ii) {
+                    //if (NAsInds[ii] > tmp[iii-beg]) break;
+                    if (NAsInds[ii] <= tmp[iii-beg]) allnas += 1;
+                    if (tmp[iii-beg] == NAsInds[ii]) { // NA found
+                        isna = true;
+                        nas += 1;
+                        break;
+                    }
+                }
+                if (isna) continue;
+                I[beg+k] = tmp[iii-beg]  - allnas;
+                k += 1;
+            }
+        }
+        NL[i] -= nas;
+    }
+    free(tmp);
+}
+
+
 void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t& N1, size_t& N2, size_t& NM) {
 
     assert(numInds<=NB*4);

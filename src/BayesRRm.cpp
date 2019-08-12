@@ -48,15 +48,6 @@ BayesRRm::~BayesRRm()
 
 #ifdef USE_MPI
 
-// Check malloc in MPI context
-// ---------------------------
-inline void check_malloc(const void* ptr, const int linenumber, const char* filename) {
-    if (ptr == NULL) {
-        fprintf(stderr, "#FATAL#: malloc failed on line %d of %s\n", linenumber, filename);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-}
-
 
 inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, const double* __restrict__ vin2, const double dMULT, const int N) {
 
@@ -117,11 +108,12 @@ inline double sparse_dotprod(const double* __restrict__ vin1,
         //printf("1: %5d %5d %15.10f\n", i, I1[i], vin1[I1[i]]);
         dp +=       vin1[I1[i]];
     }
-
+    //printf("After the 1 dp = %20.15f\n", dp);
     for (size_t i=N2S; i<N2S+N2L; ++i) {
         //printf("2: %5d %5d %15.10f\n", i, I2[i], vin1[I2[i]]);
         dp += 2.0 * vin1[I2[i]];
     }
+    //printf("After the 2 dp = %20.15f\n", dp);
 
     dp *= sig_inv;
 
@@ -1071,60 +1063,13 @@ int BayesRRm::runMpiGibbs() {
     // Correct each marker for individuals with missing phenotype
     // ----------------------------------------------------------
     MPI_Barrier(MPI_COMM_WORLD);
+    if (rank == 0) printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", data.numNAs);
+    data.sparse_data_correct_for_missing_phenotype(N1S, N1L, I1, M);
+    data.sparse_data_correct_for_missing_phenotype(N2S, N2L, I2, M);
+    data.sparse_data_correct_for_missing_phenotype(NMS, NML, IM, M);
 
-
-    const int NNAS = data.numNAs;
-
-    if (rank == 0) printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", NNAS);
-    
-    for (int ii=0; ii<M; ++ii) {
-
-        if (rank >= 0 && ii%100 == 0) printf("INFO   : task %3d applying %3d NA corrections to marker %5d out of %5d\n", rank, NNAS, ii, M);
-        
-        size_t beg = 0, len = 0, end = 0;
-
-        for (int i=0; i<NNAS; ++i) {
-
-            beg = N1S[ii]; len = N1L[ii];
-            if (len > 0) {
-                for (size_t iii=beg; iii<beg+len; ++iii) {
-                    if (I1[iii] + i == data.NAsInds[i]) { 
-                        N1L[ii] -= 1; 
-                        for (size_t k = iii; k<beg+N1L[ii]; k++) I1[k] = I1[k + 1] - 1;                        
-                        break;
-                    } else {
-                        if (I1[iii] + i >= data.NAsInds[i]) I1[iii] = I1[iii] - 1;
-                    }
-                }
-            }
-
-            beg = N2S[ii]; len = N2L[ii];
-            if (len > 0) {
-                for (size_t iii=beg; iii<beg+len; ++iii) {
-                    if (I2[iii] + i == data.NAsInds[i]) { 
-                        N2L[ii] -= 1;
-                        for (size_t k = iii; k<beg+N2L[ii]; k++) I2[k] = I2[k + 1] - 1;
-                        break;
-                    } else {
-                        if (I2[iii] + i >= data.NAsInds[i]) I2[iii] = I2[iii] - 1;
-                    }
-                }
-            }
-
-            beg = NMS[ii]; len = NML[ii];
-            if (len > 0) {
-                for (size_t iii=beg; iii<beg+len; ++iii) {
-                    if (IM[iii] + i == data.NAsInds[i]) { 
-                        NML[ii] -= 1;
-                        for (size_t k = iii; k<beg+NML[ii]; k++) IM[k] = IM[k + 1] - 1;
-                        break;
-                    } else {
-                        if (IM[iii] + i >= data.NAsInds[i]) IM[iii] = IM[iii] - 1;
-                    }
-                }
-            }
-        }
-    }
+    //EO: old implementations
+    //data.sparse_data_correct_NA_OLD(N1S, N2S, NMS,  N1L, N2L, NML,  I1, I2, IM,  M);
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) printf("INFO   : finished applying NA corrections.\n");
@@ -1147,14 +1092,18 @@ int BayesRRm::runMpiGibbs() {
     mstd = (double*)malloc(size_t(M) * sizeof(double));  check_malloc(mstd, __LINE__, __FILE__);
     dalloc += 2 * size_t(M) * sizeof(double) / 1E9;
     
+
     double tmp0, tmp1, tmp2;
     for (int i=0; i<M; ++i) {
+
+        //printf("marker %d: N1 %4d, N2 %4d, NM %4d\n", i, N1L[i], N2L[i], NML[i]);
+
         mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
         tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
         tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
         tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
         mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
-        //printf("marker %6d mean %20.15f, std = %20.15f\n", i, mave[i], mstd[i]);
+        //printf("marker %6d mean %20.15f, std = %20.15f (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], tmp1, tmp2, tmp0);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1175,15 +1124,16 @@ int BayesRRm::runMpiGibbs() {
     // ---------------
     const auto st3 = std::chrono::high_resolution_clock::now();
  
-    double *y, *epsilon, *tmpEps, *previt_eps, *deltaEps, *dEpsSum, *deltaSum;
+    //double *y, *epsilon, *tmpEps, *previt_eps, *deltaEps, *dEpsSum, *deltaSum;
+    double *y, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum;
     const size_t NDB = size_t(Ntot) * sizeof(double);
-    y          = (double*)malloc(NDB);  check_malloc(y,        __LINE__, __FILE__);
-    epsilon    = (double*)malloc(NDB);  check_malloc(epsilon,  __LINE__, __FILE__);
-    tmpEps     = (double*)malloc(NDB);  check_malloc(tmpEps,   __LINE__, __FILE__);
-    previt_eps = (double*)malloc(NDB);  check_malloc(tmpEps,   __LINE__, __FILE__);
-    deltaEps   = (double*)malloc(NDB);  check_malloc(deltaEps, __LINE__, __FILE__);
-    dEpsSum    = (double*)malloc(NDB);  check_malloc(dEpsSum,  __LINE__, __FILE__);
-    deltaSum   = (double*)malloc(NDB);  check_malloc(deltaSum, __LINE__, __FILE__);
+    y          = (double*)malloc(NDB);  check_malloc(y,          __LINE__, __FILE__);
+    epsilon    = (double*)malloc(NDB);  check_malloc(epsilon,    __LINE__, __FILE__);
+    tmpEps     = (double*)malloc(NDB);  check_malloc(tmpEps,     __LINE__, __FILE__);
+    //previt_eps = (double*)malloc(NDB);  check_malloc(previt_eps, __LINE__, __FILE__);
+    deltaEps   = (double*)malloc(NDB);  check_malloc(deltaEps,   __LINE__, __FILE__);
+    dEpsSum    = (double*)malloc(NDB);  check_malloc(dEpsSum,    __LINE__, __FILE__);
+    deltaSum   = (double*)malloc(NDB);  check_malloc(deltaSum,   __LINE__, __FILE__);
     dalloc += NDB * 7 / 1E9;
 
     double totalloc = 0.0;
@@ -1270,11 +1220,11 @@ int BayesRRm::runMpiGibbs() {
     uint n_thinned_saved = 0;
 
 
-    double   previt_m0 = 0.0;
-    double   previt_sg = 0.0;
-    double   previt_mu = 0.0;
-    double   previt_se = 0.0;
-    VectorXd previt_Beta(M);
+    //double   previt_m0 = 0.0;
+    //double   previt_sg = 0.0;
+    //double   previt_mu = 0.0;
+    //double   previt_se = 0.0;
+    //VectorXd previt_Beta(M);
 
 
     // Main iteration loop
@@ -1300,12 +1250,12 @@ int BayesRRm::runMpiGibbs() {
 
         // Store status of iteration to revert back to it if required
         // ----------------------------------------------------------
-        previt_m0 = m0;
-        previt_sg = sigmaG;
-        previt_se = sigmaE;
-        previt_mu = mu;
-        for (int i=0; i<Ntot; ++i) previt_eps[i]  = epsilon[i];
-        for (int i=0; i<M;    ++i) previt_Beta(i) = Beta(i);
+        //previt_m0 = m0;
+        //previt_sg = sigmaG;
+        //previt_se = sigmaE;
+        //previt_mu = mu;
+        //for (int i=0; i<Ntot; ++i) previt_eps[i]  = epsilon[i];
+        //for (int i=0; i<M;    ++i) previt_Beta(i) = Beta(i);
 
         //printf("mu = %15.10f   eps[0] = %15.10f\n", mu, epsilon[0]);
         for (int i=0; i<Ntot; ++i) epsilon[i] += mu;
@@ -1359,6 +1309,9 @@ int BayesRRm::runMpiGibbs() {
                     //printf("denom[%d] = %20.15f\n", i-1, denom(i-1));
                 }
 
+                //if (NML[marker] > 0)
+                //    printf("marker %d has %d missing values\n", marker, NML[marker]);
+               
                 num = sparse_dotprod(epsilon,
                                      I1, N1S[marker], N1L[marker],
                                      I2, N2S[marker], N2L[marker],
@@ -1662,7 +1615,6 @@ int BayesRRm::runMpiGibbs() {
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
-
     // Close output files
     check_mpi(MPI_File_close(&outfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&betfh), __LINE__, __FILE__);
@@ -1670,12 +1622,11 @@ int BayesRRm::runMpiGibbs() {
     check_mpi(MPI_File_close(&cpnfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&acufh), __LINE__, __FILE__);
 
-
     // Release memory
     free(y);
     free(epsilon);
     free(tmpEps);
-    free(previt_eps);
+    //free(previt_eps);
     free(deltaEps);
     free(dEpsSum);
     free(deltaSum);
@@ -1690,7 +1641,6 @@ int BayesRRm::runMpiGibbs() {
     free(NMS); 
     free(NML);
     free(IM);
-    
 
     // Finalize the MPI environment
     //MPI_Finalize();

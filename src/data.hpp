@@ -144,6 +144,14 @@ public:
 
 
 #ifdef USE_MPI
+    
+    void sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
+                                    size_t*       N1L,       size_t* N2L,       size_t* NML,
+                                    uint*         I1,        uint*   I2,        uint*   IM,
+                                    const int M);
+
+    void sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M);
+
     void sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t& N1, size_t& N2, size_t& NM);
 
     void sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB,
