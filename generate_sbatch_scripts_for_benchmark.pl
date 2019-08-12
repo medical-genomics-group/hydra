@@ -36,7 +36,7 @@ if ($DS == 0) {
     $sparsebsn=${dataset}."_uint";
 } elsif ($DS == 3) {
     $sparsedir="/scratch/orliac/UKBgen/";
-    $sparsebsn="epfl_test_data_sparse_V2";
+    $sparsebsn="epfl_test_data_sparse";
     $phen="epfl_test_data";
     $numinds=457810;
     $numsnps=8430446;
@@ -77,7 +77,6 @@ my @SEEDS  = qw(4321);
 
 my $PARTITION = 'parallel';
 #$PARTITION = 'debug';
-
 
 my $submit = "$DIR/submit_all_sbatch_$nickname.sh";
 open S, ">$submit" or die $!;
