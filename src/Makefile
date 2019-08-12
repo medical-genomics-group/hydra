@@ -8,8 +8,8 @@ EXE ?= mpi_gibbs
 
 CXX       = mpiicpc
 
-CXXFLAGS  = -O3
-#CXXFLAGS = -Ofast
+#CXXFLAGS  = -O3
+CXXFLAGS = -Ofast
 #CXXFLAGS  = -O0
 #CXXFLAGS += -g
 CXXFLAGS += -std=c++17
