@@ -13,6 +13,7 @@
 
 module purge
 module load intel intel-mpi intel-mkl boost eigen
+module load valgrind
 module list
 
 if [ 1  == 1 ]; then 
@@ -21,14 +22,17 @@ if [ 1  == 1 ]; then
     icc components_converter.c -o components_converter
 fi    
 
-EXE=./src/mpi_gibbs
+NAM=mpi_gibbs_NA
+EXE=./src/$NAM
 
 # COMPILATION
 cd ./src
 B='-B'
-B=''
-make $B -f Makefile || exit 1;
+#B=''
+make $B EXE=$NAM -f Makefile || exit 1;
 cd ..
+
+#exit
 
 if [ ! -f $EXE ]; then
     echo Fatal: binary $EXE not found!
@@ -37,7 +41,7 @@ fi
 
 S="1.0,0.1"
 
-DS=4
+DS=5
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -73,17 +77,33 @@ elif [ $DS == 3 ]; then
     NUMSNPS=3600
     S="0.00001,0.0001,0.001,0.01"
 elif [ $DS == 4 ]; then
+    E=nm
     datadir=/scratch/orliac/testNA
-    dataset=test_nm
+    dataset=test_$E
     sparsedir=$datadir
     sparsebsn=${dataset}_sparse
-    phen=test_m
+    phen=test_$E
+    phen=test_m;#1miss
     NUMINDS=20000
     NUMSNPS=50000
     S="0.00001,0.0001,0.001,0.01"
     outdir=$datadir/results
-    sol=$outdir/test_mnm4
-    sol2=$outdir/test_mnm4_sparse
+    sol=$outdir/test_${E}7
+    sol2=$outdir/test_${E}7_sparse
+elif [ $DS == 5 ]; then
+    datadir=/scratch/orliac/testing_missing
+    dataset=testing_missing
+    sparsedir=$datadir
+    sparsebsn=${dataset}_sparse
+    phen=testing
+    phen_na=testing_missing
+    NUMINDS=10000
+    NUMSNPS=10000
+    NUMSNPS=1
+    S="0.00001,0.0001,0.001,0.01"
+    outdir=$datadir/results
+    sol=$outdir/out1
+    sol2=$outdir/out1_sparse
 fi
 
 if [ ! -d $outdir ]; then
@@ -102,7 +122,7 @@ echo "output dir:" $outdir
 echo "======================================"
 echo
 
-CL=5
+CL=1
 SEED=10
 SR=0
 SM=1
@@ -112,10 +132,10 @@ TOCONV_T=$((($CL - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
 TPN=1
-BPR=7
+BPR=5
 
 # Selecte what to run
-bed_to_sparse=0;  run_bed=1;  run_sparse=1;  run_comp=1;
+bed_to_sparse=0;  run_bed=1;  run_sparse=0;  run_comp=0;
 
 # Convert bed to sparse
 if [ $bed_to_sparse == 1 ]; then
@@ -129,12 +149,28 @@ COV="--covariates $datadir/scaled_covariates.csv"
 COV=""
 BLK="--marker-blocks-file $datadir/${dataset}.blk"
 BLK=""
-
+VALGRIND="valgrind -v --leak-check=yes";
+VALGRIND="valgrind -v --tool=exp-sgcheck";
+VALGRIND=""
 if [ $run_bed == 1 ]; then
     echo; echo
     echo "@@@ Solution reading from  BED file @@@"
     echo
-    cmd="srun -N $N --ntasks-per-node=$TPN  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
+    sol=$outdir/out1
+    cmd="srun -N $N --ntasks-per-node=$TPN $VALGRIND $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
+    printf '=%.0s' {1..100}; echo
+    echo $cmd
+    printf '=%.0s' {1..100}; echo
+    $cmd || exit 1
+    #rm $sol".bet.txt" $sol".eps.txt" $sol".cpn.txt"
+    ./beta_converter       $sol".bet" $TOCONV_T > $sol".bet.txt"
+    ./epsilon_converter    $sol".eps"           > $sol".eps.txt"
+    ./components_converter $sol".cpn" $TOCONV_T > $sol".cpn.txt"
+
+    #### bed + phen with NAs ###
+
+    sol=$outdir/out1
+    cmd="srun -N $N --ntasks-per-node=$TPN $VALGRIND $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen_na}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
     printf '=%.0s' {1..100}; echo
     echo $cmd
     printf '=%.0s' {1..100}; echo
