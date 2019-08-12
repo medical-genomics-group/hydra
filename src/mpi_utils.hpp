@@ -3,6 +3,17 @@
 
 #include <mpi.h>
 
+
+// Check malloc in MPI context
+// ---------------------------
+inline void check_malloc(const void* ptr, const int linenumber, const char* filename) {
+    if (ptr == NULL) {
+        fprintf(stderr, "#FATAL#: malloc failed on line %d of %s\n", linenumber, filename);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+}
+
+
 // Check MPI call returned value. If error print message and call MPI_Abort()
 // --------------------------------------------------------------------------
 inline void check_mpi(const int error, const int linenumber, const char* filename) {
