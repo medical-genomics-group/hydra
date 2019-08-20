@@ -37,7 +37,7 @@ fi
 
 S="1.0,0.1"
 
-DS=4
+DS=5
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -82,8 +82,22 @@ elif [ $DS == 4 ]; then
     NUMSNPS=8430446
     NUMSNPS=2000000
     S="0.00001,0.0001,0.001,0.01"
+elif [ $DS == 5 ]; then
+    datadir=/scratch/local/yearly/Thanasis/testdata_msp_constpop_Ne10K_M100K_N10K
+    dataset=testdata_msp_constpop_Ne10K_M100K_N10K
+    sparsedir=/scratch/temporary/eorliacXXX/
+    sparsebsn=epfl_test_data_sparseXXX
+    phen=testdata_msp_constpop_Ne10K_M100K_N10K
+    NUMINDS=10000
+    NUMSNPS=114561
+    #NUMSNPS=100
+    S="0.00001,0.0001,0.001,0.01"
+    outdir=$datadir/results/test_thana
 fi
 
+if [ ! -d $outdir ]; then
+    mkdir -p -v $outdir || exit 1;
+fi
 
 echo 
 echo "======================================"
@@ -93,10 +107,11 @@ echo "dataset:   " $dataset
 echo "sparse dir:" $sparsedir
 echo "sparse bsn:" $sparsebsn
 echo "S         :" $S
+echo "output dir:" $outdir
 echo "======================================"
 echo
 
-CL=2
+CL=10
 SEED=10
 SR=0
 SM=0
@@ -105,22 +120,26 @@ SAVE=3
 TOCONV_T=$((($CL - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
-TPN=140
+TPN=20
 
-COV="--covariates $datadir/scaled_covariates.csv";   COV=""
-BLK="--marker-blocks-file $datadir/${dataset}.blk";  BLK=""
+COV="--covariates $datadir/scaled_covariates.csv";
+COV=""
+BLK="--marker-blocks-file $datadir/${dataset}.blk";
+BLK=""
 
 
 # Set what to run
 # ---------------
-run_bed=1; run_sparse=1; run_comp=0;
+run_bed=1; run_sparse=0; run_comp=0;
 
+outnam=from_bed
+sol=$outdir/$outnam
+sol2=$outdir/${outnam}_sparse
 
 if [ $run_bed == 1 ]; then
     echo; echo
     echo "@@@ Solution reading from  BED file @@@"
     echo
-    sol=from_bed
     cmd="-n $TPN  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
     echo "$cmd"; echo
     mpirun -mca btl ^openib $cmd |& tee -a bed.log || exit 1
