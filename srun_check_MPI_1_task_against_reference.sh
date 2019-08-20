@@ -4,12 +4,15 @@
 # ATTENTION: need to be in an active slurm allocation!
 #
 
+
+slmodules -r deprecated
+
 module purge
-module load intel intel-mpi intel-mkl boost eigen zlib
+module load intel intel-mpi intel-mkl boost eigen
 module list
 
 
-NAM=mpi_gibbs_NA
+NAM=mpi_gibbs
 
 EXE=./src/$NAM
 
@@ -28,7 +31,7 @@ fi
 
 S="1.0,0.1"
 
-DS=1
+DS=0
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -47,7 +50,7 @@ elif [ $DS == 1 ]; then
     sparsebsn=${dataset}_uint
     NUMINDS=5000
     NUMSNPS=117148
-    NUMSNPS=2
+    NUMSNPS=1000
 elif [ $DS == 2 ]; then
     datadir=/scratch/orliac/testN500K
     dataset=testN500K
@@ -70,15 +73,15 @@ fi
 echo 
 echo "======================================"
 echo "        RUNNING THE APPLICATION ON:   "
-echo "datadir:   " $datadir
-echo "dataset:   " $dataset
+echo "datadir   :" $datadir
+echo "dataset   :" $dataset
 echo "sparse dir:" $sparsedir
 echo "sparse bsn:" $sparsebsn
 echo "S         :" $S
 echo "======================================"
 echo
 
-CL=1
+CL=27
 SEED=1222
 SR=0
 SM=0
@@ -92,9 +95,13 @@ echo
 echo
 echo "@@@ Official (sequential) solution (reading from BED file) @@@"
 echo
-srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out ref --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS
-srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phenNA}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out refNA --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen   --chain-length $CL --burn-in 0 --thin 1 --mcmc-out ref --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS"
+#cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phenNA}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out refNA --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS"
 #--covariates $datadir/scaled_covariates.csv
+echo ----------------------------------------------------------------------------------
+echo $cmd
+echo ----------------------------------------------------------------------------------
+$cmd
 
 
 echo
@@ -102,17 +109,26 @@ echo
 echo "@@@ MPI 1-task solution reading from  BED file @@@"
 echo
 sol=mpi1tbed
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phenNA}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS"
+echo ----------------------------------------------------------------------------------
+echo $cmd
+echo ----------------------------------------------------------------------------------
+$cmd
+
 #--covariates $datadir/scaled_covariates.csv
 
-exit 0
+#exit 0
 
 echo
 echo
 echo "@@@ MPI 1-task solution reading from SPARSE files @@@"
 echo
 sol=mpi1tsparse
-srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
+echo ----------------------------------------------------------------------------------
+echo $cmd
+echo ----------------------------------------------------------------------------------
+$cmd
 #--marker-blocks-file $datadir/${dataset}.blk_1 
 #--covariates $datadir/scaled_covariates.csv
 

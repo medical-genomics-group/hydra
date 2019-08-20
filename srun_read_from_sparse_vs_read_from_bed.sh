@@ -118,7 +118,7 @@ if [ $run_bed == 1 ]; then
     echo; echo
     echo "@@@ Solution reading from  BED file @@@"
     echo
-    sol=test_mnm
+    sol=test_mnm2
     cmd="-N $N --ntasks-per-node=$TPN  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
     echo $cmd
     srun $cmd || exit 1
@@ -133,7 +133,7 @@ if [ $run_sparse == 1 ]; then
     echo; echo
     echo "@@@ Solution reading from SPARSE files @@@"
     echo
-    sol2=from_sparse
+    sol2=from_sparse2
     cmd="-N $N --ntasks-per-node=$TPN  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol2 --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --sparse-dir $sparsedir  --sparse-basename $sparsebsn $COV $BLK"
     echo $cmd
     srun $cmd || exit 1
