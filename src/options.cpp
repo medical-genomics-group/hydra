@@ -16,6 +16,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             ss << "--bayes " << argv[i] << "\n";
         }
 #ifdef USE_MPI
+        else if (!strcmp(argv[i], "--restart")) {
+            restart = true;
+            ss << "--restart " << "\n";
+        }
         else if (!strcmp(argv[i], "--mpibayes")) {
             analysisType = "RAM";
             bayesType = argv[++i];
@@ -36,6 +40,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if (!strcmp(argv[i], "--check-RAM")) {
             checkRam = true;
             ss << "--check-RAM " << "\n";
+        }
+        else if (!strcmp(argv[i], "--restart")) {
+            restart = true;
+            ss << "--restart " << "\n";
         }
         else if (!strcmp(argv[i], "--check-RAM-tasks")) {
             int tmp = atoi(argv[++i]);

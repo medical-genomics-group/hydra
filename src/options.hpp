@@ -22,6 +22,7 @@ public:
 
     unsigned shuffleMarkers    = 1;
 #ifdef USE_MPI
+    bool     restart           = false;
     unsigned MPISyncRate       = 1;
     bool     bedToSparse       = false;
     bool     readFromBedFile   = false; //EO: by default read from sparse representation files

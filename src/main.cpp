@@ -51,17 +51,20 @@ int main(int argc, const char * argv[]) {
          */// but maybe we can have something like : if we use --group option then read these files
 
 
-        if (opt.bedToSparse == true) {
+        if (opt.bedToSparse || opt.checkRam) {
             data.readFamFile(opt.bedFile + ".fam");
             data.readBimFile(opt.bedFile + ".bim");
             //data.readPhenotypeFile(opt.phenotypeFile);
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
-            analysis.write_sparse_data_files(opt.blocksPerRank);
-
+            if (opt.bedToSparse) {
+                analysis.write_sparse_data_files(opt.blocksPerRank);
+            } else if (opt.checkRam) {
+                analysis.checkRamUsage();
+            }
         } else if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
             
             if (opt.readFromBedFile) {
-                printf("INFO   : reading from BED file\n");
+                //printf("INFO   : reading from BED file\n");
                 data.readFamFile(opt.bedFile + ".fam");
                 data.readBimFile(opt.bedFile + ".bim");
                 data.readPhenotypeFile(opt.phenotypeFile);
@@ -83,8 +86,6 @@ int main(int argc, const char * argv[]) {
 
             if (opt.markerBlocksFile != "") {
                 data.readMarkerBlocksFile(opt.markerBlocksFile);
-            } else {
-                if (rank == 0) cout << "INFO   : no request to read a block markers definition file." << endl;
             }
 
             analysis.runMpiGibbs();

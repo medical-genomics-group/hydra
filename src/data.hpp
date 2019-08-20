@@ -96,10 +96,8 @@ public:
 
     // Original data
     MatrixXd X;              // coefficient matrix for fixed effects
-    //MatrixXf Z;            // coefficient matrix for SNP effects
     MatrixXd Z;
     VectorXf D;              // 2pqn
-    //VectorXf y;            // phenotypes
     VectorXd y;              // phenotypes
 
     // marion : vector for annotation file and matrix for mS
@@ -131,7 +129,6 @@ public:
     vector<string> fixedEffectNames;
     vector<string> snpEffectNames;
 
-
     vector<bool> fullSnpFlag;
     vector<vector<SnpInfo*> > mldmVec;
 
@@ -140,18 +137,58 @@ public:
     unsigned numSnps = 0;
     unsigned numInds = 0;
     unsigned numNAs  = 0;
+
     vector<uint> NAsInds;
-    vector<int> blocksStarts;
-    vector<int> blocksEnds;
-    uint        numBlocks = 0;
+    vector<int>  blocksStarts;
+    vector<int>  blocksEnds;
+    uint         numBlocks = 0;
 
 
 #ifdef USE_MPI
-    
+
+    void print_restart_banner(const string mcmcOut, const uint iteration_restart, const uint iteration_start);
+
+
+    void read_mcmc_output_mrk_file(const string mcmcOut, const int* MrankL, const uint iteration_restart,
+                                   std::vector<int>& markerI);
+
+    void read_mcmc_output_eps_file(const string mcmcOut, const uint Ntot,
+                                   const uint iteration_restart,
+                                   //const int*   IrankS,  const int* IrankL,
+                                   VectorXd&    epsilon);
+
+    void read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
+                                   const uint   iteration_restart, const int thin,
+                                   const int*   MrankS,  const int* MrankL,
+                                   VectorXi&    components);
+
+    void read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
+                                   const uint   iteration_restart, const int thin,
+                                   const int*   MrankS,  const int* MrankL,
+                                   VectorXd&    Beta);
+
+    void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
+                                   double& sigmaG, double& sigmaE, VectorXd& pi,
+                                   uint& iteration_restart);
+
     void sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
                                     size_t*       N1L,       size_t* N2L,       size_t* NML,
                                     uint*         I1,        uint*   I2,        uint*   IM,
                                     const int M);
+
+    void load_data_from_bed_file(string bedfp, const uint Ntot, const int M, const int rank, const int start, double& dalloc,
+                                 size_t* N1S,   size_t* N1L, uint*& I1,
+                                 size_t* N2S,   size_t* N2L, uint*& I2,
+                                 size_t* NMS,   size_t* NML, uint*& IM);
+
+    void load_data_from_sparse_files(const int rank, const int nranks, const int M,
+                                     const int* MrankS, const int* MrankL,
+                                     const string sparseOut,
+                                     double& dalloc,
+                                     size_t* N1S, size_t* N1L, uint*& I1,
+                                     size_t* N2S, size_t* N2L, uint*& I2,
+                                     size_t* NMS, size_t* NML, uint*& IM
+                                     );
 
     void sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M);
 
@@ -266,6 +303,7 @@ public:
     // marion : annotation variables
     unsigned numGroups;	// number of annotations
     void readGroupFile(const string &groupFile);
+    void readGroupFile_new(const string &groupFile);
     void readmSFile(const string& mSfile);
 
 };

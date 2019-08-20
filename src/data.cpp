@@ -23,6 +23,297 @@ Data::Data()
 #ifdef USE_MPI
 
 
+
+void Data::print_restart_banner(const string mcmcOut, const uint iteration_restart, 
+                                const uint iteration_start) {
+    printf("INFO   : %s\n", string(100, '*').c_str());
+    printf("INFO   : RESTART DETECTED\n");
+    printf("INFO   : restarting from: %s.* files\n", mcmcOut.c_str());
+    printf("INFO   : last saved iteration:        %d\n", iteration_restart);
+    printf("INFO   : will restart from iteration: %d\n", iteration_start);
+    printf("INFO   : %s\n", string(100, '*').c_str());
+}
+
+
+void Data::read_mcmc_output_mrk_file(const string mcmcOut, const int* MrankL, const uint iteration_restart,
+                                     std::vector<int>& markerI)  {
+    
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    MPI_Status status;
+    MPI_File   fh;
+
+    const string fp = mcmcOut + ".mrk." + std::to_string(rank);
+    check_mpi(MPI_File_open(MPI_COMM_SELF, fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
+
+    // 1. get and validate iteration number that we are about to read
+    MPI_Offset off = size_t(0);
+    uint iteration_ = UINT_MAX;
+    check_mpi(MPI_File_read_at(fh, off, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (iteration_ != iteration_restart) {
+        printf("Mismatch between expected and read mrk iteration: %d vs %d\n", iteration_restart, iteration_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 2. get and validate M (against size of markerI)
+    uint M_ = 0;
+    off = sizeof(uint);
+    check_mpi(MPI_File_read_at(fh, off, &M_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    uint M = markerI.size();
+    if (M_ != M) {
+        printf("Mismatch between expected and read mrk M: %d vs %d\n", M, M_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 3. read the M_ coefficients
+    off = sizeof(uint) + sizeof(uint);
+    check_mpi(MPI_File_read_at(fh, off, markerI.data(), M_, MPI_INT, &status), __LINE__, __FILE__);
+
+
+    check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
+}
+
+
+//EO: .eps files only contain a dump of last saved iteration (no history)
+//
+void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, const uint iteration_restart,
+                                     //const int*   IrankS,  const int* IrankL,
+                                     VectorXd&    epsilon) {
+
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    
+    const string epsfp = mcmcOut + ".eps." + std::to_string(rank);
+
+    MPI_Status status;
+    
+    MPI_File epsfh;
+    check_mpi(MPI_File_open(MPI_COMM_SELF, epsfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &epsfh), __LINE__, __FILE__);
+
+
+    // 1. get and validate iteration number that we are about to read
+    MPI_Offset epsoff = size_t(0);
+    uint iteration_ = UINT_MAX;
+    check_mpi(MPI_File_read_at_all(epsfh, epsoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (iteration_ != iteration_restart) {
+        printf("Mismatch between expected and read cvs iteration: %d vs %d\n", iteration_restart, iteration_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 2. get and validate Ntot_ (against size of epsilon, adjusted for NAs)
+    uint Ntot_ = 0;
+    epsoff = sizeof(uint);
+    check_mpi(MPI_File_read_at_all(epsfh, epsoff, &Ntot_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    uint Ntot = epsilon.size();
+    assert(Ntot == Ntotc);
+    if (Ntot_ != Ntot) {
+        printf("Mismatch between expected and read eps Ntot: %d vs %d\n", Ntot, Ntot_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 3. read the Ntot_ coefficients
+    epsoff = sizeof(uint) + sizeof(uint);
+    check_mpi(MPI_File_read_at_all(epsfh, epsoff, epsilon.data(), Ntot_, MPI_DOUBLE, &status), __LINE__, __FILE__);
+
+    //printf("rank %d reading back eps: %15.10f %15.10f\n", rank, epsilon[0], epsilon[Ntot_-1]);
+
+    check_mpi(MPI_File_close(&epsfh), __LINE__, __FILE__);
+}
+
+
+//EO: Watch out the saving frequency of the betas (--thin)
+void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot, 
+                                     const uint  iteration_restart, const int thin,
+                                     const int*   MrankS,  const int* MrankL,
+                                     VectorXi& components) {
+
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    const string cpnfp = mcmcOut + ".cpn";
+
+    MPI_Status status;
+
+    MPI_File cpnfh;
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, cpnfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &cpnfh), __LINE__, __FILE__);
+
+    // 1. first element of the .bet, .cpn and .acu files is the total number of processed markers
+    uint Mtot_ = 0;
+    MPI_Offset cpnoff = size_t(0);
+    check_mpi(MPI_File_read_at_all(cpnfh, cpnoff, &Mtot_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (Mtot_ != Mtot) {
+        printf("Mismatch between expected and read cpn Mtot: %d vs %d\n", Mtot, Mtot_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 2. get and validate iteration number that we are about to read
+    assert(iteration_restart%thin == 0);
+    int n_thinned_saved = iteration_restart / thin;
+    cpnoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(int));
+    uint iteration_ = UINT_MAX;
+    check_mpi(MPI_File_read_at_all(cpnfh, cpnoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (iteration_ != iteration_restart) {
+        printf("Mismatch between expected and read cpn iteration: %d vs %d\n", iteration_restart, iteration_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 3. read the Mtot_ coefficients
+    cpnoff = sizeof(uint) + sizeof(uint) 
+        + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(int))
+        + size_t(MrankS[rank]) * sizeof(int);
+    check_mpi(MPI_File_read_at_all(cpnfh, cpnoff, components.data(), MrankL[rank], MPI_INTEGER, &status), __LINE__, __FILE__);
+
+    //printf("reading back cpn: %d %d\n", components[0], components[MrankL[rank]-1]);
+
+    check_mpi(MPI_File_close(&cpnfh), __LINE__, __FILE__);
+}
+
+
+//EO: Watch out the saving frequency of the betas (--thin)
+void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
+                                     const uint  iteration_restart, const int thin,
+                                     const int*   MrankS,  const int* MrankL,
+                                     VectorXd& Beta) {
+
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    const string betfp = mcmcOut + ".bet";
+
+    MPI_Status status;
+
+    MPI_File betfh;
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, betfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &betfh), __LINE__, __FILE__);
+
+    // 1. first element of the .bet, .cpn and .acu files is the total number of processed markers
+    uint Mtot_ = 0;
+    MPI_Offset betoff = size_t(0);
+    check_mpi(MPI_File_read_at_all(betfh, betoff, &Mtot_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (Mtot_ != Mtot) {
+        printf("Mismatch between expected and read bet Mtot: %d vs %d\n", Mtot, Mtot_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 2. get and validate iteration number that we are about to read
+    assert(iteration_restart%thin == 0);
+    int n_thinned_saved = iteration_restart / thin;
+    betoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(double));
+    uint iteration_ = UINT_MAX;
+    check_mpi(MPI_File_read_at_all(betfh, betoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (iteration_ != iteration_restart) {
+        printf("Mismatch between expected and read bet iteration: %d vs %d\n", iteration_restart, iteration_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 3. read the Mtot_ coefficients
+    betoff = sizeof(uint) + sizeof(uint) 
+        + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(double))
+        + size_t(MrankS[rank]) * sizeof(double);
+    check_mpi(MPI_File_read_at_all(betfh, betoff, Beta.data(), MrankL[rank], MPI_DOUBLE, &status), __LINE__, __FILE__);
+
+    //printf("rank %d reading back bet: %15.10f %15.10f\n", rank, Beta[0], Beta[MrankL[rank]-1]);
+        
+
+    check_mpi(MPI_File_close(&betfh), __LINE__, __FILE__);
+}
+
+
+//EO: consider moving the csv output file from ASCII to BIN
+//
+void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
+                                     double& sigmaG, double& sigmaE, VectorXd& pi,
+                                     uint& iteration_restart) {
+    
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    string csv = mcmcOut + ".csv";
+    std::ifstream file(csv);
+    int it_ = 1E9, rank_ = -1, m0_ = -1, pisize_ = -1, nchar = 0;
+    double mu_, sigg_, sige_, rat_;
+    double pipi[K];
+    int lastSavedIt = 0;
+    
+    if (file.is_open()) {
+        std::string str;
+        while (std::getline(file, str)) {
+            if (str.length() > 0) {
+                int nread = sscanf(str.c_str(), "%5d, %4d", &it_, &rank_);
+                if (rank_ == rank && it_%optSave == 0) {
+                    lastSavedIt = it_;
+                    char cstr[str.length()+1];
+                    strcpy(cstr, str.c_str());
+                    nread = sscanf(cstr, "%5d, %4d, %lf, %lf, %lf, %lf, %7d, %2d, %n",
+                                   &it_, &rank_, &mu_, &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
+                    string pis = str.substr(nchar, str.length()-nchar);
+                    char   pic[pis.length()+1];
+                    strcpy(pic, pis.c_str());
+                    for (int i=0; i<pis.length(); ++i) {
+                        if (pic[i] == ',') pic[i] = ' ';
+                    }
+                    //cout << "pic = " << pic << endl;
+                    char* ppic = pic;
+                    for (int i=0; i<K; i++) {
+                        pipi[i] = strtod(ppic, &ppic);
+                    }
+                }
+            }
+        }
+    } else {
+        printf("*FATAL*: failed to open csv file %s!\n", csv.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    
+    //printf("INFO   : read csv last it on rank %3d: %5d %15.10f %15.10f %15.10f %7d %2d ",
+    //       rank, lastSavedIt, mu_, sigg_, sige_, m0_, pisize_);
+    //for (int i=0; i<K; i++)  printf("%15.10f ", pipi[i]);
+    //printf("\n");
+    
+    MPI_Barrier(MPI_COMM_WORLD);
+    
+    
+    // Check that all ranks are on the same last iteration
+    int* allit_, lastit = -1;
+    if (rank == 0) {
+        allit_ = (int*)malloc(sizeof(int) * nranks);
+        check_malloc(allit_, __LINE__, __FILE__);
+    }
+
+    MPI_Gather(&lastSavedIt, 1, MPI_INT, allit_, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    if (rank == 0) {
+        int refit_ = allit_[0];
+        for (int i=0; i<nranks; ++i) {
+            if (allit_[i] != refit_) {
+                printf("*FATAL*: not all ranks on the same last iteration! (%d vs %d for rank %d)\n",
+                       refit_, allit_[i], rank);
+                MPI_Abort(MPI_COMM_WORLD, 1);
+            }
+        }
+        free(allit_);
+        lastit = refit_;
+    }
+
+    MPI_Bcast(&lastit, 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+    // Assign
+    assert(lastit % optSave == 0);
+    assert(lastit >= 0);
+    assert(lastit <= UINT_MAX);
+    iteration_restart = lastit;
+    sigmaG            = sigg_;
+    sigmaE            = sige_;
+    for (int i=0; i<K; i++)  pi[i] = pipi[i];
+}
+
+
+
 void Data::sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
                                       size_t*       N1L,       size_t* N2L,       size_t* NML,
                                       uint*         I1,        uint*   I2,        uint*   IM,
@@ -74,6 +365,137 @@ void Data::sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, cons
             }
         }
     }
+}
+
+//EO: load data from a bed file
+// ----------------------------
+void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, const int rank, const int start, 
+                                   double& dalloc,
+                                   size_t* N1S, size_t* N1L, uint*& I1,
+                                   size_t* N2S, size_t* N2L, uint*& I2,
+                                   size_t* NMS, size_t* NML, uint*& IM) {
+
+    MPI_File   bedfh;
+    MPI_Offset offset;
+
+    bedfp += ".bed";
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh),  __LINE__, __FILE__);
+
+    // Length of a "column" in bytes
+    const size_t snpLenByt = (Ntot % 4) ? Ntot / 4 + 1 : Ntot / 4;
+    //if (rank==0) printf("INFO   : marker length in bytes (snpLenByt) = %zu bytes.\n", snpLenByt);
+
+    // Alloc memory for raw BED data
+    // -----------------------------
+    const size_t rawdata_n = size_t(M) * size_t(snpLenByt) * sizeof(char);
+    char* rawdata = (char*) malloc(rawdata_n);  check_malloc(rawdata, __LINE__, __FILE__);
+    dalloc += rawdata_n / 1E9;
+    //printf("rank %d allocation %zu bytes (%.3f GB) for the raw data.\n", rank, rawdata_n, double(rawdata_n/1E9));
+
+    // Compute the offset of the section to read from the BED file
+    // -----------------------------------------------------------
+    //offset = size_t(3) + size_t(MrankS[rank]) * size_t(snpLenByt) * sizeof(char);
+    offset = size_t(3) + size_t(start) * size_t(snpLenByt) * sizeof(char);
+
+    // Read the BED file
+    // -----------------
+    MPI_Barrier(MPI_COMM_WORLD);
+    //const auto st1 = std::chrono::high_resolution_clock::now();
+
+    // Gather the sizes to determine common number of reads
+    size_t rawdata_n_max = 0;
+    check_mpi(MPI_Allreduce(&rawdata_n, &rawdata_n_max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+    int NREADS = check_int_overflow(size_t(ceil(double(rawdata_n_max)/double(INT_MAX/2))), __LINE__, __FILE__);
+
+    mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    //const auto et1 = std::chrono::high_resolution_clock::now();
+    //const auto dt1 = et1 - st1;
+    //const auto du1 = std::chrono::duration_cast<std::chrono::milliseconds>(dt1).count();
+    //if (rank == 0)  std::cout << "INFO   : time to read the BED file: " << du1 / double(1000.0) << " seconds." << std::endl;
+
+    // Close BED file
+    check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
+   
+
+    size_t N1=0, N2=0, NM=0;
+    sparse_data_get_sizes_from_raw(rawdata, M, snpLenByt, N1, N2, NM);
+
+    // Alloc and build sparse structure
+    I1 = (uint*) malloc(N1 * sizeof(uint));  check_malloc(I1, __LINE__, __FILE__);
+    I2 = (uint*) malloc(N2 * sizeof(uint));  check_malloc(I2, __LINE__, __FILE__);
+    IM = (uint*) malloc(NM * sizeof(uint));  check_malloc(IM, __LINE__, __FILE__);
+    dalloc += (N1 + N2 + NM) * sizeof(size_t) / 1E9;
+    
+    sparse_data_fill_indices(rawdata, M, snpLenByt,
+                             N1S, N1L, I1,
+                             N2S, N2L, I2,
+                             NMS, NML, IM);
+
+    free(rawdata);        
+}
+
+
+void Data::load_data_from_sparse_files(const int rank, const int nranks, const int M,
+                                       const int* MrankS, const int* MrankL,
+                                       const string sparseOut,
+                                       double& dalloc,
+                                       size_t* N1S,   size_t* N1L, uint*& I1,
+                                       size_t* N2S,   size_t* N2L, uint*& I2,
+                                       size_t* NMS,   size_t* NML, uint*& IM) {
+
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int  processor_name_len;
+    MPI_Get_processor_name(processor_name, &processor_name_len);
+
+    // Get sizes to alloc for the task
+    size_t N1 = get_number_of_elements_from_sparse_files(sparseOut, "1", MrankS, MrankL, N1S, N1L);
+    size_t N2 = get_number_of_elements_from_sparse_files(sparseOut, "2", MrankS, MrankL, N2S, N2L);
+    size_t NM = get_number_of_elements_from_sparse_files(sparseOut, "m", MrankS, MrankL, NMS, NML);
+
+    size_t N1max = 0, N2max = 0, NMmax = 0;
+    check_mpi(MPI_Allreduce(&N1, &N1max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+    check_mpi(MPI_Allreduce(&N2, &N2max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+    check_mpi(MPI_Allreduce(&NM, &NMmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+    size_t N1tot = 0, N2tot = 0, NMtot = 0;
+    check_mpi(MPI_Allreduce(&N1, &N1tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+    check_mpi(MPI_Allreduce(&N2, &N2tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+    check_mpi(MPI_Allreduce(&NM, &NMtot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+    if (rank == 0) printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
+    if (rank == 0) printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
+    if (rank == 0) printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1+N2+NM)*sizeof(uint)/1E9);
+
+    fflush(stdout);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (rank == 0) printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", (N1tot+N2tot+NMtot)*sizeof(uint)/1E9);
+
+    I1 = (uint*) malloc(N1 * sizeof(uint));  check_malloc(I1, __LINE__, __FILE__);
+    I2 = (uint*) malloc(N2 * sizeof(uint));  check_malloc(I2, __LINE__, __FILE__);
+    IM = (uint*) malloc(NM * sizeof(uint));  check_malloc(IM, __LINE__, __FILE__);
+    dalloc += (N1 + N2 + NM) * sizeof(uint) / 1E9;
+
+    // To check that each element is properly set
+    //for (int i=0; i<N1; i++) I1[i] = UINT_MAX;
+    //for (int i=0; i<N2; i++) I2[i] = UINT_MAX;
+    //for (int i=0; i<NM; i++) IM[i] = UINT_MAX;
+
+    int NREADS1 = check_int_overflow(size_t(ceil(double(N1max)/double(INT_MAX/2))), __LINE__, __FILE__);
+    int NREADS2 = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))), __LINE__, __FILE__);
+    int NREADSM = check_int_overflow(size_t(ceil(double(NMmax)/double(INT_MAX/2))), __LINE__, __FILE__);
+    if (rank == 0) printf("INFO   : number of call to read the sparse files: NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", NREADS1, NREADS2, NREADSM);
+
+    read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);
+    read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], NREADS2, I2);
+    read_sparse_data_file(sparseOut + ".sim", NM, NMS[0], NREADSM, IM);
+
+    // Make starts relative to start of block in each task
+    const size_t n1soff = N1S[0];  for (int i=0; i<M; ++i) { N1S[i] -= n1soff; }
+    const size_t n2soff = N2S[0];  for (int i=0; i<M; ++i) { N2S[i] -= n2soff; }
+    const size_t nmsoff = NMS[0];  for (int i=0; i<M; ++i) { NMS[i] -= nmsoff; }
 }
 
 
@@ -828,9 +1250,9 @@ void Data::readFamFile(const string &famFile){
     in.close();
     numInds = (unsigned) indInfoVec.size();
 
-    //#ifndef USE_MPI
+#ifndef USE_MPI
     cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
-    //#endif
+#endif
 }
 
 void Data::readBimFile(const string &bimFile) {
@@ -1109,7 +1531,7 @@ void Data::readCovariateFile(const string &covariateFile ) {
 
 //marion : read annotation file
 //group index starts from 0
-void Data::readGroupFile(const string& groupFile){
+void Data::readGroupFile_new(const string& groupFile){
 
 	ifstream input(groupFile);
 	vector<int> tmp;
