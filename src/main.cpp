@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include "BayesRRm.h"
+#include "BayesRRm_mt.h"
 #include "data.hpp"
 #include "options.hpp"
 #ifndef USE_MPI
@@ -54,7 +55,6 @@ int main(int argc, const char * argv[]) {
         if (opt.bedToSparse || opt.checkRam) {
             data.readFamFile(opt.bedFile + ".fam");
             data.readBimFile(opt.bedFile + ".bim");
-            //data.readPhenotypeFile(opt.phenotypeFile);
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
             if (opt.bedToSparse) {
                 analysis.write_sparse_data_files(opt.blocksPerRank);
@@ -68,27 +68,37 @@ int main(int argc, const char * argv[]) {
                 data.readFamFile(opt.bedFile + ".fam");
                 data.readBimFile(opt.bedFile + ".bim");
                 data.readPhenotypeFile(opt.phenotypeFile);
+
                 // Read in covariates file if passed
                 if (opt.covariates) {
-                    std::cout << "reading covariates file: "  << opt.covariatesFile;
+                    //std::cout << "reading covariates file: "  << opt.covariatesFile << endl;
                     data.readCovariateFile(opt.covariatesFile);
                 }
-            } else {
-                data.readPhenotypeFile(opt.phenotypeFile, opt.numberIndividuals);
-                
+
+            } else { // Read from sparse representation files
+
+                if (opt.multi_phen) {
+                    data.readPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals, data.phenosData);
+                } else {                    
+                    data.readPhenotypeFile(opt.phenotypeFiles[0], opt.numberIndividuals, data.y);
+                }
+
                 if (opt.covariates) {
-                    std::cout << "reading covariates file: "  << opt.covariatesFile;
+                    //std::cout << "reading covariates file: "  << opt.covariatesFile << endl;
                     data.readCovariateFile(opt.covariatesFile);
                 }
             }
-
-            BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
 
             if (opt.markerBlocksFile != "") {
                 data.readMarkerBlocksFile(opt.markerBlocksFile);
             }
-
-            analysis.runMpiGibbs();
+            if (opt.multi_phen) {
+                //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+                //analysis.runMpiGibbsMultiTraits();
+            } else {
+                BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+                analysis.runMpiGibbs();
+            }
 
         } else if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
 

@@ -12,7 +12,7 @@
 
 
 module purge
-module load intel intel-mpi intel-mkl boost eigen zlib
+module load intel intel-mpi intel-mkl boost eigen
 module list
 
 if [ 1  == 1 ]; then 
@@ -39,7 +39,7 @@ fi
 
 S="1.0,0.1"
 
-DS=4
+DS=3
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -72,7 +72,7 @@ elif [ $DS == 3 ]; then
     phen=epfl_test_data
     NUMINDS=457810
     NUMSNPS=8430446
-    NUMSNPS=3600
+    NUMSNPS=1000
     S="0.00001,0.0001,0.001,0.01"
 elif [ $DS == 4 ]; then
     datadir=/scratch/orliac/testNA/
@@ -107,7 +107,7 @@ N=1
 TPN=1
 
 # Set what to run
-run_bed=1; run_sparse=0; run_comp=0;
+run_bed=0; run_sparse=1; run_comp=0;
 
 COV="--covariates $datadir/scaled_covariates.csv"
 COV=""

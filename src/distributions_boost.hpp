@@ -20,7 +20,8 @@ class Distributions_boost{
 #endif
     unsigned int seed;
 public:
-    Distributions_boost(unsigned int seed);
+    //Distributions_boost(unsigned int seed);
+    Distributions_boost();
     virtual ~Distributions_boost();
 #ifdef USE_MPI
     boost::mt19937 rng;

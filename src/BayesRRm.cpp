@@ -19,25 +19,25 @@
 #include <libgen.h>
 #include <string.h>
 #include <boost/range/algorithm.hpp>
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-
+#include <sys/time.h>
+#include <iostream>
+#include <ctime>
 #ifdef USE_MPI
 #include <mpi.h>
 #include "mpi_utils.hpp"
 #endif
 
+#include <omp.h>
 
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
 : data(data)
 , opt(opt)
 , bedFile(opt.bedFile + ".bed")
 , memPageSize(memPageSize)
-, outputFile(opt.mcmcOut + ".csv")
 , seed(opt.seed)
 , max_iterations(opt.chainLength)
 , burn_in(opt.burnin)
-, dist(opt.seed)
+  //, dist(opt.seed)
 , usePreprocessedData(opt.analysisType == "PPBayes")
 , showDebug(false)
 {
@@ -49,7 +49,166 @@ BayesRRm::~BayesRRm()
 {
 }
 
-#ifdef USE_MPI
+void BayesRRm::set_vector_f64(double* __restrict__ vec, const double val, const int N) {
+  
+    const int N8 = (N/8) * 8;
+
+    __assume_aligned(vec, 64);
+    __assume(N8%8==0);
+    //#pragma unroll(8)
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int i=0; i<N8; i++) {
+        vec[i] = val;
+    }
+
+    for (int i=N8; i<N; ++i) {
+        vec[i] = val;
+    }
+}
+
+
+/*
+inline void copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
+
+    const int N8 = (N/8) * 8;
+
+    __assume_aligned(dest,   64);
+    __assume_aligned(source, 64);
+    __assume(N8%8==0);
+
+#pragma unroll(8)
+    for (int i=0; i<N8; i++) {
+        dest[i] = source[i];
+    }
+
+    for (int i=N8; i<N; ++i) {
+        dest[i] = source[i];
+    }
+}
+*/
+
+void BayesRRm::copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
+
+    __assume_aligned(dest,   64);
+    __assume_aligned(source, 64);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int i=0; i<N; i++) {
+        dest[i] = source[i];
+    }
+}
+
+
+double BayesRRm::sum_vector_elements_f64_base(const double* __restrict__ vec, const int N) {
+
+    const int N8 = (N/8) * 8;
+    double sum = 0.0;
+
+    __assume_aligned(vec, 64);
+    __assume(N8%8==0);
+
+#pragma unroll(8)
+    for (int i=0; i<N8; i++) {
+        sum += vec[i];
+    }
+
+    for (int i=N8; i<N; ++i) {
+        sum += vec[i];
+    }
+
+    return sum;
+}
+
+
+double BayesRRm::sum_vector_elements_f64(const double* __restrict__ vec, const int N) {
+
+    double sum = 0.0;
+
+    __assume_aligned(vec, 64);
+
+    //#pragma unroll
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+: sum)
+#endif
+    for (int i=0; i<N; i++) {
+        sum += vec[i];
+    }
+
+    return sum;
+}
+
+
+void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
+                               const int N) {
+    __assume_aligned(in1, 64);
+    __assume_aligned(in2, 64);
+    __assume_aligned(out, 64);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int i=0; i<N; i++) {
+        out[i] = in1[i] + in2[i];
+    }
+}
+
+/*
+inline void sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
+                            const int N) {
+
+    const int N8 = (N/8) * 8;
+
+    __assume_aligned(in1, 64);
+    __assume_aligned(in2, 64);
+    __assume_aligned(out, 64);
+    __assume(N8%8==0);
+
+    //#pragma unroll(8)
+#pragma omp parallel for
+    for (int i=0; i<N8; i++) {
+        out[i] = in1[i] + in2[i];
+    }
+
+    for (int i=N8; i<N; ++i) {
+        out[i] = in1[i] + in2[i];
+    }
+}
+*/
+
+void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N) {
+    
+    const int N8 = (N/8) * 8;
+
+    __assume_aligned(in1, 64);
+    __assume_aligned(out, 64);
+    __assume(N8%8==0);
+    //#pragma unroll(8)
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int i=0; i<N8; i++) {
+        out[i] += in1[i];
+    }
+
+    for (int i=N8; i<N; ++i) {
+        out[i] += in1[i];
+    }
+}
+
+
+inline void sum_vectors_f64_ref(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
+                                const int N) {
+
+    __assume_aligned(in1, 64);
+    __assume_aligned(in2, 64);
+    __assume_aligned(out, 64);
+
+    for (int i=0; i<N; ++i) {
+        out[i] = in1[i] + in2[i];
+    }
+}
 
 
 inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, const double* __restrict__ vin2, const double dMULT, const int N) {
@@ -66,68 +225,109 @@ inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, c
 }
 
 
-inline void sparse_scaadd(double*       __restrict__ vout,
-                          const double  dMULT,
-                          const uint* __restrict__ I1, const size_t N1S, const size_t N1L,
-                          const uint* __restrict__ I2, const size_t N2S, const size_t N2L,
-                          const uint* __restrict__ IM, const size_t NMS, const size_t NML,
-                          const double  mu,
-                          const double  sig_inv,
-                          const int     N) {
+inline void partial_sparse_scaadd(double*       __restrict__ vec,
+                                  const double               val,
+                                  const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
+    __assume_aligned(vec, 64);
+    __assume_aligned(IX,  64);
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (size_t i=NXS; i<NXS+NXL; ++i) {
+        vec[ IX[i] ] = val;
+    }
+}
 
+void BayesRRm::sparse_scaadd(double*     __restrict__ vout,
+                             const double  dMULT,
+                             const uint* __restrict__ I1, const size_t N1S, const size_t N1L,
+                             const uint* __restrict__ I2, const size_t N2S, const size_t N2L,
+                             const uint* __restrict__ IM, const size_t NMS, const size_t NML,
+                             const double  mu,
+                             const double  sig_inv,
+                             const int     N) {
+    
     if (dMULT == 0.0) {
-        for (int i=0; i<N; i++)
-            vout[i] = 0.0;
+
+        set_vector_f64(vout, 0.0, N);
+
     } else {
 
         double aux = mu * sig_inv * dMULT;
 
-        for (int i=0; i<N; i++)
-            vout[i] = -aux;
+        set_vector_f64(vout, -aux, N);
 
-        for (size_t i=NMS; i<NMS+NML; ++i)
-            vout[IM[i]] = 0.0;
+        partial_sparse_scaadd(vout, 0.0, IM, NMS, NML);
 
         aux = dMULT * (1.0 - mu) * sig_inv;
-        for (size_t i=N1S; i<N1S+N1L; ++i)
-            vout[I1[i]] = aux;
+
+        partial_sparse_scaadd(vout, aux, I1, N1S, N1L);
 
         aux = dMULT * (2.0 - mu) * sig_inv;
-        for (size_t i=N2S; i<N2S+N2L; ++i)
-            vout[I2[i]] = aux;
+
+        partial_sparse_scaadd(vout, aux, I2, N2S, N2L);
     }
 }
 
+double mysecond()
+{
+    struct timeval  tp;
+    struct timezone tzp;
+    int i;
+    i = gettimeofday(&tp, &tzp);
+    return ( (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6 );
+}
 
-inline double sparse_dotprod(const double* __restrict__ vin1,
-                             const uint*   __restrict__ I1,   const size_t N1S,  const size_t N1L,
-                             const uint*   __restrict__ I2,   const size_t N2S,  const size_t N2L,
-                             const uint*   __restrict__ IM,   const size_t NMS,  const size_t NML,
-                             const double  mu, const double sig_inv, const int N, const int marker) {
 
-    double dp = 0.0, syt = 0.0;
 
-    for (size_t i=N1S; i<N1S+N1L; ++i) {
-        //printf("1: %5d %5d %15.10f\n", i, I1[i], vin1[I1[i]]);
-        dp +=       vin1[I1[i]];
+inline double partial_sparse_dotprod(const double* __restrict__ vec,
+                                     const uint*   __restrict__ IX,
+                                     const size_t               NXS,
+                                     const size_t               NXL,
+                                     const double               fac) {
+
+    //double t1 = -mysecond();
+    //for (int ii=0; ii<1024; ii++) {
+    //}
+    //t1 += mysecond();
+    //printf("kerold 1 BW = %g\n", double(N1L)*sizeof(double) / 1024. / 1024. / t1);
+
+    double dp = 0.0;
+
+    __assume_aligned(vec, 64);
+    __assume_aligned(IX,  64);
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+: dp)
+#endif
+    for (size_t i=NXS; i<NXS+NXL; i++) {
+        dp += vec[ IX[i] ] * fac;
     }
-    //printf("marker %d: after the 1 dp = %20.15f\n", marker, dp);
 
-    for (size_t i=N2S; i<N2S+N2L; ++i) {
-        //printf("2: %5d %5d %15.10f\n", i, I2[i], vin1[I2[i]]);
-        dp += 2.0 * vin1[I2[i]];
-    }
-    //printf("marker %d: after the 2 dp = %20.15f\n", marker, dp);
+    return dp;
+}
+
+
+double BayesRRm::sparse_dotprod(const double* __restrict__ vin1,
+                                const uint*   __restrict__ I1,      const size_t N1S,  const size_t N1L,
+                                const uint*   __restrict__ I2,      const size_t N2S,  const size_t N2L,
+                                const uint*   __restrict__ IM,      const size_t NMS,  const size_t NML,
+                                const double               mu, 
+                                const double               sig_inv,
+                                const int                  N,
+                                const int                  marker) {
+    
+    double dp  = 0.0;
+    double syt = 0.0;
+
+    dp += partial_sparse_dotprod(vin1, I1, N1S, N1L, 1.0);
+
+    dp += partial_sparse_dotprod(vin1, I2, N2S, N2L, 2.0);
 
     dp *= sig_inv;
 
-    for (int i=0; i<N; i++) syt += vin1[i];
-
-    //EO: ajust for missing values
-    for (size_t i=NMS; i<NMS+NML; ++i) {
-        //printf("M: %5d %5d %15.10f\n", i, IM[i], vin1[IM[i]]);
-        syt -= vin1[IM[i]];
-    }
+    syt += sum_vector_elements_f64(vin1, N);
+    
+    syt += partial_sparse_dotprod(vin1, IM, NMS, NML, -1.0);
 
     dp -= mu * sig_inv * syt;
 
@@ -161,7 +361,7 @@ inline double dotprod(const double* __restrict__ vec1, const double* __restrict_
 }
 
 
-inline double center_and_scale(double* __restrict__ vec, const int N) {
+inline void center_and_scale(double* __restrict__ vec, const int N) {
 
     // Compute mean
     double mean = 0.0;
@@ -180,11 +380,13 @@ inline double center_and_scale(double* __restrict__ vec, const int N) {
     for (int i=0; i<N; ++i)  vec[i] *= sqn;
 }
 
+#ifdef USE_MPI
+
 
 // Define blocks of markers to be processed by each task
 // By default processes all markers
 // -----------------------------------------------------
-void mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks) {
+void BayesRRm::mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks) {
 
     const uint modu   = Mtot % nblocks;
     const uint Mrank  = int(Mtot / nblocks);
@@ -341,7 +543,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
 
         // Alloc memory for raw BED data
         const size_t rawdata_n = size_t(MLi) * size_t(snpLenByt) * sizeof(char);
-        char* rawdata = (char*) malloc(rawdata_n);  check_malloc(rawdata, __LINE__, __FILE__);
+        char* rawdata = (char*) _mm_malloc(rawdata_n, 64);  check_malloc(rawdata, __LINE__, __FILE__);
 
         // Gather sizes to determine common number of reads
         size_t rawdata_n_max = 0;
@@ -367,7 +569,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         rN2 += N2;
         rNM += NM;
 
-        free(rawdata);
+        _mm_free(rawdata);
 
         MPI_Barrier(MPI_COMM_WORLD);
     }
@@ -375,9 +577,9 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
 
     // Gather offsets
     // --------------
-    size_t *AllN1 = (size_t*) malloc(nranks * sizeof(size_t));  check_malloc(AllN1, __LINE__, __FILE__);
-    size_t *AllN2 = (size_t*) malloc(nranks * sizeof(size_t));  check_malloc(AllN2, __LINE__, __FILE__);
-    size_t *AllNM = (size_t*) malloc(nranks * sizeof(size_t));  check_malloc(AllNM, __LINE__, __FILE__);
+    size_t *AllN1 = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllN1, __LINE__, __FILE__);
+    size_t *AllN2 = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllN2, __LINE__, __FILE__);
+    size_t *AllNM = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllNM, __LINE__, __FILE__);
 
     check_mpi(MPI_Allgather(&rN1, 1, MPI_UNSIGNED_LONG_LONG, AllN1, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allgather(&rN2, 1, MPI_UNSIGNED_LONG_LONG, AllN2, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -408,7 +610,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
 
         // Alloc memory for raw BED data
         const size_t rawdata_n = size_t(MLi) * size_t(snpLenByt) * sizeof(char);
-        char* rawdata = (char*) malloc(rawdata_n);  check_malloc(rawdata, __LINE__, __FILE__);
+        char* rawdata = (char*) _mm_malloc(rawdata_n, 64);  check_malloc(rawdata, __LINE__, __FILE__);
 
         // Gather sizes to determine common number of reads
         size_t rawdata_n_max = 0;
@@ -427,12 +629,12 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
 
         // Alloc memory for sparse representation
         size_t *N1S, *N1L, *N2S, *N2L, *NMS, *NML;
-        N1S = (size_t*) malloc(size_t(MLi) * sizeof(size_t));  check_malloc(N1S, __LINE__, __FILE__);
-        N1L = (size_t*) malloc(size_t(MLi) * sizeof(size_t));  check_malloc(N1L, __LINE__, __FILE__);
-        N2S = (size_t*) malloc(size_t(MLi) * sizeof(size_t));  check_malloc(N2S, __LINE__, __FILE__);
-        N2L = (size_t*) malloc(size_t(MLi) * sizeof(size_t));  check_malloc(N2L, __LINE__, __FILE__);
-        NMS = (size_t*) malloc(size_t(MLi) * sizeof(size_t));  check_malloc(NMS, __LINE__, __FILE__);
-        NML = (size_t*) malloc(size_t(MLi) * sizeof(size_t));  check_malloc(NML, __LINE__, __FILE__);
+        N1S = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
+        N1L = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
+        N2S = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
+        N2L = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
+        NMS = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
+        NML = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
 
         size_t N1 = 0, N2 = 0, NM = 0;
         data.sparse_data_get_sizes_from_raw(rawdata, uint(MLi), snpLenByt, N1, N2, NM);
@@ -440,9 +642,9 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
 
         // Alloc and build sparse structure
         uint *I1, *I2, *IM;
-        I1 = (uint*) malloc(N1 * sizeof(uint));  check_malloc(I1, __LINE__, __FILE__);
-        I2 = (uint*) malloc(N2 * sizeof(uint));  check_malloc(I2, __LINE__, __FILE__);
-        IM = (uint*) malloc(NM * sizeof(uint));  check_malloc(IM, __LINE__, __FILE__);
+        I1 = (uint*) _mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
+        I2 = (uint*) _mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
+        IM = (uint*) _mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
 
         // To check that each element is properly set
         //for (int i=0; i<N1; i++) I1[i] = UINT_MAX;
@@ -480,7 +682,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         check_mpi(MPI_Allreduce(&NM, &NMmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
         int    MLimax = 0;
         check_mpi(MPI_Allreduce(&MLi, &MLimax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
-        if (rank == 0) printf("INFO   : N1max = %lu, N2max = %lu, NMmax = %lu, MLimax = %lu\n", N1max, N2max, NMmax, MLimax);
+        if (rank == 0) printf("INFO   : N1max = %lu, N2max = %lu, NMmax = %lu, MLimax = %d\n", N1max, N2max, NMmax, MLimax);
         
         int NREADS1   = check_int_overflow(size_t(ceil(double(N1max)/double(INT_MAX/2))),  __LINE__, __FILE__);
         int NREADS2   = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))),  __LINE__, __FILE__);
@@ -510,19 +712,19 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, ssmfh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, NMS);
 
         // Free allocated memory
-        free(rawdata);
-        free(N1S); free(N1L); free(I1);
-        free(N2S); free(N2L); free(I2);
-        free(NMS); free(NML); free(IM);
+        _mm_free(rawdata);
+        _mm_free(N1S); _mm_free(N1L); _mm_free(I1);
+        _mm_free(N2S); _mm_free(N2L); _mm_free(I2);
+        _mm_free(NMS); _mm_free(NML); _mm_free(IM);
 
         tN1 += N1;
         tN2 += N2;
         tNM += NM;
     }
 
-    free(AllN1);
-    free(AllN2);
-    free(AllNM);
+    _mm_free(AllN1);
+    _mm_free(AllN2);
+    _mm_free(AllNM);
 
     // Sync
     MPI_Barrier(MPI_COMM_WORLD);    
@@ -569,7 +771,7 @@ size_t get_file_size(const std::string& filename) {
 
 
 
-void mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax) {
+void BayesRRm::mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax) {
 
     if (numBlocks > 0) {
 
@@ -624,12 +826,11 @@ void BayesRRm::init_from_scratch() {
 }
 
 
-void BayesRRm::init_from_restart(const int K, const uint  Mtot, const uint Ntot,
+void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot,
                                  const int* MrankS, const int* MrankL) {
     
-    data.read_mcmc_output_csv_file(opt.mcmcOut, opt.save, K,
-                                   sigmaG, sigmaE, pi,
-                                   iteration_restart);
+    data.read_mcmc_output_csv_file(opt.mcmcOut, opt.save, K, sigmaG, sigmaE, mu, pi, iteration_restart);
+
     MPI_Barrier(MPI_COMM_WORLD);
     
 
@@ -644,9 +845,15 @@ void BayesRRm::init_from_restart(const int K, const uint  Mtot, const uint Ntot,
     data.read_mcmc_output_eps_file(opt.mcmcOut, Ntot, iteration_restart,
                                    epsilon_restart);
     
-    data.read_mcmc_output_mrk_file(opt.mcmcOut, MrankL, iteration_restart,
+    data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_restart,
                                    markerI_restart);
 
+    if (opt.covariates) {
+        data.read_mcmc_output_gam_file(opt.mcmcOut, data.X.cols(), iteration_restart,
+                                       gamma_restart);
+        data.read_mcmc_output_idx_file(opt.mcmcOut, "xiv", (uint)data.X.cols(), iteration_restart,
+                                       xI_restart);
+    }
 
     // Adjust starting iteration number.
     iteration_start = iteration_restart + 1;
@@ -660,6 +867,11 @@ void BayesRRm::init_from_restart(const int K, const uint  Mtot, const uint Ntot,
 //-------------
 int BayesRRm::runMpiGibbs() {
 
+#ifdef _OPENMP
+#warning "using OpenMP"
+#endif
+
+
     char   buff[LENBUF]; 
     int    nranks, rank, name_len, result;
     double dalloc = 0.0;
@@ -667,7 +879,7 @@ int BayesRRm::runMpiGibbs() {
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File   outfh, betfh, epsfh, cpnfh, acufh, mrkfh;
+    MPI_File   outfh, betfh, epsfh, gamfh, cpnfh, acufh, mrkfh, xivfh;
     MPI_Status status;
     MPI_Info   info;
     MPI_Offset offset, betoff, cpnoff, epsoff;
@@ -694,7 +906,7 @@ int BayesRRm::runMpiGibbs() {
     int MrankS[nranks], MrankL[nranks], lmin = 1E9, lmax = 0;
     mpi_assign_blocks_to_tasks(data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot, nranks, rank, MrankS, MrankL, lmin, lmax);
 
-    int M = MrankL[rank];
+    uint M = MrankL[rank];
     printf("INFO   : rank %4d will handle a block of %6d markers starting at %d\n", rank, MrankL[rank], MrankS[rank]);
 
 
@@ -725,7 +937,7 @@ int BayesRRm::runMpiGibbs() {
     typedef Matrix<bool, Dynamic, 1> VectorXb;
     VectorXb            adaV(M);   //daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0
 
-    //marion : for annotation code
+    //marion : for annotation code
     /*
     sigmaGG = VectorXd(groupCount); 	//vector with sigmaG (variance) for each annotation
     betasqnG = VectorXd(groupCount);	//vector with sum of beta squared for each annotation
@@ -751,13 +963,16 @@ int BayesRRm::runMpiGibbs() {
 
     // Invariant initializations (from scratch / from restart)
     // -------------------------------------------------------
+    string lstfp = opt.mcmcOut + ".lst";
     string outfp = opt.mcmcOut + ".csv";
     string betfp = opt.mcmcOut + ".bet";
-    string epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
     string cpnfp = opt.mcmcOut + ".cpn";
     string acufp = opt.mcmcOut + ".acu";
     string rngfp = opt.mcmcOut + ".rng." + std::to_string(rank);
     string mrkfp = opt.mcmcOut + ".mrk." + std::to_string(rank);
+    string xivfp = opt.mcmcOut + ".xiv." + std::to_string(rank);
+    string epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
+    string gamfp = opt.mcmcOut + ".gam." + std::to_string(rank);
 
     priorPi.resize(K);
     priorPi.setZero();
@@ -777,6 +992,10 @@ int BayesRRm::runMpiGibbs() {
     priorPi.segment(1,km1) = priorPi[0] * cVa.segment(1,km1).array() / cVa.segment(1,km1).sum();
     pi                     = priorPi;
 
+    std::vector<unsigned int> xI(data.X.cols());
+    std::iota(xI.begin(), xI.end(), 0);
+    xI_restart.resize(data.X.cols());
+
     Beta.resize(M);
     Beta.setZero();
 
@@ -786,43 +1005,69 @@ int BayesRRm::runMpiGibbs() {
     epsilon_restart.resize(Ntot - data.numNAs);
     epsilon_restart.setZero();
 
+    gamma_restart.resize(data.X.cols());
+    gamma_restart.setZero();
+
     markerI_restart.resize(M);
     std::fill(markerI_restart.begin(), markerI_restart.end(), 0);
 
     sigmaE = 0.0;
 
+
     // In case of a restart, we first read the latest dumps
     // ----------------------------------------------------
     if (opt.restart) {
 
-        init_from_restart(K, Mtot, Ntot, MrankS, MrankL);
+        init_from_restart(K, M, Mtot, Ntot, MrankS, MrankL);
 
         if (rank == 0)
             data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_restart, iteration_start);
 
-        // Load dumped PRNG state
-        //printf("RESTART: rank %3d reading PRNG state from file %s!\n", rank, rngfp.c_str());
         dist.read_rng_state_from_file(rngfp);
 
         // Rename output files so that we do not erase from failed job!
-        //if (rank == 0)  printf("RESTART: renaming output files to %s\n", (opt.mcmcOut+"_rs").c_str());
-        opt.mcmcOut = opt.mcmcOut + "_rs";
+        //EO: add a function, to update both Nam and Dir!
+        opt.mcmcOutNam += "_rs";
+        opt.mcmcOut = opt.mcmcOutDir + "/" + opt.mcmcOutNam;
+        lstfp = opt.mcmcOut + ".lst";
         outfp = opt.mcmcOut + ".csv";
         betfp = opt.mcmcOut + ".bet";
-        epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
         cpnfp = opt.mcmcOut + ".cpn";
         acufp = opt.mcmcOut + ".acu";
         rngfp = opt.mcmcOut + ".rng." + std::to_string(rank);
+        mrkfp = opt.mcmcOut + ".mrk." + std::to_string(rank);
+        xivfp = opt.mcmcOut + ".xiv." + std::to_string(rank);
+        epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
+        gamfp = opt.mcmcOut + ".gam." + std::to_string(rank);
 
-        //exit(0);
-    } else {        
+    } else { 
+
         init_from_scratch();
         
-        // Init task's prng
         dist.reset_rng((uint)(opt.seed + rank*1000));
 
         sigmaG = dist.beta_rng(1.0, 1.0);
     }
+
+
+    // Build a list of the files to tar
+    // --------------------------------
+    MPI_Barrier(MPI_COMM_WORLD);
+    ofstream listFile;
+    listFile.open(lstfp);
+    listFile << outfp << "\n";
+    listFile << betfp << "\n";
+    listFile << cpnfp << "\n";
+    listFile << acufp << "\n";
+    for (int i=0; i<nranks; i++) {
+        listFile << opt.mcmcOut + ".rng." + std::to_string(i) << "\n";
+        listFile << opt.mcmcOut + ".mrk." + std::to_string(i) << "\n";
+        listFile << opt.mcmcOut + ".xiv." + std::to_string(i) << "\n";
+        listFile << opt.mcmcOut + ".eps." + std::to_string(i) << "\n";
+        listFile << opt.mcmcOut + ".gam." + std::to_string(i) << "\n";
+    }
+    listFile.close();
+    MPI_Barrier(MPI_COMM_WORLD);
 
 
     // Delete old files (fp appended with "_rs" in case of restart, so that
@@ -836,6 +1081,9 @@ int BayesRRm::runMpiGibbs() {
     }
     MPI_File_delete(epsfp.c_str(), MPI_INFO_NULL);
     MPI_File_delete(mrkfp.c_str(), MPI_INFO_NULL);
+    MPI_File_delete(xivfp.c_str(), MPI_INFO_NULL);
+    MPI_File_delete(gamfp.c_str(), MPI_INFO_NULL);
+
     MPI_Barrier(MPI_COMM_WORLD);
 
     check_mpi(MPI_File_open(MPI_COMM_WORLD, outfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &outfh), __LINE__, __FILE__);
@@ -845,6 +1093,8 @@ int BayesRRm::runMpiGibbs() {
 
     check_mpi(MPI_File_open(MPI_COMM_SELF,  epsfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &epsfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_SELF,  mrkfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &mrkfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_SELF,  xivfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xivfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_SELF,  gamfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &gamfh), __LINE__, __FILE__);
 
 
     // First element of the .bet, .cpn and .acu files is the
@@ -863,12 +1113,12 @@ int BayesRRm::runMpiGibbs() {
     // Read the data (from sparse representation by default)
     // -----------------------------------------------------
     size_t *N1S, *N1L,  *N2S, *N2L,  *NMS, *NML;
-    N1S = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N1S, __LINE__, __FILE__);
-    N1L = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N1L, __LINE__, __FILE__);
-    N2S = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N2S, __LINE__, __FILE__);
-    N2L = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N2L, __LINE__, __FILE__);
-    NMS = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(NMS, __LINE__, __FILE__);
-    NML = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(NML, __LINE__, __FILE__);
+    N1S = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
+    N1L = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
+    N2S = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
+    N2L = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
+    NMS = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
+    NML = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
     dalloc += 6.0 * double(Mtot) * sizeof(size_t) / 1E9;
 
     uint *I1, *I2, *IM;
@@ -915,8 +1165,8 @@ int BayesRRm::runMpiGibbs() {
     double dN   = (double) Ntot;
     double dNm1 = (double)(Ntot - 1);
     double *mave, *mstd;
-    mave = (double*)malloc(size_t(M) * sizeof(double));  check_malloc(mave, __LINE__, __FILE__);
-    mstd = (double*)malloc(size_t(M) * sizeof(double));  check_malloc(mstd, __LINE__, __FILE__);
+    mave = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mave, __LINE__, __FILE__);
+    mstd = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
     dalloc += 2 * size_t(M) * sizeof(double) / 1E9;
 
     double tmp0, tmp1, tmp2;
@@ -926,7 +1176,7 @@ int BayesRRm::runMpiGibbs() {
         tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
         tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
         mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
-        //printf("marker %6d mean %20.15f, std = %20.15f (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], tmp1, tmp2, tmp0);
+        //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -948,13 +1198,13 @@ int BayesRRm::runMpiGibbs() {
     //double *y, *epsilon, *tmpEps, *previt_eps, *deltaEps, *dEpsSum, *deltaSum;
     double *y, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum;
     const size_t NDB = size_t(Ntot) * sizeof(double);
-    y          = (double*)malloc(NDB);  check_malloc(y,          __LINE__, __FILE__);
-    epsilon    = (double*)malloc(NDB);  check_malloc(epsilon,    __LINE__, __FILE__);
-    tmpEps     = (double*)malloc(NDB);  check_malloc(tmpEps,     __LINE__, __FILE__);
+    y          = (double*)_mm_malloc(NDB, 64);  check_malloc(y,          __LINE__, __FILE__);
+    epsilon    = (double*)_mm_malloc(NDB, 64);  check_malloc(epsilon,    __LINE__, __FILE__);
+    tmpEps     = (double*)_mm_malloc(NDB, 64);  check_malloc(tmpEps,     __LINE__, __FILE__);
     //previt_eps = (double*)malloc(NDB);  check_malloc(previt_eps, __LINE__, __FILE__);
-    deltaEps   = (double*)malloc(NDB);  check_malloc(deltaEps,   __LINE__, __FILE__);
-    dEpsSum    = (double*)malloc(NDB);  check_malloc(dEpsSum,    __LINE__, __FILE__);
-    deltaSum   = (double*)malloc(NDB);  check_malloc(deltaSum,   __LINE__, __FILE__);
+    deltaEps   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaEps,   __LINE__, __FILE__);
+    dEpsSum    = (double*)_mm_malloc(NDB, 64);  check_malloc(dEpsSum,    __LINE__, __FILE__);
+    deltaSum   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaSum,   __LINE__, __FILE__);
     dalloc += NDB * 7 / 1E9;
 
     double totalloc = 0.0;
@@ -962,32 +1212,22 @@ int BayesRRm::runMpiGibbs() {
     if (rank == 0) printf("INFO   : overall allocation %.3f GB\n", totalloc);
 
 
-    //marion : init prior for each annotation
-    /*
-    m_cVa[0] = 0;
-    m_cVaI[0] = 0;
+    set_vector_f64(dEpsSum, 0.0, Ntot);
 
-    for(int i=0; i < groupCount; i++){
-    	m_priorPi.row(i)(0)=0.5;
-        for(int k=1;k<K;k++){
-        	m_priorPi.row(i)(k)=0.5/K;
-        }
-    }
-
-    m_y_tilde.setZero();
-    m_beta.setZero();
-
-    for(int i=0; i<groupCount;i++)
-       m_sigmaGG[i] = m_dist.beta_rng(1,1);
-
-    m_pi = m_priorPi;
-    */
-
-    for (int i=0; i<Ntot; ++i) dEpsSum[i] = 0.0;
-
+    // Set gamma and xI, following a restart or not
     if (opt.covariates) {
+        if (rank == 0)
+            printf("INFO   : using covariate file: %s\n", opt.covariatesFile.c_str());
+
     	gamma = VectorXd(data.X.cols()); 
     	gamma.setZero();
+
+        if (opt.restart) {
+            for (int i=0; i<data.X.cols(); i++) {
+                gamma[i] = gamma_restart[i];
+                xI[i]    = xI_restart[i];
+            }
+        }
     }
     
 
@@ -1004,6 +1244,7 @@ int BayesRRm::runMpiGibbs() {
         for (int i=0; i<Ntot; ++i)  epsilon[i] = y[i];
         sigmaE = 0.0;
         for (int i=0; i<Ntot; ++i)  sigmaE += epsilon[i] * epsilon[i];
+        //printf("<sigmaE = %15.13f\n", sigmaE);
         sigmaE = sigmaE / dN * 0.5;        
     }
     //printf("sigmaE = %15.13f\n", sigmaE);
@@ -1021,8 +1262,7 @@ int BayesRRm::runMpiGibbs() {
     size_t   markoff;
     int      marker, left;
     VectorXd logL(K);
-    std::vector<unsigned int> xI(data.X.cols());
-    std::iota(xI.begin(), xI.end(), 0);
+
     sigmaF = s02F;
 
     // A counter on previously saved thinned iterations
@@ -1039,6 +1279,9 @@ int BayesRRm::runMpiGibbs() {
     // Main iteration loop
     // -------------------
     //bool replay_it = false;
+
+    int count__sum_vectors_f64_v2 = 0;
+    
 
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
 
@@ -1071,6 +1314,7 @@ int BayesRRm::runMpiGibbs() {
 
         double epssum  = 0.0;
         for (int i=0; i<Ntot; ++i) epssum += epsilon[i];
+        //printf("epssum = %20.15f with Ntot=%d elements\n", epssum, Ntot);
 
         // update mu
         mu = dist.norm_rng(epssum / dN, sigmaE / dN);
@@ -1078,7 +1322,6 @@ int BayesRRm::runMpiGibbs() {
 
         // We substract again now epsilon =Y-mu-X*beta
         for (int i=0; i<Ntot; ++i) epsilon[i] -= mu;
-
 
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
@@ -1135,39 +1378,35 @@ int BayesRRm::runMpiGibbs() {
                         denom(i-1) = dNm1 + sigE_G * cVaI(i);
                         //printf("it %d, rank %d, m %d: denom[%d] = %20.15f\n", iteration, rank, marker, i-1, denom(i-1));
                     }
+                    //cout << "denom = " << endl << denom << endl;
                     
                     num = sparse_dotprod(epsilon,
                                          I1, N1S[marker], N1L[marker],
                                          I2, N2S[marker], N2L[marker],
                                          IM, NMS[marker], NML[marker],
                                          mave[marker],    mstd[marker], Ntot, marker);
+                    //cout << "num = " << num << endl;
+
+                    //PROFILE
+                    //continue;
                     
                     num += beta * double(Ntot - 1);
                     //printf("it %d, rank %d, mark %d: num = %20.15f, %20.15f, %20.15f\n", iteration, rank, marker, num, mave[marker], mstd[marker]);
                     
                     //muk for the other components is computed according to equations
                     muk.segment(1, km1) = num / denom.array();           
+                    //cout << "muk = " << endl << muk << endl; 
                     
-
-                    //marion : update the logL for each component of corresponding annotation
-                    /*
-                      VectorXd logL(K);
-                      const double logLScale = sigmaG_process / m_sigmaE * NM1;
-                      logL = m_pi.row(m_data->G(marker->i)).array().log();
-                      // First component probabilities remain unchanged
-                      logL.segment(1, km1) = logL.segment(1, km1).array()
-                      - 0.5 * ((logLScale * m_cVa.segment(1, km1).array() + 1).array().log())
-                      + 0.5 * (m_muk.segment(1, km1).array() * num) / m_sigmaE;
-                    */
-
                     //first component probabilities remain unchanged
                     logL = pi.array().log();
-                    
+                    //cout << "logL = " << endl << logL << endl;
+
                     // Update the log likelihood for each component
                     logL.segment(1,km1) = logL.segment(1, km1).array()
                         - 0.5d * (sigG_E * dNm1 * cVa.segment(1,km1).array() + 1.0d).array().log() 
                         + muk.segment(1,km1).array() * num * i_2sigE;
-                    
+                    //cout << "logL = " << endl << logL << endl;
+
                     p = dist.unif_rng();
                     //printf("%d/%d/%d  p = %15.10f\n", iteration, rank, j, p);
                     
@@ -1177,35 +1416,8 @@ int BayesRRm::runMpiGibbs() {
                     } else{
                         acum = 1.0 / ((logL.array()-logL[0]).exp().sum());
                     }
-                    //printf("acum = %15.10f\n", acum);
-                    
-                    
-                    //marion : store marker acum
-                    /*
-                    for (int k = 0; k < K; k++) {
-                        if (p <= acum) {
-                            //if zeroth component
-                            if (k == 0) {
-                                beta(marker->i) = 0;
-                            } else {
-                                beta(marker->i) = dist.norm_rng(m_muk[k], sigmaE/denom[k-1]);
-                                betasqnG(data->G(marker->i))+= pow(beta(marker->i),2);
-                            }
-                            v.row(data->G(marker->i))(k)+=1.0;
-                            components[marker->i] = k;
-                            break;
-                        } else {
-                            //if too big or too small
-                            if (((logL.segment(1, km1).array() - logL[k+1]).abs().array() > 700).any()) {
-                                acum += 0;
-                            } else {
-                                acum += 1.0 / ((logL.array() - logL[k+1]).exp().sum());
-                            }
-                        }
-                    }
-                    */
-                    
-                 
+                    //printf("acum = %15.10f, p = %15.10f\n", acum, p);
+
                     //TODO Store marker acum for later dump to file
                     Acum(marker) = acum;
 
@@ -1215,7 +1427,7 @@ int BayesRRm::runMpiGibbs() {
                                 Beta(marker) = 0.0;
                             } else {
                                 Beta(marker) = dist.norm_rng(muk[k], sigmaE/denom[k-1]);
-                                //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with p=%15.10f <= acum=%15.10f\n", iteration, rank, marker, k, muk[k], p, acum);
+                                //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with p=%15.10f <= acum = %15.10f, denom = %15.10f, sigmaE = %15.10f: beta = %15.10f\n", iteration, rank, marker, k, muk[k], p, acum, denom[k-1], sigmaE, Beta(marker));
                             }
                             v[k] += 1.0d;
                             components[marker] = k;
@@ -1237,15 +1449,17 @@ int BayesRRm::runMpiGibbs() {
                     Beta(marker) = 0.0;
                     Acum(marker) = 1.0; // probability of beta being 0 equals 1.0
                 }
-
-                //printf("acum = %15.10f\n", acum);
+                //printf("After acum = %15.10f\n", acum);
                 
+
                 betaOld   = beta;
                 beta      = Beta(marker);
                 deltaBeta = betaOld - beta;
-                
+                //printf("deltaBeta = %15.10f\n", deltaBeta);
+
                 // Compute delta epsilon
                 if (deltaBeta != 0.0) {
+
                     sparse_scaadd(deltaEps, deltaBeta, 
                                   I1, N1S[marker], N1L[marker], 
                                   I2, N2S[marker], N2L[marker], 
@@ -1253,18 +1467,17 @@ int BayesRRm::runMpiGibbs() {
                                   mave[marker], mstd[marker], Ntot);
                     
                     // Update local sum of delta epsilon
-                    for (int i=0; i<Ntot; ++i)
-                        dEpsSum[i] += deltaEps[i];
+                    sum_vectors_f64(dEpsSum, deltaEps, Ntot);
                 }
-            } 
+            }
 
             // Make the contribution of tasks beyond their last marker nill
             // ------------------------------------------------------------
             else {
                 //cout << "rank " << rank << " with M=" << M << " waiting for " << lmax << endl;
                 deltaBeta = 0.0;
-                for (int i=0; i<Ntot; ++i)
-                    deltaEps[i] = 0.0;
+                
+                set_vector_f64(deltaEps, 0.0, Ntot);
             }
 
             // Check whether we have a non-zero beta somewhere
@@ -1278,22 +1491,27 @@ int BayesRRm::runMpiGibbs() {
             } 
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
             
-            //if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == M-1) && cumSumDeltaBetas != 0.0) {
             if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
 
                 // Update local copy of epsilon
                 if (nranks > 1) {
                     check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-                    for (int i=0; i<Ntot; ++i) epsilon[i] = tmpEps[i] + deltaSum[i];
+                    sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
                 } else {
-                    for (int i=0; i<Ntot; ++i) epsilon[i] = tmpEps[i] + dEpsSum[i];
+                    count__sum_vectors_f64_v2 += 1;
+                    //double t1 = -mysecond();
+                    //for (int ii=0; ii<100; ii++) {
+                        sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
+                        //}
+                        //t1 += mysecond();
+                        //printf("kernel 1 BW = %g\n", double(Ntot) * 3.0 * sizeof(double) / 1024. / 1024. / (t1 / 100.0));
                 }
 
                 // Store epsilon state at last synchronization
-                for (int i=0; i<Ntot; ++i) tmpEps[i] = epsilon[i];                    
-                
+                copy_vector_f64(tmpEps, epsilon, Ntot);
+
                 // Reset local sum of delta epsilon
-                for (int i=0; i<Ntot; ++i) dEpsSum[i] = 0.0;
+                set_vector_f64(dEpsSum, 0.0, Ntot);
                 
                 // Reset cumulated sum of delta betas
                 cumSumDeltaBetas = 0.0;
@@ -1304,6 +1522,10 @@ int BayesRRm::runMpiGibbs() {
             }
 
         } // END PROCESSING OF ALL MARKERS
+
+        //PROFILE
+        //continue;
+
 
         beta_squaredNorm = Beta.squaredNorm();
         //printf("rank %d it %d  beta_squaredNorm = %15.10f\n", rank, iteration, beta_squaredNorm);
@@ -1323,15 +1545,7 @@ int BayesRRm::runMpiGibbs() {
         // ------------------------
         m0      = double(Mtot) - v[0];
         sigmaG  = dist.inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0));
-
-        // marion : update sigmaGG
-        /*
- 	 	for(int i = 0; i < nGroups; i++){
-            m_m0 = m_v.row(i).sum() - m_v.row(i)(0);
-            m_sigmaGG[i] = m_dist.inv_scaled_chisq_rng(m_v0G + m_m0, (m_betasqnG(i) * m_m0 + m_v0G * m_s02G) / (m_v0G + m_m0));
-            m_pi.row(i) = m_dist.dirichilet_rng(m_v.row(i).array() + 1.0);
-        }
-        */
+        //printf("sigmaG = %15.10f\n", sigmaG);
 
 
         // Check iteration
@@ -1367,45 +1581,56 @@ int BayesRRm::runMpiGibbs() {
 
         // For the fixed effects
         // ---------------------
+        uint gamma_length = 0;
+ 
         if (opt.covariates) {
 
-            if (rank == 0) {
+            std::shuffle(xI.begin(), xI.end(), dist.rng);            
 
-                std::shuffle(xI.begin(), xI.end(), dist.rng);
-                double gamma_old, num_f, denom_f;
-                double sigE_sigF = sigmaE / sigmaF;
-                //cout << "data.X.cols " << data.X.cols() << endl;
-                for (int i=0; i<data.X.cols(); i++) {
-                    gamma_old = gamma(xI[i]);
-                    num_f     = 0.0;
-                    denom_f   = 0.0;
-                    
-                    for (int k=0; k<Ntot; k++)
-                        num_f += data.X(k, xI[i]) * (epsilon[k] + gamma_old * data.X(k, xI[i]));
-                    denom_f = dNm1 + sigE_sigF;
-                    gamma(i) = dist.norm_rng(num_f/denom_f, sigmaE/denom_f);
-                    
-                    for (int k = 0; k<Ntot ; k++) {
-                        epsilon[k] = epsilon[k] + (gamma_old - gamma(xI[i])) * data.X(k, xI[i]);
-                        //cout << "adding " << (gamma_old - gamma(xI[i])) * data.X(k, xI[i]) << endl;
-                    }
+            double gamma_old, num_f, denom_f;
+            double sigE_sigF = sigmaE / sigmaF;
+
+            gamma_length = data.X.cols();
+            
+            for (int i=0; i<gamma_length; i++) {
+
+                gamma_old = gamma(xI[i]);
+                num_f     = 0.0;
+                denom_f   = 0.0;
+                
+                for (int k=0; k<Ntot; k++) {
+                    num_f += data.X(k, xI[i]) * (epsilon[k] + gamma_old * data.X(k, xI[i]));
                 }
-                //the next line should be uncommented if we want to use ridge for the other covariates.
-                //sigmaF = inv_scaled_chisq_rng(0.001 + F, (gamma.squaredNorm() + 0.001)/(0.001+F));
-                sigmaF = s02F;
+
+                denom_f      = dNm1 + sigE_sigF;
+                gamma(xI[i]) = dist.norm_rng(num_f/denom_f, sigmaE/denom_f);
+                
+                for (int k = 0; k<Ntot ; k++) {
+                    epsilon[k] = epsilon[k] + (gamma_old - gamma(xI[i])) * data.X(k, xI[i]);
+                    //cout << "adding " << (gamma_old - gamma(xI[i])) * data.X(k, xI[i]) << endl;
+                }
             }
+            //the next line should be uncommented if we want to use ridge for the other covariates.
+            //sigmaF = inv_scaled_chisq_rng(0.001 + F, (gamma.squaredNorm() + 0.001)/(0.001+F));
+            sigmaF = s02F;
         }
 
         MPI_Barrier(MPI_COMM_WORLD);
 
         e_sqn = 0.0d;
         for (int i=0; i<Ntot; ++i) e_sqn += epsilon[i] * epsilon[i];
+        //printf("e_sqn = %15.10f\n", e_sqn);
 
         sigmaE  = dist.inv_scaled_chisq_rng(v0E+dN, (e_sqn + v0E*s02E)/(v0E+dN));
+        //printf("sigmaE = %15.10f\n", sigmaE);
+
+        double end_it = MPI_Wtime();
+        //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
+
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
         if (rank%10==0)
-            printf("RESULT : it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %d\n", iteration, rank, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
+            printf("RESULT : it %4d, rank %4d: time = %9.3f s, sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, rank, end_it-start_it, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
         fflush(stdout);
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
@@ -1421,7 +1646,7 @@ int BayesRRm::runMpiGibbs() {
         // ------------------
         if (iteration%opt.thin == 0) {
             
-            left = snprintf(buff, LENBUF, "%5d, %4d, %20.15f, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, rank, mu, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), int(m0), pi.size());
+            left = snprintf(buff, LENBUF, "%5d, %4d, %20.15f, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, rank, mu, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), int(m0), int(pi.size()));
             assert(left > 0);
 
             for (int ii=0; ii<pi.size(); ++ii) {
@@ -1485,14 +1710,26 @@ int BayesRRm::runMpiGibbs() {
             epsoff  = size_t(0);
             check_mpi(MPI_File_write_at(epsfh, epsoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             check_mpi(MPI_File_write_at(mrkfh, epsoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-
+            if (opt.covariates) {
+                check_mpi(MPI_File_write_at(gamfh, epsoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(xivfh, epsoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            }
             epsoff += sizeof(uint);
-            check_mpi(MPI_File_write_at(epsfh, epsoff, &Ntot,      1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-            check_mpi(MPI_File_write_at(mrkfh, epsoff, &M,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-
+            check_mpi(MPI_File_write_at(epsfh, epsoff, &Ntot,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(mrkfh, epsoff, &M,            1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            if (opt.covariates) {
+                check_mpi(MPI_File_write_at(gamfh, epsoff, &gamma_length, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(xivfh, epsoff, &gamma_length, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            }
             epsoff = sizeof(uint) + sizeof(uint);
             check_mpi(MPI_File_write_at(epsfh, epsoff, epsilon,        Ntot,           MPI_DOUBLE, &status), __LINE__, __FILE__);
             check_mpi(MPI_File_write_at(mrkfh, epsoff, markerI.data(), markerI.size(), MPI_INT,    &status), __LINE__, __FILE__);
+            if (opt.covariates) {
+                check_mpi(MPI_File_write_at(gamfh, epsoff, gamma.data(),   gamma_length,  MPI_DOUBLE, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(xivfh, epsoff, xI.data(),      gamma_length,  MPI_INT,    &status), __LINE__, __FILE__);
+            }
+
+
             //if (iteration == 0) {
             //    printf("rank %d dumping eps: %15.10f %15.10f\n", rank, epsilon[0], epsilon[Ntot-1]);
             //}
@@ -1500,13 +1737,42 @@ int BayesRRm::runMpiGibbs() {
             //    the corresponding values from the .eps file
             //    Print only first and last value handled by each task
             //printf("%4d/%4d epsilon[%5d] = %15.10f, epsilon[%5d] = %15.10f\n", iteration, rank, IrankS[rank], epsilon[IrankS[rank]], IrankS[rank]+IrankL[rank]-1, epsilon[IrankS[rank]+IrankL[rank]-1]);
+
+#if 1
+            //EO system call to create a tarball of the dump
+            //TODO: quite rough, make it more selective...
+            //----------------------------------------------
+            MPI_Barrier(MPI_COMM_WORLD);
+            if (rank == 0) {
+                time_t now = time(0);
+                tm *   ltm = localtime(&now);
+                int    n   = 0;
+                char targz[LENBUF];
+
+                n=sprintf(targz, "dump_%s_%05d__%4d-%02d-%02d_%02d-%02d-%02d.tgz",
+                          opt.mcmcOutNam.c_str(), iteration,
+                          1900 + ltm->tm_year, 1 + ltm->tm_mon, ltm->tm_mday,
+                          ltm->tm_hour, ltm->tm_min, ltm->tm_sec);
+                assert(n > 0);
+
+                printf("INFO   : will create tarball %s in %s with file listed in %s.\n",
+                       targz, opt.mcmcOutDir.c_str(), lstfp.c_str());
+                //std::system(("ls " + opt.mcmcOut + ".*").c_str());
+                string cmd = "tar -czf " + opt.mcmcOutDir + "/tarballs/" + targz + " -T " + lstfp;
+                //cout << "cmd >>" << cmd << "<<" << endl;
+                std::system(cmd.c_str());
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
+#endif
         }
 
-        double end_it = MPI_Wtime();
+        //double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
 
         MPI_Barrier(MPI_COMM_WORLD);
     }
+
+    //printf(">.CHECK.< int count__sum_vectors_f64_v2 = %d\n", count__sum_vectors_f64_v2);
 
 
     // Close output files
@@ -1516,27 +1782,29 @@ int BayesRRm::runMpiGibbs() {
     check_mpi(MPI_File_close(&cpnfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&acufh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&mrkfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&xivfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&gamfh), __LINE__, __FILE__);
 
 
     // Release memory
-    free(y);
-    free(epsilon);
-    free(tmpEps);
+    _mm_free(y);
+    _mm_free(epsilon);
+    _mm_free(tmpEps);
     //free(previt_eps);
-    free(deltaEps);
-    free(dEpsSum);
-    free(deltaSum);
-    free(mave);
-    free(mstd);
-    free(N1S);
-    free(N1L);
-    free(I1);
-    free(N2S); 
-    free(N2L);
-    free(I2);
-    free(NMS); 
-    free(NML);
-    free(IM);
+    _mm_free(deltaEps);
+    _mm_free(dEpsSum);
+    _mm_free(deltaSum);
+    _mm_free(mave);
+    _mm_free(mstd);
+    _mm_free(N1S);
+    _mm_free(N1L);
+    _mm_free(I1);
+    _mm_free(N2S); 
+    _mm_free(N2L);
+    _mm_free(I2);
+    _mm_free(NMS); 
+    _mm_free(NML);
+    _mm_free(IM);
 
     // Finalize the MPI environment
     //MPI_Finalize();
@@ -1582,12 +1850,12 @@ int BayesRRm::checkRamUsage() {
 
     // Alloc memory for sparse representation
     size_t *N1S, *N1L,  *N2S, *N2L,  *NMS, *NML;
-    N1S = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N1S, __LINE__, __FILE__);
-    N1L = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N1L, __LINE__, __FILE__);
-    N2S = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N2S, __LINE__, __FILE__);
-    N2L = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(N2L, __LINE__, __FILE__);
-    NMS = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(NMS, __LINE__, __FILE__);
-    NML = (size_t*)malloc(size_t(Mtot) * sizeof(size_t));  check_malloc(NML, __LINE__, __FILE__);
+    N1S = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
+    N1L = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
+    N2S = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
+    N2L = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
+    NMS = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
+    NML = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
     
     MPI_File   slfh;
     MPI_Status status;
@@ -1658,9 +1926,9 @@ int BayesRRm::checkRamUsage() {
             ramnode += GB;
             printf("   - t %3d  n %2d will attempt to alloc %.3f + %.3f + %.3f GB of RAM\n", i, node, n1*sizeof(uint)*1E-9,  n2*sizeof(uint)*1E-9,  nm*sizeof(uint)*1E-9);
             
-            allocs1[i] = (uint*) malloc(n1 * sizeof(uint));  check_malloc(allocs1[i], __LINE__, __FILE__);
-            allocs2[i] = (uint*) malloc(n2 * sizeof(uint));  check_malloc(allocs2[i], __LINE__, __FILE__);
-            allocsm[i] = (uint*) malloc(nm * sizeof(uint));  check_malloc(allocsm[i], __LINE__, __FILE__);
+            allocs1[i] = (uint*)_mm_malloc(n1 * sizeof(uint), 64);  check_malloc(allocs1[i], __LINE__, __FILE__);
+            allocs2[i] = (uint*)_mm_malloc(n2 * sizeof(uint), 64);  check_malloc(allocs2[i], __LINE__, __FILE__);
+            allocsm[i] = (uint*)_mm_malloc(nm * sizeof(uint), 64);  check_malloc(allocsm[i], __LINE__, __FILE__);
             
             printf("   - t %3d  n %2d sm %7d  l %6d markers. Number of 1s: %15lu, 2s: %15lu, ms: %15lu => RAM: %7.3f GB; RAM on node: %7.3f with %d tasks\n", i, node, MrankS[node*tpn + i], MrankL[node*tpn + i], n1, n2, nm, GB, ramnode, tpn);
             
@@ -1669,9 +1937,9 @@ int BayesRRm::checkRamUsage() {
         
         // free memory on the node
         for (int i=0; i<tpn; i++) { 
-            free(allocs1[i]);
-            free(allocs2[i]);
-            free(allocsm[i]);
+            _mm_free(allocs1[i]);
+            _mm_free(allocs2[i]);
+            _mm_free(allocsm[i]);
         }
         
         if (ramnode < min) { min = ramnode; nodemin = node; }
@@ -1689,9 +1957,9 @@ int BayesRRm::checkRamUsage() {
     printf("\n");
     
     // Free previously allocated memory
-    free(N1S); free(N1L);
-    free(N2S); free(N2L);
-    free(NMS); free(NML);
+    _mm_free(N1S); _mm_free(N1L);
+    _mm_free(N2S); _mm_free(N2L);
+    _mm_free(NMS); _mm_free(NML);
     
     return 0;   
 }
@@ -1789,7 +2057,7 @@ void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCoun
     muk     = VectorXd(K);      // mean of k-th component marker effect size
     denom   = VectorXd(K - 1);  // temporal variable for computing the inflation of the effect variance for a given non-zero component
     m0      = 0;                // total number of markers in model
-    v       = VectorXd(K);      // variable storing the component assignment
+    cass    = VectorXd(K);      // variable storing the component assignment
 
     // Mean and residual variables
     mu     = 0.0;   // mean or intercept
@@ -1827,6 +2095,8 @@ void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCoun
     Beta.setZero();
 
     //sample from beta distribution
+    dist.reset_rng((uint)(opt.seed + 0));
+
     sigmaG = dist.beta_rng(1.0, 1.0);
     //printf("First sigmaG = %15.10f\n", sigmaG);
 
@@ -1906,7 +2176,7 @@ int BayesRRm::runGibbs()
         //printf("epssum = %20.15f with Ntot=%d elements\n", epsilon.sum(), N);
         //printf("sigmaE = %20.15f\n", sigmaE);
         mu = dist.norm_rng(epsilon.sum() / (double)N, sigmaE / (double)N); //update mu
-        //printf("it %d, rank %d: mu = %15.10f with dN = %10.1f\n", iteration, 0, mu, double(N));
+        //printf("it %d, rank %d: mu = %15.10f with dNtot = %10.1f\n", iteration, 0, mu, double(N));
 
         //printf("mu = %15.10f\n", mu);
         epsilon = epsilon.array() - mu;// we substract again now epsilon =Y-mu-X*beta
@@ -1919,7 +2189,7 @@ int BayesRRm::runGibbs()
         }
 
         m0 = 0;
-        v.setZero();
+        cass.setZero();
 
         // This for should not be parallelized, resulting chain would not be ergodic, still, some times it may converge to the correct solution
         for (unsigned int j = 0; j < M; j++) {
@@ -2004,7 +2274,7 @@ int BayesRRm::runGibbs()
                         Beta(marker) = dist.norm_rng(muk[k], sigmaE/denom[k-1]);
                         //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with p=%15.10f <= acum=%15.10f\n", iteration, rank, marker, k, muk[k], p, acum);
                     }
-                    v[k] += 1.0d;
+                    cass[k] += 1.0d;
                     components[marker] = k;
                     break;
                 } else {
@@ -2031,6 +2301,7 @@ int BayesRRm::runGibbs()
             } else {
                 epsilon=y_tilde;
             }
+
             /*
             if (beta(marker) != 0.0) {
                 epsilon=y_tilde - beta(marker)*Cx;
@@ -2044,7 +2315,7 @@ int BayesRRm::runGibbs()
         //set no. of markers included in the model
         //cout << "M " << M  << endl;
         //cout << "v[0] " << v[0] << endl;
-        m0 = int(M) - int(v[0]);
+        m0 = int(M) - int(cass[0]);
         //cout << "m0 " << m0 << endl;
 
         //sample sigmaG from inverse gamma
@@ -2058,13 +2329,20 @@ int BayesRRm::runGibbs()
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, epsilonSqNorm, v0E, s02E, N, sigmaE);
 
         //sample hyperparameter pi from dirichlet
-        pi = dist.dirichilet_rng(v.array() + 1.0);
+        pi = dist.dirichilet_rng(cass.array() + 1.0);
         //cout << pi << endl;
 
         if (showDebug)
             printDebugInfo();
 
-        printf("RESULT#: it %4d, rank %4d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq=%15.10f, m0=%10.1f\n", iteration, 0000, v0G+double(m0),(betasqn * double(m0) + v0G*s02G) /(v0G+double(m0)), sigmaG, sigmaE, betasqn, double(m0));
+        //output time taken for each iteration
+        const auto endTime = std::chrono::high_resolution_clock::now();
+        const auto dif = endTime - iterStart;
+        const auto iterationDuration = std::chrono::duration_cast<std::chrono::milliseconds>(dif).count();
+        //std::cout << iterationDuration / double(1000.0) << "s" << std::endl;
+        
+
+        printf("RESULT#: it %4d, rank %4d: time = %9.3f s, sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, 0000, iterationDuration / double(1000.0), v0G+double(m0),(betasqn * double(m0) + v0G*s02G) /(v0G+double(m0)), sigmaG, sigmaE, betasqn, m0);
 
         //write samples
         //if (iteration >= burn_in && iteration % opt.thin == 0) {
@@ -2072,11 +2350,6 @@ int BayesRRm::runGibbs()
         //        writer.write(sample);
         //    }
 
-        //output time taken for each iteration
-        const auto endTime = std::chrono::high_resolution_clock::now();
-        const auto dif = endTime - iterStart;
-        const auto iterationDuration = std::chrono::duration_cast<std::chrono::milliseconds>(dif).count();
-        //std::cout << iterationDuration / double(1000.0) << "s" << std::endl;
 
         //end of iteration
     }

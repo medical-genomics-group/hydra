@@ -98,7 +98,11 @@ public:
     MatrixXd X;              // coefficient matrix for fixed effects
     MatrixXd Z;
     VectorXf D;              // 2pqn
+
     VectorXd y;              // phenotypes
+    MatrixXd phenosData;     // multiple phenotypes
+    MatrixXi phenosNanMasks; // masks for NAs in phenotypes phenos
+    VectorXi phenosNanNum;   // number of NAs in phenotypes phenos
 
     // marion : vector for annotation file and matrix for mS
     VectorXi G; 			 // groups
@@ -146,15 +150,18 @@ public:
 
 #ifdef USE_MPI
 
+    void center_and_scale(double* __restrict__ vec, int* __restrict__ mask, const uint N, const uint nas);
+
     void print_restart_banner(const string mcmcOut, const uint iteration_restart, const uint iteration_start);
 
-
-    void read_mcmc_output_mrk_file(const string mcmcOut, const int* MrankL, const uint iteration_restart,
+    
+    void read_mcmc_output_idx_file(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
                                    std::vector<int>& markerI);
+    
+    void read_mcmc_output_gam_file(const string mcmcOut, const int gamma_length, const uint iteration_restart,
+                                   VectorXd& gamma);
 
-    void read_mcmc_output_eps_file(const string mcmcOut, const uint Ntot,
-                                   const uint iteration_restart,
-                                   //const int*   IrankS,  const int* IrankL,
+    void read_mcmc_output_eps_file(const string mcmcOut, const uint Ntot, const uint iteration_restart,
                                    VectorXd&    epsilon);
 
     void read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
@@ -168,7 +175,7 @@ public:
                                    VectorXd&    Beta);
 
     void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                   double& sigmaG, double& sigmaE, VectorXd& pi,
+                                   double& sigmaG, double& sigmaE, double& mu, VectorXd& pi,
                                    uint& iteration_restart);
 
     void sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
@@ -294,8 +301,15 @@ public:
     void readFamFile(const string &famFile);
     void readBimFile(const string &bimFile);
     void readBedFile_noMPI(const string &bedFile);
+
     void readPhenotypeFile(const string &phenFile);
-    void readPhenotypeFile(const string &phenFile, const int numberIndividuals);
+
+    void readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest);
+    void readPhenotypeFiles(const vector<string> &phenFile, const int numberIndividuals, MatrixXd& dest);
+
+    void readPhenotypeFileAndSetNanMask(const string &phenFile, const int numberIndividuals, VectorXd& phen, VectorXi& mask, uint& nas);
+
+
     template<typename M>
     M    readCSVFile(const string &covariateFile);
     void readCovariateFile(const string &covariateFile);

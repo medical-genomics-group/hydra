@@ -51,10 +51,17 @@ public:
     string title;
     string analysisType;
     string bayesType;
+
     string phenotypeFile;
+    bool   multi_phen = false;
+    vector<string> phenotypeFiles;
+    bool   interleave = false;
+
     string markerBlocksFile;
     string bedFile;
-    string mcmcOut;
+    string mcmcOutDir = "";
+    string mcmcOutNam = "default_output_name";
+    string mcmcOut    = "default_output_name";
     string sparseDir,      sparseBsn;
     string optionFile;
     string covariatesFile;              // for extra covariates.
@@ -81,7 +88,6 @@ public:
         phenotypeFile           = "";
         markerBlocksFile        = "";
         bedFile                 = "";
-        mcmcOut                 = "bayesOutput";
         sparseDir               = "";
         sparseBsn               = "";
         optionFile				= "";

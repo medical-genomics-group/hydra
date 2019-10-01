@@ -18,14 +18,18 @@
 
 using namespace std;
 
-
+/*
 Distributions_boost::Distributions_boost(unsigned int pseed):seed(pseed){
-    //std::cout << "Initiating dist.rng with pseed = " << pseed << std::endl;
+    std::cout << "Initiating dist.rng with pseed = " << pseed << std::endl;
     rng = boost::mt19937(seed);
 }
+*/
 
-Distributions_boost::~Distributions_boost(){
+Distributions_boost::Distributions_boost() {
+    rng = boost::mt19937(0);
 }
+
+Distributions_boost::~Distributions_boost() {}
 
 void Distributions_boost::reset_rng(unsigned int seed) {
     rng = boost::mt19937(seed);

@@ -1,4 +1,6 @@
 #include "options.hpp"
+#include <sys/stat.h>
+
 
 void Options::inputOptions(const int argc, const char* argv[]){
     stringstream ss;
@@ -83,10 +85,56 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if (!strcmp(argv[i], "--pheno")) {
             phenotypeFile = argv[++i];
             ss << "--pheno " << argv[i] << "\n";
+            string substr;
+            stringstream stream(phenotypeFile);
+            while(stream.good()) {
+                getline(stream, substr, ',');
+                //cout << "adding phenotype file: " << substr << endl;
+                phenotypeFiles.push_back(substr);
+            }
+            
+            int nphen = phenotypeFiles.size();
+            //cout << nphen << " phenotype files passed on CL option" << endl;
+            if (nphen != 1 && nphen != 2 && nphen != 4 && nphen != 8) {
+                cout << "Passed " << nphen << " phenotype files via CL option --pheno; Only accepts either 1, 2, 4 or 8 input phenotypes! (to fill evenly up to 8)" << endl;
+                exit(0);
+            }
+
+            //EO: trick: if 2 or more passed, fill up to 8 and activate multi-phen option. Otherwise assume single-phen processing.
+            // Disabled for now!!
+            if (nphen > 1) {
+                /*
+                for (int i=0; i < 8/nphen - 1; i++) {
+                    for (int j=0; j<nphen; j++) {
+                        phenotypeFiles.push_back(phenotypeFiles[j]);
+                    }
+                }
+                assert(phenotypeFiles.size() == 8);
+                */
+                multi_phen = true;
+                //nphen = 8;
+               
+            } else {
+                multi_phen = false;
+            }
+            
+            //Print for record
+            //EO TODO: get rank and print only for 0
+            //cout << "Final list of phenotype file(s) to be processed:" << endl;
+            //for (int i=0; i<nphen; i++)
+            //    cout << " " << i << ": " << phenotypeFiles[i] << endl;
         }
-        else if (!strcmp(argv[i], "--mcmc-out")) {
-            mcmcOut = argv[++i];
-            ss << "--mcmc-out " << argv[i] << "\n";
+        else if (!strcmp(argv[i], "--interleave-phenotypes")) {
+            interleave = true;
+            ss << "--interleave-phenotypes " << "\n";
+        }
+        else if (!strcmp(argv[i], "--mcmc-out-dir")) {
+            mcmcOutDir = argv[++i];
+            ss << "--mcmc-out-dir " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--mcmc-out-name")) {
+            mcmcOutNam = argv[++i];
+            ss << "--mcmc-out-nam " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--shuf-mark")) {    //EO
             shuffleMarkers = atoi(argv[++i]);
@@ -163,8 +211,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
         	groupFile = argv[++i];
             ss << "--group " << argv[i] << "\n";
         }
-
-
         else if (!strcmp(argv[i], "--thread")) {
             numThread = atoi(argv[++i]);
             ss << "--thread " << argv[i] << "\n";
@@ -187,6 +233,31 @@ void Options::inputOptions(const int argc, const char* argv[]){
 
     options_s = ss.str();
     //cout << ss.str() << endl;
+
+
+    //EO: check output directory exists or can be created
+    int ldir = mcmcOutDir.length();
+    if (ldir == 0)
+        throw "--mcmc-out-dir CL option has to be set!";
+
+    int lnam = mcmcOutNam.length();
+    if (lnam == 0)
+        throw "--mcmc-out-nam CL option has to be set!";
+
+    struct stat buffer;
+    if (stat (mcmcOutDir.c_str(), &buffer) != 0) {
+        if (system(("mkdir -p " + mcmcOutDir).c_str()) != 0)
+            throw "could not create output directory --mcmc-out-dir " + mcmcOutDir;
+    }
+    
+    string dir_tar = mcmcOutDir + "/tarballs";
+    if (stat (dir_tar.c_str(), &buffer) != 0) {
+        if (system(("mkdir -p " + dir_tar).c_str()) != 0)
+            throw "could not create tarballs subdirectory " + dir_tar;
+    }
+    
+    mcmcOut = mcmcOutDir + "/" + mcmcOutNam;
+
 }
 
 void Options::readFile(const string &file){  // input options from file

@@ -36,11 +36,13 @@ if [ 1  == 1 ]; then
     icc components_converter.c -o components_converter
 fi    
 
+COV=""
+
 
 # DATASETS DEFINITION
 # -------------------
 S="1.0,0.1"
-DS=5
+DS=1
 if [ $DS == 0 ]; then
     datadir=./test/data
     dataset=uk10k_chr1_1mb
@@ -53,10 +55,13 @@ elif [ $DS == 1 ]; then
     datadir=/scratch/orliac/testM100K_N5K_missing
     dataset=memtest_M100K_N5K_missing0.01
     phen=memtest_M100K_N5K_missing0.01
+    #phen=memtest_M100K_N5K
+    COV="--covariates ${datadir}/memtest_M100K_N5K.cov"
     sparsedir=$datadir
     sparsebsn=${dataset}_uint
     NUMINDS=5000
     NUMSNPS=117148
+    NUMSNPS=10000
 elif [ $DS == 2 ]; then
     datadir=/scratch/orliac/testN500K
     dataset=testN500K
@@ -121,7 +126,7 @@ echo "output dir:" $outdir
 echo "======================================"
 echo
 
-CLR=20; CLF=19;
+CLR=33; CLF=18;
 if [ "$CLF" -ge "$CLR" ]; then
     echo "FATAL: failing iteration CLF(=$CLF) must be strictly lower than full chain length CLR(=$CLR)!"
     exit 1;
@@ -132,15 +137,18 @@ SEED=10
 SR=0
 SM=1
 THIN=1
-SAVE=4
+SAVE=5
 TOCONV_T=$((($CLR - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
-TPN=12
+TPN=9
 BPR=5
 
-# Selecte what to run
+
+# Select what to run ------------------------------------
 bed_to_sparse=0;  run_bed=1;  run_sparse=0;  run_comp=0;
+# -------------------------------------------------------
+
 
 # Convert bed to sparse
 if [ $bed_to_sparse == 1 ]; then
@@ -149,9 +157,6 @@ if [ $bed_to_sparse == 1 ]; then
     $cmd
 fi
 
-
-COV="--covariates $datadir/scaled_covariates.csv"
-COV=""
 BLK="--marker-blocks-file $datadir/${dataset}.blk"
 BLK=""
 VALGRIND="valgrind -v --leak-check=yes";
@@ -164,21 +169,23 @@ if [ $run_bed == 1 ]; then
     echo
 
     outnam=ref; sol=$outdir/$outnam;  CL=$CLR;
-    cmd="srun -N $N --ntasks-per-node=$TPN  $VALGRIND  $EXE           --number-individuals $NUMINDS  --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
+    cmd="srun -N $N --ntasks-per-node=$TPN  $VALGRIND  $EXE           --number-individuals $NUMINDS  --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out-dir $datadir/results --mcmc-out-name $outnam  --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
     printf '=%.0s' {1..100}; echo
     echo $cmd
     printf '=%.0s' {1..100}; echo
     $cmd || exit 1
 
     outnam=fail; sol=$outdir/$outnam; CL=$CLF;
-    cmd="srun -N $N --ntasks-per-node=$TPN  $VALGRIND  $EXE           --number-individuals $NUMINDS  --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
+    cmd="srun -N $N --ntasks-per-node=$TPN  $VALGRIND  $EXE           --number-individuals $NUMINDS  --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out-dir $datadir/results --mcmc-out-name $outnam  --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
     printf '=%.0s' {1..100}; echo
     echo $cmd
     printf '=%.0s' {1..100}; echo
     $cmd >/dev/null || exit 1
+    #$cmd || exit 1
+
 
     outnam=fail; sol=$outdir/$outnam; CL=$CLR;
-    cmd="srun -N $N --ntasks-per-node=$TPN  $VALGRIND  $EXE --restart --number-individuals $NUMINDS  --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
+    cmd="srun -N $N --ntasks-per-node=$TPN  $VALGRIND  $EXE --restart --number-individuals $NUMINDS  --number-markers $NUMSNPS --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE --mcmc-out-dir $datadir/results --mcmc-out-name $outnam --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file $COV $BLK"
     printf '=%.0s' {1..100}; echo
     echo $cmd
     printf '=%.0s' {1..100}; echo

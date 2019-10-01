@@ -8,16 +8,20 @@ EXE ?= mpi_gibbs
 
 CXX       = mpiicpc
 
-#CXXFLAGS  = -O3
-CXXFLAGS = -Ofast
 #CXXFLAGS  = -O0
-#CXXFLAGS += -g
+CXXFLAGS = -Ofast
+#CXXFLAGS  = -O1
+CXXFLAGS += -g
 CXXFLAGS += -std=c++17
 CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 #CXXFLAGS += -xCORE-AVX2
 #CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
-CXXFLAGS += -D USE_MPI  
+CXXFLAGS += -D USE_MPI
 #CXXFLAGS += -D EIGEN_DONT_VECTORIZE
+CXXFLAGS += -qopenmp
+#CXXFLAGS += -qopt-report=2
+#CXXFLAGS += -qopt-report-phase=loop,vec
+#CXXFLAGS += -qopt-report-file=stdout
 
 #EO: set this back when switching to production
 #    This will allow to fully use vectorization on both fidis and gacrux
@@ -32,24 +36,34 @@ INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
 #INCLUDE += -I../tbb/include
 
-LIBS     = -lz #-lstdc++fs #-lboost_system -lboost_filesystem
+LIBS     = -lz 
+#LIBS    += -lomp
+#LIBS    += -lstdc++fs
+#LIBS    += -lboost_system 
+#LIBS    += -lboost_filesystem
 
-#HDR = \
-	data.hpp    BayesRRm.h       gadgets.hpp     distributions_boost.hpp \
-	options.cpp samplewriter.cpp compression.cpp \
-	mpi_utils.hpp
 
-SRC = \
-	main.cpp	data.cpp    BayesRRm.cpp     gadgets.cpp     distributions_boost.cpp \
-	options.cpp samplewriter.cpp compression.cpp
+SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 
-OBJ = $(SRC:.cpp = .o)
+OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
-all: $(EXE) 
+DEPENDS := $(patsubst %.cpp,%.d,$(SOURCES))
 
-$(EXE):	$(OBJ)
-		$(CXX) $(CXXFLAGS) $(INCLUDE) $(LIBS) -o $(EXE) $(OBJ)
+WARNING := -Wall -Wextra
+
+RM := /usr/bin/rm
+
+.PHONY: all clean
+
+all: $(EXE)
 
 clean:
-	/usr/bin/rm -rvf	\
-	*.o
+	$(RM) $(OBJECTS) $(DEPENDS) $(EXE)
+
+$(EXE): $(OBJECTS)
+	$(CXX) $(WARNING) $(CXXFLAGS) $(INCLUDE) $(LIBS) $^ -o $@
+
+-include $(DEPENDS)
+
+%.o: %.cpp Makefile
+	$(CXX) $(WARNING) $(CXXFLAGS) $(INCLUDE) $(LIBS) -MMD -MP -c $< -o $@

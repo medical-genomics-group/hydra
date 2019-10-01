@@ -35,7 +35,7 @@ void Data::print_restart_banner(const string mcmcOut, const uint iteration_resta
 }
 
 
-void Data::read_mcmc_output_mrk_file(const string mcmcOut, const int* MrankL, const uint iteration_restart,
+void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
                                      std::vector<int>& markerI)  {
     
     int nranks, rank;
@@ -45,7 +45,7 @@ void Data::read_mcmc_output_mrk_file(const string mcmcOut, const int* MrankL, co
     MPI_Status status;
     MPI_File   fh;
 
-    const string fp = mcmcOut + ".mrk." + std::to_string(rank);
+    const string fp = mcmcOut + "." + ext + "." + std::to_string(rank);
     check_mpi(MPI_File_open(MPI_COMM_SELF, fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
 
     // 1. get and validate iteration number that we are about to read
@@ -75,18 +75,63 @@ void Data::read_mcmc_output_mrk_file(const string mcmcOut, const int* MrankL, co
     check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
 }
 
+//EO: .gam files only contain a dump of last saved iteration (no history)
+//  : format is: iter, length, vector
+void Data::read_mcmc_output_gam_file(const string mcmcOut, const int gamma_length, const uint iteration_restart,
+                                     VectorXd& gamma) {
+
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    
+    const string gamfp = mcmcOut + ".gam." + std::to_string(rank);
+
+    MPI_Status status;
+    
+    MPI_File gamfh;
+    check_mpi(MPI_File_open(MPI_COMM_SELF, gamfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &gamfh), __LINE__, __FILE__);
+
+
+    // 1. get and validate iteration number that we are about to read
+    MPI_Offset gamoff = size_t(0);
+    uint iteration_ = UINT_MAX;
+    check_mpi(MPI_File_read_at_all(gamfh, gamoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (iteration_ != iteration_restart) {
+        printf("Mismatch between expected and read cvs iteration: %d vs %d\n", iteration_restart, iteration_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 2. get and validate gamma_length
+    uint gamma_length_ = 0;
+    gamoff = sizeof(uint);
+    check_mpi(MPI_File_read_at_all(gamfh, gamoff, &gamma_length_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (gamma_length_ != gamma_length) {
+        printf("Mismatch between expected and read length of gamma vector: %d vs %d\n", gamma_length, gamma_length_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 3. read the gamma_length_ coefficients
+    gamoff = sizeof(uint) + sizeof(uint);
+    check_mpi(MPI_File_read_at_all(gamfh, gamoff, gamma.data(), gamma_length_, MPI_DOUBLE, &status), __LINE__, __FILE__);
+
+    //if (rank%50==0)
+    //    printf("rank %d reading back gam: %15.10f %15.10f\n", rank, gamma[0], gamma[gamma_length_-1]);
+
+    check_mpi(MPI_File_close(&gamfh), __LINE__, __FILE__);
+}
+
 
 //EO: .eps files only contain a dump of last saved iteration (no history)
 //
 void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, const uint iteration_restart,
-                                     //const int*   IrankS,  const int* IrankL,
-                                     VectorXd&    epsilon) {
+                                     VectorXd& epsilon) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
     const string epsfp = mcmcOut + ".eps." + std::to_string(rank);
+    //const string epsfp = mcmcOut + ".eps";
 
     MPI_Status status;
     
@@ -118,7 +163,8 @@ void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, co
     epsoff = sizeof(uint) + sizeof(uint);
     check_mpi(MPI_File_read_at_all(epsfh, epsoff, epsilon.data(), Ntot_, MPI_DOUBLE, &status), __LINE__, __FILE__);
 
-    //printf("rank %d reading back eps: %15.10f %15.10f\n", rank, epsilon[0], epsilon[Ntot_-1]);
+    //if (rank%50==0)
+    //    printf("rank %d reading back eps: %15.10f %15.10f\n", rank, epsilon[0], epsilon[Ntot_-1]);
 
     check_mpi(MPI_File_close(&epsfh), __LINE__, __FILE__);
 }
@@ -226,7 +272,7 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
 //EO: consider moving the csv output file from ASCII to BIN
 //
 void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                     double& sigmaG, double& sigmaE, VectorXd& pi,
+                                     double& sigmaG, double& sigmaE, double& mu, VectorXd& pi,
                                      uint& iteration_restart) {
     
     int nranks, rank;
@@ -281,8 +327,7 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     // Check that all ranks are on the same last iteration
     int* allit_, lastit = -1;
     if (rank == 0) {
-        allit_ = (int*)malloc(sizeof(int) * nranks);
-        check_malloc(allit_, __LINE__, __FILE__);
+        allit_ = (int*)_mm_malloc(sizeof(int) * nranks, 64);  check_malloc(allit_, __LINE__, __FILE__);
     }
 
     MPI_Gather(&lastSavedIt, 1, MPI_INT, allit_, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -296,7 +341,7 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
                 MPI_Abort(MPI_COMM_WORLD, 1);
             }
         }
-        free(allit_);
+        _mm_free(allit_);
         lastit = refit_;
     }
 
@@ -309,6 +354,7 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     iteration_restart = lastit;
     sigmaG            = sigg_;
     sigmaE            = sige_;
+    mu                = mu_;
     for (int i=0; i<K; i++)  pi[i] = pipi[i];
 }
 
@@ -388,7 +434,7 @@ void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, c
     // Alloc memory for raw BED data
     // -----------------------------
     const size_t rawdata_n = size_t(M) * size_t(snpLenByt) * sizeof(char);
-    char* rawdata = (char*) malloc(rawdata_n);  check_malloc(rawdata, __LINE__, __FILE__);
+    char* rawdata = (char*)_mm_malloc(rawdata_n, 64);  check_malloc(rawdata, __LINE__, __FILE__);
     dalloc += rawdata_n / 1E9;
     //printf("rank %d allocation %zu bytes (%.3f GB) for the raw data.\n", rank, rawdata_n, double(rawdata_n/1E9));
 
@@ -424,9 +470,9 @@ void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, c
     sparse_data_get_sizes_from_raw(rawdata, M, snpLenByt, N1, N2, NM);
 
     // Alloc and build sparse structure
-    I1 = (uint*) malloc(N1 * sizeof(uint));  check_malloc(I1, __LINE__, __FILE__);
-    I2 = (uint*) malloc(N2 * sizeof(uint));  check_malloc(I2, __LINE__, __FILE__);
-    IM = (uint*) malloc(NM * sizeof(uint));  check_malloc(IM, __LINE__, __FILE__);
+    I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
+    I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
+    IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
     dalloc += (N1 + N2 + NM) * sizeof(size_t) / 1E9;
     
     sparse_data_fill_indices(rawdata, M, snpLenByt,
@@ -434,7 +480,7 @@ void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, c
                              N2S, N2L, I2,
                              NMS, NML, IM);
 
-    free(rawdata);        
+    _mm_free(rawdata);        
 }
 
 
@@ -473,9 +519,9 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", (N1tot+N2tot+NMtot)*sizeof(uint)/1E9);
 
-    I1 = (uint*) malloc(N1 * sizeof(uint));  check_malloc(I1, __LINE__, __FILE__);
-    I2 = (uint*) malloc(N2 * sizeof(uint));  check_malloc(I2, __LINE__, __FILE__);
-    IM = (uint*) malloc(NM * sizeof(uint));  check_malloc(IM, __LINE__, __FILE__);
+    I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
+    I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
+    IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
     dalloc += (N1 + N2 + NM) * sizeof(uint) / 1E9;
 
     // To check that each element is properly set
@@ -509,9 +555,11 @@ void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* N
     for (int i=0; i<M; ++i)
         if (NL[i] > max) max = NL[i];
 
-    uint* tmp = (uint*) malloc(max * sizeof(uint));  check_malloc(tmp, __LINE__, __FILE__);
+    uint* tmp = (uint*)_mm_malloc(max * sizeof(uint), 64);  check_malloc(tmp, __LINE__, __FILE__);
 
     for (int i=0; i<M; ++i) {
+
+        //cout << "dealing with marker " << i << " out of " << M << endl;
 
         const size_t beg = NS[i], len = NL[i];
         size_t k   = 0;
@@ -526,7 +574,7 @@ void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* N
                 bool isna   = false;
                 uint allnas = 0;
                 for (int ii=0; ii<numNAs; ++ii) {
-                    //if (NAsInds[ii] > tmp[iii-beg]) break;
+                    if (NAsInds[ii] > tmp[iii-beg]) break;
                     if (NAsInds[ii] <= tmp[iii-beg]) allnas += 1;
                     if (tmp[iii-beg] == NAsInds[ii]) { // NA found
                         isna = true;
@@ -541,7 +589,7 @@ void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* N
         }
         NL[i] -= nas;
     }
-    free(tmp);
+    _mm_free(tmp);
 }
 
 
@@ -550,7 +598,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
     assert(numInds<=NB*4);
 
     // temporary array used for translation
-    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(char));
+    int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(char), 64);  check_malloc(tmpi, __LINE__, __FILE__);
 
     N1 = 0;
     N2 = 0;
@@ -587,7 +635,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
         assert(cm+c0+c1+c2 == numInds);
     }
 
-    free(tmpi);
+    _mm_free(tmpi);
 }
 
 
@@ -604,7 +652,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
     assert(numInds<=NB*4);
 
     // temporary array used for translation
-    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+    int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(int8_t), 64);  check_malloc(tmpi, __LINE__, __FILE__);
 
     size_t i1 = 0, i2 = 0, im = 0;
     size_t N1 = 0, N2 = 0, NM = 0;
@@ -656,7 +704,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
         NMS[i] = NM;  NML[i] = nm;  NM += nm;
     }
 
-    free(tmpi);
+    _mm_free(tmpi);
 }
 
 size_t Data::get_number_of_elements_from_sparse_files(const std::string basename, const std::string id, const int* MrankS, const int* MrankL,
@@ -811,7 +859,7 @@ void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const 
     char* locraw = (char*)&rawdata[size_t(marker) * size_t(NB)];
     
     // temporary array used for translation
-    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+    int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(int8_t), 64); check_malloc(tmpi, __LINE__, __FILE__);
 
     for (int ii=0; ii<NB; ++ii) {
         for (int iii=0; iii<4; ++iii) {
@@ -835,7 +883,7 @@ void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const 
         }
     }
 
-    free(tmpi);
+    _mm_free(tmpi);
 }
 
 
@@ -848,7 +896,7 @@ void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const 
     char* locraw = (char*)&rawdata[size_t(marker) * size_t(NB)];
     
     // temporary array used for translation
-    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+    int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(int8_t), 64);  check_malloc(tmpi, __LINE__, __FILE__);
 
     for (int ii=0; ii<NB; ++ii) {
         for (int iii=0; iii<4; ++iii) {
@@ -904,7 +952,7 @@ void Data::get_normalized_marker_data(const char* rawdata, const uint NB, const 
     for (size_t ii=0; ii<numInds; ++ii)
         Cx[ii] *= std_;
 
-    free(tmpi);
+    _mm_free(tmpi);
 }
 
 // Read raw data loaded in memory to preprocess them (center, scale and cast to double)
@@ -913,7 +961,7 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
     assert(numInds<=NB*4);
 
     // temporary array used for translation
-    int8_t *tmpi = (int8_t*)malloc(NB * 4 * sizeof(int8_t));
+    int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(int8_t), 64);  check_malloc(tmpi, __LINE__, __FILE__);
 
     for (int i=0; i<NC; ++i) {
 
@@ -969,7 +1017,8 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
             locpp[ii] *= std_;
         }
     }
-    free(tmpi);
+
+    _mm_free(tmpi);
 }
 
 #endif
@@ -1350,7 +1399,7 @@ void Data::readBedFile_noMPI(const string &bedFile) {
             }
         }
 
-        if (j==0) printf("numInds vs nona; numNAs: %d vs %d vs %d\n", numInds, nona, numNAs);
+        //if (j==0) printf("numInds vs nona; numNAs: %d vs %d vs %d\n", numInds, nona, numNAs);
 
         //EO: account for missing phenotypes
         //----------------------------------
@@ -1404,25 +1453,138 @@ void Data::readBedFile_noMPI(const string &bedFile) {
 #endif
 }
 
+
+void Data::center_and_scale(double* __restrict__ vec, int* __restrict__ mask, const uint N, const uint nas) {
+
+    // Compute mean
+    double mean = 0.0;
+    uint nonas = N - nas;
+
+    for (int i=0; i<N; ++i)
+        mean += vec[i] * mask[i];
+
+    mean /= nonas;
+    //cout << "mean = " << mean << endl;
+
+    // Center
+    for (int i=0; i<N; ++i)
+        vec[i] -= mean;
+
+    // Compute scale
+    double sqn = 0.0;
+    for (int i=0; i<N; ++i) {
+        if (mask[i] == 1) {
+            sqn += vec[i] * vec[i];
+        }
+    }
+    sqn = sqrt(double(nonas-1) / sqn);
+
+    // Scale
+    for (int i=0; i<N; ++i) {
+        if (mask[i] == 1) {
+            vec[i] *= sqn;
+        } else {
+            vec[i] = 0.0;
+        }
+    }
+}
+
+
 // EO: overloaded function to be used when processing sparse data
 //     In such case we do not read from fam file before
 // --------------------------------------------------------------
-void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals) {
+void Data::readPhenotypeFiles(const vector<string> &phenFiles, const int numberIndividuals, MatrixXd& dest) {
+
+    const int NT = phenFiles.size();
+    int ninds = -1;
+
+    for (int i=0; i<NT; i++) {
+        //cout << "reading phen " << i << ": " << phenFiles[i] << endl;
+        VectorXd phen;
+        VectorXi mask;
+        uint nas = 0;
+        readPhenotypeFileAndSetNanMask(phenFiles[i], numberIndividuals, phen, mask, nas);
+        cout << "read phen file of length: " << phen.size() << " with " << nas << " NAs" << endl;
+
+        // Make sure that all phenotypes cover the same number of individuals
+        if (ninds < 0) {
+            ninds = phen.size();
+
+            phenosData.resize(NT, ninds);
+            phenosNanMasks.resize(NT, ninds);
+            phenosNanNum.resize(NT);
+            cout << "data phenosNanNum " << phenosNanNum.size() << endl; 
+
+            phenosData.setZero();
+            phenosNanMasks.setZero();
+            phenosNanNum.setZero();
+        }
+        assert(ninds == phen.size());
+        assert(ninds == mask.size());
+
+        center_and_scale(phen.data(), mask.data(), ninds, nas);
+
+        for (int j=0; j<ninds; j++) {
+            phenosData(i, j)   = phen(j);
+            phenosNanMasks(i, j) = mask(j);
+        }
+
+        phenosNanNum(i) = nas;
+    }
+}
+
+void Data::readPhenotypeFileAndSetNanMask(const string &phenFile, const int numberIndividuals, VectorXd& dest, VectorXi& mask, uint& nas) {
+
     numInds = numberIndividuals;
     ifstream in(phenFile.c_str());
     if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
 #ifndef USE_MPI
-    cout << "Reading phenotypes from [" + phenFile + "]." << endl;
+    //cout << "Reading phenotypes from [" + phenFile + "], and setting NAn" << endl;
+#endif
+    uint line = 0, nonas = 0;
+    Gadget::Tokenizer colData;
+    string inputStr;
+    string sep(" \t");
+    dest.setZero(numInds);
+    mask.setZero(numInds);
+    while (getline(in,inputStr)) {
+        colData.getTokens(inputStr, sep);
+        if (colData[1+1] != "NA") {
+            dest(line) = double( atof(colData[1+1].c_str()) );
+            mask(line) = 1;
+            nonas += 1;
+        } else {
+            dest(line) = 1E30; //0./0.; //EO: generate a nan
+            mask(line) = 0;
+            nas += 1;
+        }
+        line += 1;
+    }
+    in.close();
+    assert(nonas + nas == numInds);
+    assert(line == numInds);
+    //printf("nonas = %d, nas = %d\n", nonas, nas);
+}
+
+
+void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest) {
+    numInds = numberIndividuals;
+    ifstream in(phenFile.c_str());
+    if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
+#ifndef USE_MPI
+    //cout << "Reading phenotypes from [" + phenFile + "]." << endl;
 #endif
     uint line = 0, nas = 0, nonas = 0;
     Gadget::Tokenizer colData;
     string inputStr;
     string sep(" \t");
-    y.setZero(numInds);
+    //y.setZero(numInds);
+    dest.setZero(numInds);
     while (getline(in,inputStr)) {
         colData.getTokens(inputStr, sep);
         if (colData[1+1] != "NA") {
-            y[nonas] = double( atof(colData[1+1].c_str()) );
+            //y[nonas] = double( atof(colData[1+1].c_str()) );
+            dest[nonas] = double( atof(colData[1+1].c_str()) );
             //if (nonas < 30) printf("read no na on line %d, nonas %d = %15.10f\n", line, nonas, y(nonas));
             nonas += 1;
         } else {
@@ -1436,7 +1598,8 @@ void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals
     assert(nonas + nas == numInds);
 
     numNAs = nas;
-    y.conservativeResize(numInds-nas);
+    //y.conservativeResize(numInds-nas);
+    dest.conservativeResize(numInds-nas);
 }
 
 void Data::readPhenotypeFile(const string &phenFile) {
@@ -1444,7 +1607,7 @@ void Data::readPhenotypeFile(const string &phenFile) {
     ifstream in(phenFile.c_str());
     if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
 #ifndef USE_MPI
-    cout << "Reading phenotypes from [" + phenFile + "]." << endl;
+    //cout << "Reading phenotypes from [" + phenFile + "]." << endl;
 #endif
     map<string, IndInfo*>::iterator it, end=indInfoMap.end();
     IndInfo *ind = NULL;
@@ -1479,6 +1642,7 @@ void Data::readPhenotypeFile(const string &phenFile) {
         }
     }
     in.close();
+    //printf("nonas = %d + nas = %d = numInds = %d\n", nonas, nas, numInds);
     assert(nonas + nas == numInds);
 
     numNAs = nas;

@@ -4,9 +4,6 @@
 # ATTENTION: need to be in an active slurm allocation!
 #
 
-
-slmodules -r deprecated
-
 module purge
 module load intel intel-mpi intel-mkl boost eigen
 module list
@@ -31,7 +28,7 @@ fi
 
 S="1.0,0.1"
 
-DS=0
+DS=2
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -59,16 +56,18 @@ elif [ $DS == 2 ]; then
     sparsebsn=${dataset}_uint_test
     NUMINDS=500000
     NUMSNPS=1270420
-    NUMSNPS=10000
+    NUMSNPS=5000
 elif [ $DS == 3 ]; then
     sparsedir=/scratch/orliac/UKBgen/
     sparsebsn=epfl_test_data_sparse
     phen=epfl_test_data
     NUMINDS=457810
     NUMSNPS=8430446
-    NUMSNPS=100
+    NUMSNPS=500
     S="0.00001,0.0001,0.001,0.01"
 fi
+
+outdir=/home/orliac/DCSR/CTGG/BayesRRcmd/output_tests/
 
 echo 
 echo "======================================"
@@ -81,11 +80,10 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=27
+CL=10
 SEED=1222
 SR=0
 SM=0
-NM=100
 
 # If you change those, do not expect compatibility
 N=1
@@ -95,7 +93,7 @@ echo
 echo
 echo "@@@ Official (sequential) solution (reading from BED file) @@@"
 echo
-cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen   --chain-length $CL --burn-in 0 --thin 1 --mcmc-out ref --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS"
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen   --chain-length $CL --burn-in 0 --thin 1 --mcmc-out-dir $outdir --mcmc-out-name ref --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS"
 #cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phenNA}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out refNA --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS"
 #--covariates $datadir/scaled_covariates.csv
 echo ----------------------------------------------------------------------------------
@@ -103,28 +101,24 @@ echo $cmd
 echo ----------------------------------------------------------------------------------
 $cmd
 
-
 echo
 echo
 echo "@@@ MPI 1-task solution reading from  BED file @@@"
 echo
 sol=mpi1tbed
-cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS"
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS"
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------
 $cmd
 
-#--covariates $datadir/scaled_covariates.csv
-
-#exit 0
 
 echo
 echo
 echo "@@@ MPI 1-task solution reading from SPARSE files @@@"
 echo
 sol=mpi1tsparse
-cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1 --mcmc-out $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------

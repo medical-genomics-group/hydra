@@ -9,6 +9,7 @@
 inline void check_malloc(const void* ptr, const int linenumber, const char* filename) {
     if (ptr == NULL) {
         fprintf(stderr, "#FATAL#: malloc failed on line %d of %s\n", linenumber, filename);
+        fflush(stdout);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
@@ -19,6 +20,7 @@ inline void check_malloc(const void* ptr, const int linenumber, const char* file
 inline void check_mpi(const int error, const int linenumber, const char* filename) {
     if (error != MPI_SUCCESS) {
         fprintf(stderr, "*FATAL*: MPI error %d at line %d of file %s\n", error, linenumber, filename);
+        fflush(stdout);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 }
@@ -30,6 +32,7 @@ inline int check_int_overflow(const size_t n, const int linenumber, const char* 
 
     if (n > INT_MAX) {
         fprintf(stderr, "FATAL  : integer overflow detected on line %d of %s. %lu does not fit in type int.\n", linenumber, filename, n);
+        fflush(stdout);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     return static_cast<int>(n);
@@ -38,7 +41,7 @@ inline int check_int_overflow(const size_t n, const int linenumber, const char* 
 
 // Check file size is the expected one
 // -----------------------------------
-inline int check_file_size(const MPI_File fh, const size_t N, const size_t DTSIZE, const int linenumber, const char* filename) {
+inline void check_file_size(const MPI_File fh, const size_t N, const size_t DTSIZE, const int linenumber, const char* filename) {
 
     //printf("DEBUG  : expected size = %lu x %lu bytes\n", N, DTSIZE);
     size_t     expected_file_size = N * DTSIZE;
