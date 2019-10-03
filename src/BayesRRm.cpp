@@ -1702,7 +1702,7 @@ int BayesRRm::runMpiGibbs() {
         // .eps format: uint, uint, double[0, N-1] (it, Ntot, [eps])
         // .mrk format: uint, uint, int[0, M-1]    (it, M,    <mrk>)
         // ------------------------------------------------------
-        if (iteration%opt.save == 0) {
+        if (iteration > 0 && iteration%opt.save == 0) {
 
             // Each task writes its own rng file
             dist.write_rng_state_to_file(rngfp);
