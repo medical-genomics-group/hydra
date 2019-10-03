@@ -1,5 +1,6 @@
 /Debug/
 *.o
+*.d
 CMakeLists.txt.user
 gctb
 brr
@@ -7,6 +8,8 @@ brr
 *.sqnorm
 *.csv
 *~
+*.out
+*.err
 *.optrpt
 /MR_ADV/
 slurm-*.out
