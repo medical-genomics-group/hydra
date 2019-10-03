@@ -511,27 +511,32 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     check_mpi(MPI_Allreduce(&N2, &N2tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allreduce(&NM, &NMtot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-    if (rank == 0) printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
-    if (rank == 0) printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
-    if (rank == 0) printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1+N2+NM)*sizeof(uint)/1E9);
-
+    if (rank == 0) { 
+      printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
+      printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
+      printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1 + N2 + NM) * sizeof(uint) / 1E9);
+      printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", (N1tot + N2tot + NMtot) * sizeof(uint) / 1E9);
+    }
     fflush(stdout);
-    MPI_Barrier(MPI_COMM_WORLD);
-    if (rank == 0) printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", (N1tot+N2tot+NMtot)*sizeof(uint)/1E9);
 
     I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
     I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
     IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
     dalloc += (N1 + N2 + NM) * sizeof(uint) / 1E9;
 
-    // To check that each element is properly set
-    //for (int i=0; i<N1; i++) I1[i] = UINT_MAX;
-    //for (int i=0; i<N2; i++) I2[i] = UINT_MAX;
-    //for (int i=0; i<NM; i++) IM[i] = UINT_MAX;
+    //EO: base the number of read calls on a max buffer size of 2 GiB
+    //    rather than count be lower that MAX_INT/2
+    //----------------------------------------------------------------------
+    int NREADS1 = int(ceil(double(N1 * sizeof(uint)) / double(2147483648)));
+    int NREADS2 = int(ceil(double(N2 * sizeof(uint)) / double(2147483648)));
+    int NREADSM = int(ceil(double(NM * sizeof(uint)) / double(2147483648)));
 
+    /*
     int NREADS1 = check_int_overflow(size_t(ceil(double(N1max)/double(INT_MAX/2))), __LINE__, __FILE__);
     int NREADS2 = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))), __LINE__, __FILE__);
     int NREADSM = check_int_overflow(size_t(ceil(double(NMmax)/double(INT_MAX/2))), __LINE__, __FILE__);
+    */
+
     if (rank == 0) printf("INFO   : number of call to read the sparse files: NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", NREADS1, NREADS2, NREADSM);
 
     read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);

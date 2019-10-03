@@ -236,6 +236,8 @@ public:
 
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Type_size(MPI_DT, &dtsize);
+	//printf("dtsize = %d vs %lu\n", dtsize, sizeof(buffer[0]));
+	//fflush(stdout);
         assert(dtsize == sizeof(buffer[0]));
 
         if (NREADS == 0) return;
@@ -246,9 +248,12 @@ public:
         for (uint i=0; i<NREADS; ++i) {
 
             const size_t iim = size_t(i) * size_t(SPLIT_ON);
-
+	    
             // Last iteration takes only the leftover
             if (i == NREADS-1) count = check_int_overflow(N - iim, __LINE__, __FILE__);
+
+	    //printf("read %d with count = %d x %lu = %lu Bytes to read\n", i, count, sizeof(buffer[0]), sizeof(buffer[0]) * size_t(count));
+	    //fflush(stdout);
 
             check_mpi(MPI_File_read_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
         }
