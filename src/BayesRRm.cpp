@@ -1640,7 +1640,7 @@ int BayesRRm::runMpiGibbs() {
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
         if (rank%10==0)
-            printf("RESULT : it %4d, rank %4d: time/sync = %9.3f/%8.3f s, sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, rank, end_it-start_it, tot_sync, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
+            printf("RESULT : it %4d, rank %4d: time/sync = %9.3f/%8.3f s, sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, rank, end_it-start_it, tot_sync, sigmaG, sigmaE, beta_squaredNorm, int(m0));
         fflush(stdout);
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
