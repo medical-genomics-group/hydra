@@ -1291,6 +1291,7 @@ int BayesRRm::runMpiGibbs() {
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
 
         double start_it = MPI_Wtime();
+        double tot_sync = 0.0;
 
         //if (replay_it) {
         //    printf("INFO: replay iteration with m0=%.0f sigG=%15.10f sigE=%15.10f\n", previt_m0, previt_sg, previt_se);
@@ -1499,6 +1500,7 @@ int BayesRRm::runMpiGibbs() {
             if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
 
                 // Update local copy of epsilon
+                double beg_sync = MPI_Wtime();
                 if (nranks > 1) {
                     check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
                     sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
@@ -1511,6 +1513,9 @@ int BayesRRm::runMpiGibbs() {
                         //t1 += mysecond();
                         //printf("kernel 1 BW = %g\n", double(Ntot) * 3.0 * sizeof(double) / 1024. / 1024. / (t1 / 100.0));
                 }
+                double end_sync = MPI_Wtime();
+                //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
+                tot_sync += end_sync - beg_sync;
 
                 // Store epsilon state at last synchronization
                 copy_vector_f64(tmpEps, epsilon, Ntot);
@@ -1635,7 +1640,7 @@ int BayesRRm::runMpiGibbs() {
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
         if (rank%10==0)
-            printf("RESULT : it %4d, rank %4d: time = %9.3f s, sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, rank, end_it-start_it, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
+            printf("RESULT : it %4d, rank %4d: time/sync = %9.3f/%8.3f s, sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, rank, end_it-start_it, tot_sync, v0G+m0,(beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0), sigmaG, sigmaE, beta_squaredNorm, int(m0));
         fflush(stdout);
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
