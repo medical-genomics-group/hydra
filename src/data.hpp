@@ -247,6 +247,12 @@ public:
 
         for (uint i=0; i<NREADS; ++i) {
 
+	  if (rank == 0) {
+	    std::time_t time = std::time(nullptr);
+	    printf("DATA IN: rank %3d, start reading block %3d/%3d at %s\n", rank, i, NREADS, std::asctime(std::localtime(&time)));
+	    fflush(stdout);
+	  }
+
             const size_t iim = size_t(i) * size_t(SPLIT_ON);
 	    
             // Last iteration takes only the leftover
@@ -256,6 +262,7 @@ public:
 	    //fflush(stdout);
 
             check_mpi(MPI_File_read_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
+            //check_mpi(MPI_File_read_at(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
         }
     }
 

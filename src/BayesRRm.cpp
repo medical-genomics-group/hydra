@@ -1138,13 +1138,18 @@ int BayesRRm::runMpiGibbs() {
                                          NMS, NML, IM);
     }
 
+    printf("INFO   : rank %d finished loading data\n", rank);
+    fflush(stdout);
+
+    MPI_Barrier(MPI_COMM_WORLD);
 
     // Correct each marker for individuals with missing phenotype
     // ----------------------------------------------------------
     if (data.numNAs > 0) {
-        MPI_Barrier(MPI_COMM_WORLD);
+
         if (rank == 0)
             printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", data.numNAs);
+
         data.sparse_data_correct_for_missing_phenotype(N1S, N1L, I1, M);
         data.sparse_data_correct_for_missing_phenotype(N2S, N2L, I2, M);
         data.sparse_data_correct_for_missing_phenotype(NMS, NML, IM, M);

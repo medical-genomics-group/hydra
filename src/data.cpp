@@ -511,12 +511,10 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     check_mpi(MPI_Allreduce(&N2, &N2tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allreduce(&NM, &NMtot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-    if (rank == 0) { 
-      printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
-      printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
-      printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1 + N2 + NM) * sizeof(uint) / 1E9);
-      printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", (N1tot + N2tot + NMtot) * sizeof(uint) / 1E9);
-    }
+    printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
+    printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
+    printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1 + N2 + NM) * sizeof(uint) / 1E9);
+    printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", (N1tot + N2tot + NMtot) * sizeof(uint) / 1E9);
     fflush(stdout);
 
     I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
@@ -536,12 +534,25 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     int NREADS2 = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))), __LINE__, __FILE__);
     int NREADSM = check_int_overflow(size_t(ceil(double(NMmax)/double(INT_MAX/2))), __LINE__, __FILE__);
     */
+    //MPI_Barrier(MPI_COMM_WORLD);
+    //printf("INFO   : rank %d, number of calls to read the sparse files: NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", rank, NREADS1, NREADS2, NREADSM);
+    //fflush(stdout);
+   
+    //EO: to keep the read_at_all in, we need to get the max nreads
+    int MAX_NREADS1 = 0, MAX_NREADS2 = 0, MAX_NREADSM = 0;
+    check_mpi(MPI_Allreduce(&NREADS1, &MAX_NREADS1, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+    check_mpi(MPI_Allreduce(&NREADS2, &MAX_NREADS2, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+    check_mpi(MPI_Allreduce(&NREADSM, &MAX_NREADSM, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-    if (rank == 0) printf("INFO   : number of call to read the sparse files: NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", NREADS1, NREADS2, NREADSM);
-
-    read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);
-    read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], NREADS2, I2);
-    read_sparse_data_file(sparseOut + ".sim", NM, NMS[0], NREADSM, IM);
+    printf("INFO   : rank numbers of calls to read the sparse files: NREADS1,2,M = %3d, %3d, %3d vs MAX_NREADS1,2,M = %3d, %3d, %3d\n",
+	   NREADS1, NREADS2, NREADSM, MAX_NREADS1, MAX_NREADS2, MAX_NREADSM);
+    
+    //read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);
+    //read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], NREADS2, I2);
+    //read_sparse_data_file(sparseOut + ".sim", NM, NMS[0], NREADSM, IM);    
+    read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], MAX_NREADS1, I1);
+    read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], MAX_NREADS2, I2);
+    read_sparse_data_file(sparseOut + ".sim", NM, NMS[0], MAX_NREADSM, IM);    
 
     // Make starts relative to start of block in each task
     const size_t n1soff = N1S[0];  for (int i=0; i<M; ++i) { N1S[i] -= n1soff; }
