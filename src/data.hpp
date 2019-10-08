@@ -194,8 +194,8 @@ public:
                                      double& dalloc,
                                      size_t* N1S, size_t* N1L, uint*& I1,
                                      size_t* N2S, size_t* N2L, uint*& I2,
-                                     size_t* NMS, size_t* NML, uint*& IM
-                                     );
+                                     size_t* NMS, size_t* NML, uint*& IM,
+                                     size_t& bytes);
 
     void sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M);
 
@@ -229,7 +229,7 @@ public:
 
     // MPI_File_read_at_all handling count argument larger than INT_MAX
     template <typename T>
-    void mpi_file_read_at_all(const size_t N, const MPI_Offset offset, const MPI_File fh, const MPI_Datatype MPI_DT, const int NREADS, T buffer) {
+    void mpi_file_read_at_all(const size_t N, const MPI_Offset offset, const MPI_File fh, const MPI_Datatype MPI_DT, const int NREADS, T buffer, size_t &bytes) {
 
         int rank, dtsize;
         MPI_Status status;
@@ -245,14 +245,12 @@ public:
         int SPLIT_ON = check_int_overflow(size_t(ceil(double(N)/double(NREADS))), __LINE__, __FILE__);
         int count = SPLIT_ON;
 
+	double totime = 0.0;
+	bytes = 0;
+
         for (uint i=0; i<NREADS; ++i) {
 
-	  if (rank == 0) {
-	    std::time_t time = std::time(nullptr);
-	    printf("DATA IN: rank %3d, start reading block %3d/%3d at %s\n", rank, i, NREADS, std::asctime(std::localtime(&time)));
-	    fflush(stdout);
-	  }
-
+	  double t1 = -mysecond();
             const size_t iim = size_t(i) * size_t(SPLIT_ON);
 	    
             // Last iteration takes only the leftover
@@ -261,9 +259,19 @@ public:
 	    //printf("read %d with count = %d x %lu = %lu Bytes to read\n", i, count, sizeof(buffer[0]), sizeof(buffer[0]) * size_t(count));
 	    //fflush(stdout);
 
-            check_mpi(MPI_File_read_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
-            //check_mpi(MPI_File_read_at(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
+            //check_mpi(MPI_File_read_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_read_at(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
+	    t1 += mysecond();
+	    totime += t1;
+	    bytes += size_t(count) * size_t(dtsize);
+	    printf("INFO   : rank %3d cumulated read time at %2d/%2d: %7.3f sec, avg time %7.3f, BW = %7.3f GB/s\n",
+		   rank, i+1, NREADS, totime, totime / (i + 1), double(bytes) / totime / 1E9 );
+	    fflush(stdout);
+
+	    //MPI_Barrier(MPI_COMM_WORLD);
         }
+
+	//MPI_Barrier(MPI_COMM_WORLD);
     }
 
 

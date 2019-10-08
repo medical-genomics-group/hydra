@@ -536,7 +536,8 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
     dalloc += 6.0 * double(Mtot) * sizeof(size_t) / 1E9;
 
     uint *I1, *I2, *IM;
-
+    size_t bytes = 0;
+    
     if (opt.readFromBedFile) {
         data.load_data_from_bed_file(opt.bedFile, Ntot, M, rank, MrankS[rank],
                                      dalloc,
@@ -549,7 +550,8 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
                                          dalloc,
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,
-                                         NMS, NML, IM);
+                                         NMS, NML, IM,
+					 bytes);
     }
 
 

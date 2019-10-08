@@ -23,7 +23,6 @@ Data::Data()
 #ifdef USE_MPI
 
 
-
 void Data::print_restart_banner(const string mcmcOut, const uint iteration_restart, 
                                 const uint iteration_start) {
     printf("INFO   : %s\n", string(100, '*').c_str());
@@ -74,6 +73,7 @@ void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, con
 
     check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
 }
+
 
 //EO: .gam files only contain a dump of last saved iteration (no history)
 //  : format is: iter, length, vector
@@ -141,7 +141,7 @@ void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, co
 
     // 1. get and validate iteration number that we are about to read
     MPI_Offset epsoff = size_t(0);
-    uint iteration_ = UINT_MAX;
+    uint iteration_   = UINT_MAX;
     check_mpi(MPI_File_read_at_all(epsfh, epsoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     if (iteration_ != iteration_restart) {
         printf("Mismatch between expected and read cvs iteration: %d vs %d\n", iteration_restart, iteration_);
@@ -453,8 +453,8 @@ void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, c
     check_mpi(MPI_Allreduce(&rawdata_n, &rawdata_n_max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
 
     int NREADS = check_int_overflow(size_t(ceil(double(rawdata_n_max)/double(INT_MAX/2))), __LINE__, __FILE__);
-
-    mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata);
+    size_t bytes = 0;
+    mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
     MPI_Barrier(MPI_COMM_WORLD);
     //const auto et1 = std::chrono::high_resolution_clock::now();
@@ -490,7 +490,8 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
                                        double& dalloc,
                                        size_t* N1S,   size_t* N1L, uint*& I1,
                                        size_t* N2S,   size_t* N2L, uint*& I2,
-                                       size_t* NMS,   size_t* NML, uint*& IM) {
+                                       size_t* NMS,   size_t* NML, uint*& IM,
+				       size_t& totalBytes) {
 
     char processor_name[MPI_MAX_PROCESSOR_NAME];
     int  processor_name_len;
@@ -511,16 +512,18 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     check_mpi(MPI_Allreduce(&N2, &N2tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allreduce(&NM, &NMtot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
+    totalBytes =  (N1tot + N2tot + NMtot) * sizeof(uint);
+
     printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
     printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
     printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1 + N2 + NM) * sizeof(uint) / 1E9);
-    printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", (N1tot + N2tot + NMtot) * sizeof(uint) / 1E9);
+    printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", double(totalBytes) * 1E-9);
     fflush(stdout);
 
     I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
     I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
     IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
-    dalloc += (N1 + N2 + NM) * sizeof(uint) / 1E9;
+    dalloc += double(N1 + N2 + NM) * 1E-9;
 
     //EO: base the number of read calls on a max buffer size of 2 GiB
     //    rather than count be lower that MAX_INT/2
@@ -544,9 +547,10 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     check_mpi(MPI_Allreduce(&NREADS2, &MAX_NREADS2, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allreduce(&NREADSM, &MAX_NREADSM, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-    printf("INFO   : rank numbers of calls to read the sparse files: NREADS1,2,M = %3d, %3d, %3d vs MAX_NREADS1,2,M = %3d, %3d, %3d\n",
-	   NREADS1, NREADS2, NREADSM, MAX_NREADS1, MAX_NREADS2, MAX_NREADSM);
-    
+    printf("INFO   : rank %d, numbers of calls to read the sparse files: NREADS1,2,M = %3d, %3d, %3d vs MAX_NREADS1,2,M = %3d, %3d, %3d\n",
+	   rank, NREADS1, NREADS2, NREADSM, MAX_NREADS1, MAX_NREADS2, MAX_NREADSM);
+    fflush(stdout);
+
     //read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);
     //read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], NREADS2, I2);
     //read_sparse_data_file(sparseOut + ".sim", NM, NMS[0], NREADSM, IM);    
@@ -743,7 +747,6 @@ size_t Data::get_number_of_elements_from_sparse_files(const std::string basename
 
     // Compute the lengths of ones and twos vectors for all markers in the block
     MPI_Offset offset =  MrankS[rank] * sizeof(size_t);
-    
     check_mpi(MPI_File_read_at_all(ssfh, offset, S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(slfh, offset, L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
 
@@ -859,8 +862,12 @@ void Data::read_sparse_data_file(const std::string filename, const size_t N, con
     check_mpi(MPI_File_open(MPI_COMM_WORLD, filename.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
 
     offset = OFF * sizeof(uint);
+    size_t bytes = 0;
 
-    mpi_file_read_at_all<uint*>(N, offset, fh, MPI_UNSIGNED, NREADS, out);
+    mpi_file_read_at_all<uint*>(N, offset, fh, MPI_UNSIGNED, NREADS, out, bytes);
+
+    //EO: above call not collective anymore...
+    MPI_Barrier(MPI_COMM_WORLD);
 
     check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
 }

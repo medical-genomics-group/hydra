@@ -269,16 +269,6 @@ void BayesRRm::sparse_scaadd(double*     __restrict__ vout,
     }
 }
 
-double mysecond()
-{
-    struct timeval  tp;
-    struct timezone tzp;
-    int i;
-    i = gettimeofday(&tp, &tzp);
-    return ( (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6 );
-}
-
-
 
 inline double partial_sparse_dotprod(const double* __restrict__ vec,
                                      const uint*   __restrict__ IX,
@@ -559,7 +549,8 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         offset = size_t(3) + size_t(MSi) * size_t(snpLenByt) * sizeof(char);
         
         // Read the bed data
-        data.mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata);
+	size_t bytes = 0;
+        data.mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
         // Get number of ones, twos, and missing
         data.sparse_data_get_sizes_from_raw(rawdata, MLi, snpLenByt, N1, N2, NM);
@@ -625,7 +616,8 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         // Compute the offset of the section to read from the BED file
         offset = size_t(3) + size_t(MSi) * size_t(snpLenByt) * sizeof(char);
 
-        data.mpi_file_read_at_all<char*>(rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata);
+	size_t bytes = 0;
+        data.mpi_file_read_at_all<char*>(rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
         // Alloc memory for sparse representation
         size_t *N1S, *N1L, *N2S, *N2L, *NMS, *NML;
@@ -1109,6 +1101,8 @@ int BayesRRm::runMpiGibbs() {
 
     MPI_Barrier(MPI_COMM_WORLD);
     const auto st2 = std::chrono::high_resolution_clock::now();
+    
+    double tl = -mysecond();
 
     // Read the data (from sparse representation by default)
     // -----------------------------------------------------
@@ -1122,6 +1116,7 @@ int BayesRRm::runMpiGibbs() {
     dalloc += 6.0 * double(Mtot) * sizeof(size_t) / 1E9;
 
     uint *I1, *I2, *IM;
+    size_t totalBytes = 0;
 
     if (opt.readFromBedFile) {
         data.load_data_from_bed_file(opt.bedFile, Ntot, M, rank, MrankS[rank],
@@ -1135,13 +1130,19 @@ int BayesRRm::runMpiGibbs() {
                                          dalloc,
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,
-                                         NMS, NML, IM);
+                                         NMS, NML, IM,
+					 totalBytes);
     }
 
-    printf("INFO   : rank %d finished loading data\n", rank);
-    fflush(stdout);
-
     MPI_Barrier(MPI_COMM_WORLD);
+
+    tl += mysecond();
+
+    if (rank == 0) {
+      printf("INFO   : Total time to load the data: %lu bytes in %.3f seconds => BW = %7.3f GB/s\n", totalBytes, tl, (double)totalBytes * 1E-9 / tl);
+      fflush(stdout);
+    }
+
 
     // Correct each marker for individuals with missing phenotype
     // ----------------------------------------------------------
@@ -1210,7 +1211,7 @@ int BayesRRm::runMpiGibbs() {
     deltaEps   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaEps,   __LINE__, __FILE__);
     dEpsSum    = (double*)_mm_malloc(NDB, 64);  check_malloc(dEpsSum,    __LINE__, __FILE__);
     deltaSum   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaSum,   __LINE__, __FILE__);
-    dalloc += NDB * 7 / 1E9;
+    dalloc += NDB * 6 / 1E9;
 
     double totalloc = 0.0;
     MPI_Reduce(&dalloc, &totalloc, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -1292,6 +1293,7 @@ int BayesRRm::runMpiGibbs() {
 
         double start_it = MPI_Wtime();
         double tot_sync = 0.0;
+	int    num_sync = 0;
 
         //if (replay_it) {
         //    printf("INFO: replay iteration with m0=%.0f sigG=%15.10f sigE=%15.10f\n", previt_m0, previt_sg, previt_se);
@@ -1516,6 +1518,7 @@ int BayesRRm::runMpiGibbs() {
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
                 tot_sync += end_sync - beg_sync;
+		num_sync += 1;
 
                 // Store epsilon state at last synchronization
                 copy_vector_f64(tmpEps, epsilon, Ntot);
@@ -1640,7 +1643,8 @@ int BayesRRm::runMpiGibbs() {
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
         if (rank%10==0)
-            printf("RESULT : it %4d, rank %4d: time/sync = %9.3f/%8.3f s, sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, rank, end_it-start_it, tot_sync, sigmaG, sigmaE, beta_squaredNorm, int(m0));
+            printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f s, n_sync = %8d (%7.3f), sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n",
+		   iteration, rank, end_it-start_it, tot_sync, num_sync, tot_sync / double(num_sync) * 1000.0, sigmaG, sigmaE, beta_squaredNorm, int(m0));
         fflush(stdout);
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
@@ -1874,7 +1878,6 @@ int BayesRRm::checkRamUsage() {
     string sl;
 
     sl = sparseOut + ".sl1";
-    //cout << "sl = " << sl << endl;
     check_mpi(MPI_File_open(MPI_COMM_WORLD, sl.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &slfh), __LINE__, __FILE__);
     check_mpi(MPI_File_read_at_all(slfh, 0, N1L, Mtot, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&slfh), __LINE__, __FILE__);
