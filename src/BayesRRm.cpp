@@ -1288,12 +1288,18 @@ int BayesRRm::runMpiGibbs() {
 
     int count__sum_vectors_f64_v2 = 0;
     
+    double tot_sync_ar1  = 0.0;
+    double tot_sync_ar2  = 0.0;
+    int    tot_nsync_ar1 = 0;
+    int    tot_nsync_ar2 = 0;
 
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
 
         double start_it = MPI_Wtime();
-        double tot_sync = 0.0;
-	int    num_sync = 0;
+        double it_sync_ar1  = 0.0;
+	double it_sync_ar2  = 0.0;
+	int    it_nsync_ar1 = 0;
+	int    it_nsync_ar2 = 0;
 
         //if (replay_it) {
         //    printf("INFO: replay iteration with m0=%.0f sigG=%15.10f sigE=%15.10f\n", previt_m0, previt_sg, previt_se);
@@ -1492,7 +1498,14 @@ int BayesRRm::runMpiGibbs() {
             // sum of the abs values !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if (nranks > 1) { 
                 double sumDeltaBetas = 0.0;
+		MPI_Barrier(MPI_COMM_WORLD);
+		double tb = MPI_Wtime();
                 check_mpi(MPI_Allreduce(&deltaBeta, &sumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+		double te = MPI_Wtime();
+		tot_sync_ar1  += te - tb;
+                it_sync_ar1   += te - tb;
+		tot_nsync_ar1 += 1;
+		it_nsync_ar1  += 1;
                 cumSumDeltaBetas += sumDeltaBetas;
             } else {
                 cumSumDeltaBetas += deltaBeta;
@@ -1502,9 +1515,15 @@ int BayesRRm::runMpiGibbs() {
             if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
 
                 // Update local copy of epsilon
-                double beg_sync = MPI_Wtime();
+	        MPI_Barrier(MPI_COMM_WORLD);
                 if (nranks > 1) {
+ 		    double tb = MPI_Wtime();
                     check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+		    double te = MPI_Wtime();
+                    tot_sync_ar2  += te - tb;
+                    it_sync_ar2   += te - tb;
+                    tot_nsync_ar2 += 1;
+		    it_nsync_ar2  += 1;
                     sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
                 } else {
                     count__sum_vectors_f64_v2 += 1;
@@ -1517,8 +1536,6 @@ int BayesRRm::runMpiGibbs() {
                 }
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
-                tot_sync += end_sync - beg_sync;
-		num_sync += 1;
 
                 // Store epsilon state at last synchronization
                 copy_vector_f64(tmpEps, epsilon, Ntot);
@@ -1548,6 +1565,7 @@ int BayesRRm::runMpiGibbs() {
         // Transfer global to local
         // ------------------------
         if (nranks > 1) {
+	    MPI_Barrier(MPI_COMM_WORLD);
             check_mpi(MPI_Allreduce(&beta_squaredNorm, &sum_beta_squaredNorm, 1,        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             check_mpi(MPI_Allreduce(v.data(),          sum_v.data(),          v.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             v                = sum_v;
@@ -1643,8 +1661,13 @@ int BayesRRm::runMpiGibbs() {
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
         if (rank%10==0)
-            printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f s, n_sync = %8d (%7.3f), sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n",
-		   iteration, rank, end_it-start_it, tot_sync, num_sync, tot_sync / double(num_sync) * 1000.0, sigmaG, sigmaE, beta_squaredNorm, int(m0));
+            printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f (%9.3f + %9.3f), n_sync = %8d (%8d + %8d) (%7.3f / %7.3f), sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n",
+		   iteration, rank, end_it-start_it,
+		   it_sync_ar1  + it_sync_ar2,  it_sync_ar1,  it_sync_ar2,
+		   it_nsync_ar1 + it_nsync_ar2, it_nsync_ar1, it_nsync_ar2,
+		   (it_sync_ar1) / double(it_nsync_ar1) * 1000.0,
+		   (it_sync_ar2) / double(it_nsync_ar2) * 1000.0,
+		   sigmaG, sigmaE, beta_squaredNorm, int(m0));
         fflush(stdout);
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
@@ -1827,7 +1850,11 @@ int BayesRRm::runMpiGibbs() {
     const auto dt3 = et3 - st3;
     const auto du3 = std::chrono::duration_cast<std::chrono::milliseconds>(dt3).count();
     if (rank == 0)
-        printf("INFO   : rank %4d, time to process the data: %.3f sec.\n", rank, du3 / double(1000.0));
+        printf("INFO   : rank %4d, time to process the data: %.3f sec, with %.3f (%.3f, %.3f) = %4.1f%% spent on allred (%d, %d)\n",
+	       rank, du3 / double(1000.0),
+	       tot_sync_ar1 + tot_sync_ar2, tot_sync_ar1, tot_sync_ar2,
+	       (tot_sync_ar1 + tot_sync_ar2) / (du3 / double(1000.0)) * 100.0,
+	       tot_nsync_ar1, tot_nsync_ar2);
 
     return 0;
 }
