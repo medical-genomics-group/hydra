@@ -4,16 +4,24 @@
 # Date   : 22.01.2019
 #
 
-EXE       = mpi_gibbs_G
+EXE ?= mpi_gibbs_G
 
 CXX       = mpic++
 
-CXXFLAGS  = -O3
-#CXXFLAGS += g
+#CXXFLAGS  = -O0
+CXXFLAGS = -Ofast
+CXXFLAGS += -g
 CXXFLAGS += -std=c++17
+#CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
+#CXXFLAGS += -xCORE-AVX2
+#CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
 CXXFLAGS += -march=native
 CXXFLAGS += -D USE_MPI
-
+#CXXFLAGS += -D EIGEN_DONT_VECTORIZE
+CXXFLAGS += -fopenmp
+#CXXFLAGS += -qopt-report=2
+#CXXFLAGS += -qopt-report-phase=loop,vec
+#CXXFLAGS += -qopt-report-file=stdout
 #CXXFLAGS +=  -fopt-info-vec-optimized
 
 INCLUDE  = -I/home/orliac/external_soft/pcg-c/include
@@ -22,17 +30,32 @@ INCLUDE += -I$(BOOST_ROOT)/include
 INCLUDE += -I$(MVAPICH2_ROOT)/include
 
 LIBS     = -lz
+#LIBS    += -lomp
+#LIBS    += -lstdc++fs
+#LIBS    += -lboost_system 
+#LIBS    += -lboost_filesystem
 
-SRC = data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
+SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 
-OBJ = $(SRC:.cpp = .o)
+OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
-all:	$(EXE)
+DEPENDS := $(patsubst %.cpp,%.d,$(SOURCES))
 
-$(EXE):	$(OBJ)
-		$(CXX) $(CXXFLAGS) $(INCLUDE) $(LIBS) -o $(EXE) $(OBJ)
+#WARNING := -Wall -Wextra
+
+RM := /usr/bin/rm
+
+.PHONY: all clean
+
+all: $(EXE)
 
 clean:
-	/usr/bin/rm -rvf	\
-	*.o
+	$(RM) $(OBJECTS) $(DEPENDS) $(EXE)
 
+$(EXE): $(OBJECTS)
+	$(CXX) $(WARNING) $(CXXFLAGS) $(INCLUDE) $(LIBS) $^ -o $@
+
+-include $(DEPENDS)
+
+%.o: %.cpp Makefile
+	$(CXX) $(WARNING) $(CXXFLAGS) $(INCLUDE) $(LIBS) -MMD -MP -c $< -o $@
