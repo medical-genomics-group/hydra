@@ -10,7 +10,6 @@ CXX       = mpiicpc
 
 #CXXFLAGS  = -O0
 CXXFLAGS = -Ofast
-#CXXFLAGS  = -O1
 CXXFLAGS += -g
 CXXFLAGS += -std=c++17
 CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
@@ -22,6 +21,7 @@ CXXFLAGS += -qopenmp
 #CXXFLAGS += -qopt-report=2
 #CXXFLAGS += -qopt-report-phase=loop,vec
 #CXXFLAGS += -qopt-report-file=stdout
+CXXFLAGS += -L/usr/lib64
 
 #EO: set this back when switching to production
 #    This will allow to fully use vectorization on both fidis and gacrux
@@ -32,6 +32,8 @@ CXXFLAGS += -qopenmp
 #CXXFLAGS += -fp-model precise 
 #CXXFLAGS += -fp-model source
 
+#INCLUDE   = -I$(HOME)/inc/Eigen-3.3.7
+#INCLUDE  += -I$(HOME)/inc/Boost-1.71.0
 INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
 #INCLUDE += -I../tbb/include

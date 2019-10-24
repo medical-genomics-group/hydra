@@ -7,6 +7,7 @@
 #include "compression.h"
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
+#include <mm_malloc.h>
 #ifdef USE_MPI
 #include <mpi.h>
 #include "mpi_utils.hpp"
@@ -466,8 +467,9 @@ void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, c
     check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
    
 
-    size_t N1=0, N2=0, NM=0;
+    size_t N1 = 0, N2 = 0, NM = 0;
     sparse_data_get_sizes_from_raw(rawdata, M, snpLenByt, N1, N2, NM);
+    //printf("read from bed: N1 = %lu, N2 = %lu, NM = %lu\n", N1, N2, NM);
 
     // Alloc and build sparse structure
     I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);

@@ -3,8 +3,7 @@
 # $1 : pass -B from command line to force recompilation e.g.
 #
 
-source ./compile_code.sh $1
-
+source ./compile_code_G.sh $1
 
 S="1.0,0.1"
 
@@ -73,7 +72,7 @@ echo
 echo
 echo "@@@ Official (sequential) solution (reading from BED file) @@@"
 echo
-cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen   --chain-length $CL --burn-in 0 --thin 1 --mcmc-out-dir $outdir --mcmc-out-name ref --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS"
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phen}.phen   --chain-length $CL --burn-in 0 --thin 1 --mcmc-out-dir $outdir --mcmc-out-name refG --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS"
 #cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$dataset --pheno $datadir/${phenNA}.phen --chain-length $CL --burn-in 0 --thin 1 --mcmc-out refNA --shuf-mark $SM --seed $SEED --S $S --number-markers $NUMSNPS"
 #--covariates $datadir/scaled_covariates.csv
 echo ----------------------------------------------------------------------------------
@@ -85,7 +84,7 @@ echo
 echo
 echo "@@@ MPI 1-task solution reading from  BED file @@@"
 echo
-sol=mpi1tbed
+sol=mpi1tbedG
 cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS"
 echo ----------------------------------------------------------------------------------
 echo $cmd
@@ -97,7 +96,7 @@ echo
 echo
 echo "@@@ MPI 1-task solution reading from SPARSE files @@@"
 echo
-sol=mpi1tsparse
+sol=mpi1tsparseG
 cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
 echo ----------------------------------------------------------------------------------
 echo $cmd
