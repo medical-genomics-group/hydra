@@ -66,10 +66,12 @@ void partial_sparse_dotprod_mt(const double*  __restrict__ vin1,
     //for (int ii=0; ii<1024; ii++) {
 
     if (interleave) {
+#ifdef __INTEL_COMPILER
         __assume_aligned(vin1, 64);
         __assume_aligned(m8,   64);
         __assume_aligned(IX,   64);
         __assume_aligned(mask, 64);
+#endif
         for (size_t i=NXS; i<NXS+NXL; ++i) {
             const uint index = IX[i];
             const double* p = &vin1[NT*index];
@@ -86,10 +88,12 @@ void partial_sparse_dotprod_mt(const double*  __restrict__ vin1,
 
         for (int i=0; i<NT; i++) {
             const uint ioff = i * Ntot;
+#ifdef __INTEL_COMPILER
             __assume_aligned(vin1, 64);
             __assume_aligned(IX,   64);
             __assume_aligned(mask, 64);
             __assume_aligned(m8,   64);
+#endif
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+: m8[i])
 #endif
@@ -247,8 +251,10 @@ void BayesRRm_mt::set_mt_vector_f64(double* __restrict__ vec,
     
     if (interleave) {
         const int NNT = N * NT;
+#ifdef __INTEL_COMPILER
         __assume_aligned(vec, 64);
         __assume_aligned(val,  64);
+#endif
         for (int i=0; i<NNT; i+=NT) {
 #pragma unroll
             for (int j=0; j<NT; j++) {
@@ -273,8 +279,10 @@ void BayesRRm_mt::sum_mt_vector_elements_f64(const double* __restrict__ vec,
     if (interleave) {
         const int NNT = NT * N;
         for (int j=0; j < NT; j++) {
+#ifdef __INTEL_COMPILER
         __assume_aligned(vec, 64);
         __assume_aligned(syt8, 64);
+#endif
 #ifdef _OPENMP
 #pragma omp parallel for simd reduction(+: syt8[j])
 #endif
@@ -436,7 +444,9 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
         sigmaE8[i] = 0.0;
     }
 
+#ifdef __INTEL_COMPILER
     __assume_aligned(Beta8, 64);
+#endif
     for (int i=0; i<M*NT; i++)
         Beta8[i] = 0.0;
 
@@ -904,8 +914,10 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
             //printf("it %d rank %d: sigE_G8 = %15.10f, %15.10f, %15.10f\n", iteration, rank, sigE_G8[i], sigG_E8[i], i_2sigE8[i]);
         }
 
+#ifdef __INTEL_COMPILER
         __assume_aligned(tmpEps,  64);
         __assume_aligned(epsilon, 64);
+#endif
         for (int i=0; i<Ntot*NT; ++i) {
             tmpEps[i] = epsilon[i];
         }
@@ -1146,7 +1158,9 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
 
 
         double beta_squaredNorm8[8] = {0.0};
+#ifdef __INTEL_COMPILER
         __assume_aligned(Beta8, 64);
+#endif
         for (int i=0; i<NT; i++) {
             for (int ii=0; ii<M; ii++) {
                 beta_squaredNorm8[i] += Beta8[i*M + ii] * Beta8[i*M + ii];

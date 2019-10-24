@@ -22,6 +22,7 @@
 #include <sys/time.h>
 #include <iostream>
 #include <ctime>
+#include <mm_malloc.h>
 #ifdef USE_MPI
 #include <mpi.h>
 #include "mpi_utils.hpp"
@@ -52,9 +53,10 @@ BayesRRm::~BayesRRm()
 void BayesRRm::set_vector_f64(double* __restrict__ vec, const double val, const int N) {
   
     const int N8 = (N/8) * 8;
-
+#ifdef __INTEL_COMPILER
     __assume_aligned(vec, 64);
     __assume(N8%8==0);
+#endif
     //#pragma unroll(8)
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -90,9 +92,10 @@ inline void copy_vector_f64(double* __restrict__ dest, const double* __restrict_
 */
 
 void BayesRRm::copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
-
+#ifdef __INTEL_COMPILER
     __assume_aligned(dest,   64);
     __assume_aligned(source, 64);
+#endif
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -106,10 +109,10 @@ double BayesRRm::sum_vector_elements_f64_base(const double* __restrict__ vec, co
 
     const int N8 = (N/8) * 8;
     double sum = 0.0;
-
+#ifdef __INTEL_COMPILER
     __assume_aligned(vec, 64);
     __assume(N8%8==0);
-
+#endif
 #pragma unroll(8)
     for (int i=0; i<N8; i++) {
         sum += vec[i];
@@ -126,9 +129,9 @@ double BayesRRm::sum_vector_elements_f64_base(const double* __restrict__ vec, co
 double BayesRRm::sum_vector_elements_f64(const double* __restrict__ vec, const int N) {
 
     double sum = 0.0;
-
+#ifdef __INTEL_COMPILER
     __assume_aligned(vec, 64);
-
+#endif
     //#pragma unroll
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+: sum)
@@ -143,9 +146,11 @@ double BayesRRm::sum_vector_elements_f64(const double* __restrict__ vec, const i
 
 void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
                                const int N) {
+#ifdef __INTEL_COMPILER
     __assume_aligned(in1, 64);
     __assume_aligned(in2, 64);
     __assume_aligned(out, 64);
+#endif
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -180,10 +185,11 @@ inline void sum_vectors_f64(double* __restrict__ out, const double* __restrict__
 void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N) {
     
     const int N8 = (N/8) * 8;
-
+#ifdef __INTEL_COMPILER
     __assume_aligned(in1, 64);
     __assume_aligned(out, 64);
     __assume(N8%8==0);
+#endif
     //#pragma unroll(8)
 #ifdef _OPENMP
 #pragma omp parallel for
@@ -200,11 +206,11 @@ void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restric
 
 inline void sum_vectors_f64_ref(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
                                 const int N) {
-
+#ifdef __INTEL_COMPILER
     __assume_aligned(in1, 64);
     __assume_aligned(in2, 64);
     __assume_aligned(out, 64);
-
+#endif
     for (int i=0; i<N; ++i) {
         out[i] = in1[i] + in2[i];
     }
@@ -228,8 +234,10 @@ inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, c
 inline void partial_sparse_scaadd(double*       __restrict__ vec,
                                   const double               val,
                                   const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
+#ifdef __INTEL_COMPILER
     __assume_aligned(vec, 64);
     __assume_aligned(IX,  64);
+#endif
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -283,9 +291,10 @@ inline double partial_sparse_dotprod(const double* __restrict__ vec,
     //printf("kerold 1 BW = %g\n", double(N1L)*sizeof(double) / 1024. / 1024. / t1);
 
     double dp = 0.0;
-
+#ifdef __INTEL_COMPILER
     __assume_aligned(vec, 64);
     __assume_aligned(IX,  64);
+#endif
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+: dp)
 #endif
@@ -1660,15 +1669,16 @@ int BayesRRm::runMpiGibbs() {
 
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
-        if (rank%10==0)
+        if (rank%10==0) {
             printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f (%9.3f + %9.3f), n_sync = %8d (%8d + %8d) (%7.3f / %7.3f), sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n",
-		   iteration, rank, end_it-start_it,
-		   it_sync_ar1  + it_sync_ar2,  it_sync_ar1,  it_sync_ar2,
-		   it_nsync_ar1 + it_nsync_ar2, it_nsync_ar1, it_nsync_ar2,
-		   (it_sync_ar1) / double(it_nsync_ar1) * 1000.0,
-		   (it_sync_ar2) / double(it_nsync_ar2) * 1000.0,
-		   sigmaG, sigmaE, beta_squaredNorm, int(m0));
-        fflush(stdout);
+                   iteration, rank, end_it-start_it,
+                   it_sync_ar1  + it_sync_ar2,  it_sync_ar1,  it_sync_ar2,
+                   it_nsync_ar1 + it_nsync_ar2, it_nsync_ar1, it_nsync_ar2,
+                   (it_sync_ar1) / double(it_nsync_ar1) * 1000.0,
+                   (it_sync_ar2) / double(it_nsync_ar2) * 1000.0,
+                   sigmaG, sigmaE, beta_squaredNorm, int(m0));
+            fflush(stdout);
+        }
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
         //printf("inv scaled parameters %20.15f __ %20.15f\n", v0G+m0, (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
@@ -1839,12 +1849,10 @@ int BayesRRm::runMpiGibbs() {
     _mm_free(N2S); 
     _mm_free(N2L);
     _mm_free(I2);
-    _mm_free(NMS); 
+    _mm_free(NMS);
     _mm_free(NML);
     _mm_free(IM);
 
-    // Finalize the MPI environment
-    //MPI_Finalize();
 
     const auto et3 = std::chrono::high_resolution_clock::now();
     const auto dt3 = et3 - st3;
@@ -2382,16 +2390,14 @@ int BayesRRm::runGibbs()
         //std::cout << iterationDuration / double(1000.0) << "s" << std::endl;
         
 
-        printf("RESULT#: it %4d, rank %4d: time = %9.3f s, sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, 0000, iterationDuration / double(1000.0), v0G+double(m0),(betasqn * double(m0) + v0G*s02G) /(v0G+double(m0)), sigmaG, sigmaE, betasqn, m0);
+        printf("RESULT#: it %4d, rank %4d: time = %9.3f s, sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n", iteration, 0000, iterationDuration / double(1000.0), sigmaG, sigmaE, betasqn, m0);
+        fflush(stdout);
 
         //write samples
         //if (iteration >= burn_in && iteration % opt.thin == 0) {
         //        sample << iteration, mu, beta, sigmaE, sigmaG, components, epsilon;
         //        writer.write(sample);
         //    }
-
-
-        //end of iteration
     }
 
     //show info on total time spent
