@@ -1,29 +1,9 @@
 #!/bin/bash
-
 #
-# ATTENTION: need to be in an active slurm allocation!
+# $1 : pass -B from command line to force recompilation e.g.
 #
 
-module purge
-module load intel intel-mpi intel-mkl boost eigen
-module list
-
-
-NAM=mpi_gibbs
-
-EXE=./src/$NAM
-
-# COMPILATION
-cd ./src
-B='-B'
-B=''
-make EXE=$NAM $B -f Makefile || exit 1;
-cd ..
-
-if [ ! -f $EXE ]; then
-    echo Fatal: binary $EXE not found!
-    exit
-fi
+source ./compile_code.sh $1
 
 
 S="1.0,0.1"
@@ -53,10 +33,10 @@ elif [ $DS == 2 ]; then
     dataset=testN500K
     phen=$dataset
     sparsedir=$datadir
-    sparsebsn=${dataset}_uint_test
+    sparsebsn=${dataset}_uint
     NUMINDS=500000
     NUMSNPS=1270420
-    NUMSNPS=5000
+    NUMSNPS=20000
 elif [ $DS == 3 ]; then
     sparsedir=/scratch/orliac/UKBgen/
     sparsebsn=epfl_test_data_sparse
@@ -80,7 +60,7 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=10
+CL=3
 SEED=1222
 SR=0
 SM=0
@@ -99,7 +79,7 @@ cmd="srun -N $N --ntasks-per-node=$TPN $EXE --bayes bayesMmap --bfile $datadir/$
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------
-$cmd
+$cmd || exit 1
 
 echo
 echo
@@ -110,7 +90,7 @@ cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------
-$cmd
+$cmd || exit 1
 
 
 echo
@@ -122,7 +102,7 @@ cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------
-$cmd
+$cmd || exit 1
 #--marker-blocks-file $datadir/${dataset}.blk_1 
 #--covariates $datadir/scaled_covariates.csv
 
