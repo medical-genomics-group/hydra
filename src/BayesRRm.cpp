@@ -31,16 +31,16 @@
 #include <omp.h>
 
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
-: data(data)
-, opt(opt)
-, bedFile(opt.bedFile + ".bed")
-, memPageSize(memPageSize)
-, seed(opt.seed)
-, max_iterations(opt.chainLength)
-, burn_in(opt.burnin)
-  //, dist(opt.seed)
-, usePreprocessedData(opt.analysisType == "PPBayes")
-, showDebug(false)
+    : data(data)
+    , opt(opt)
+    , bedFile(opt.bedFile + ".bed")
+    , memPageSize(memPageSize)
+    , seed(opt.seed)
+    , max_iterations(opt.chainLength)
+    , burn_in(opt.burnin)
+      //, dist(opt.seed)
+    , usePreprocessedData(opt.analysisType == "PPBayes")
+    , showDebug(false)
 {
     float* ptr =static_cast<float*>(&opt.S[0]);
     cva = (Eigen::Map<Eigen::VectorXf>(ptr, static_cast<long>(opt.S.size()))).cast<double>();
@@ -72,23 +72,23 @@ void BayesRRm::set_vector_f64(double* __restrict__ vec, const double val, const 
 
 
 /*
-inline void copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
+  inline void copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
 
-    const int N8 = (N/8) * 8;
+  const int N8 = (N/8) * 8;
 
-    __assume_aligned(dest,   64);
-    __assume_aligned(source, 64);
-    __assume(N8%8==0);
+  __assume_aligned(dest,   64);
+  __assume_aligned(source, 64);
+  __assume(N8%8==0);
 
-#pragma unroll(8)
-    for (int i=0; i<N8; i++) {
-        dest[i] = source[i];
-    }
+  #pragma unroll(8)
+  for (int i=0; i<N8; i++) {
+  dest[i] = source[i];
+  }
 
-    for (int i=N8; i<N; ++i) {
-        dest[i] = source[i];
-    }
-}
+  for (int i=N8; i<N; ++i) {
+  dest[i] = source[i];
+  }
+  }
 */
 
 void BayesRRm::copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
@@ -160,26 +160,26 @@ void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restric
 }
 
 /*
-inline void sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
-                            const int N) {
+  inline void sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
+  const int N) {
 
-    const int N8 = (N/8) * 8;
+  const int N8 = (N/8) * 8;
 
-    __assume_aligned(in1, 64);
-    __assume_aligned(in2, 64);
-    __assume_aligned(out, 64);
-    __assume(N8%8==0);
+  __assume_aligned(in1, 64);
+  __assume_aligned(in2, 64);
+  __assume_aligned(out, 64);
+  __assume(N8%8==0);
 
-    //#pragma unroll(8)
-#pragma omp parallel for
-    for (int i=0; i<N8; i++) {
-        out[i] = in1[i] + in2[i];
-    }
+  //#pragma unroll(8)
+  #pragma omp parallel for
+  for (int i=0; i<N8; i++) {
+  out[i] = in1[i] + in2[i];
+  }
 
-    for (int i=N8; i<N; ++i) {
-        out[i] = in1[i] + in2[i];
-    }
-}
+  for (int i=N8; i<N; ++i) {
+  out[i] = in1[i] + in2[i];
+  }
+  }
 */
 
 void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N) {
@@ -558,7 +558,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         offset = size_t(3) + size_t(MSi) * size_t(snpLenByt) * sizeof(char);
         
         // Read the bed data
-	size_t bytes = 0;
+        size_t bytes = 0;
         data.mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
         // Get number of ones, twos, and missing
@@ -625,7 +625,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         // Compute the offset of the section to read from the BED file
         offset = size_t(3) + size_t(MSi) * size_t(snpLenByt) * sizeof(char);
 
-	size_t bytes = 0;
+        size_t bytes = 0;
         data.mpi_file_read_at_all<char*>(rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
         // Alloc memory for sparse representation
@@ -940,9 +940,9 @@ int BayesRRm::runMpiGibbs() {
 
     //marion : for annotation code
     /*
-    sigmaGG = VectorXd(groupCount); 	//vector with sigmaG (variance) for each annotation
-    betasqnG = VectorXd(groupCount);	//vector with sum of beta squared for each annotation
-    v = MatrixXd(groupCount,K);         // variable storing the component assignment
+      sigmaGG = VectorXd(groupCount); 	//vector with sigmaG (variance) for each annotation
+      betasqnG = VectorXd(groupCount);	//vector with sum of beta squared for each annotation
+      v = MatrixXd(groupCount,K);         // variable storing the component assignment
     */
 
     dalloc +=     M * sizeof(int)    / 1E9; // for components
@@ -1140,7 +1140,7 @@ int BayesRRm::runMpiGibbs() {
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,
                                          NMS, NML, IM,
-					 totalBytes);
+                                         totalBytes);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1148,8 +1148,8 @@ int BayesRRm::runMpiGibbs() {
     tl += mysecond();
 
     if (rank == 0) {
-      printf("INFO   : Total time to load the data: %lu bytes in %.3f seconds => BW = %7.3f GB/s\n", totalBytes, tl, (double)totalBytes * 1E-9 / tl);
-      fflush(stdout);
+        printf("INFO   : Total time to load the data: %lu bytes in %.3f seconds => BW = %7.3f GB/s\n", totalBytes, tl, (double)totalBytes * 1E-9 / tl);
+        fflush(stdout);
     }
 
 
@@ -1306,9 +1306,9 @@ int BayesRRm::runMpiGibbs() {
 
         double start_it = MPI_Wtime();
         double it_sync_ar1  = 0.0;
-	double it_sync_ar2  = 0.0;
-	int    it_nsync_ar1 = 0;
-	int    it_nsync_ar2 = 0;
+        double it_sync_ar2  = 0.0;
+        int    it_nsync_ar1 = 0;
+        int    it_nsync_ar2 = 0;
 
         //if (replay_it) {
         //    printf("INFO: replay iteration with m0=%.0f sigG=%15.10f sigE=%15.10f\n", previt_m0, previt_sg, previt_se);
@@ -1361,12 +1361,12 @@ int BayesRRm::runMpiGibbs() {
         // get sigmaGG : to which annotation the marker belongs
         // then use this sigmaGG as sigmaG for this marker
         /*
-        double sigmaG_process; // we could keep sigmaG instead of sigmaG_process
-        sigmaG_process = sigmaGG[data->G(marker->i)];
+          double sigmaG_process; // we could keep sigmaG instead of sigmaG_process
+          sigmaG_process = sigmaGG[data->G(marker->i)];
 
-        // set variable cVa
-        cVa.segment(1, km1) = cva.row(data->G(marker->i));
-        cVaI.segment(1, km1) = cVa.segment(1, km1).cwiseInverse();
+          // set variable cVa
+          cVa.segment(1, km1) = cva.row(data->G(marker->i));
+          cVaI.segment(1, km1) = cVa.segment(1, km1).cwiseInverse();
         */
 
 
@@ -1507,14 +1507,14 @@ int BayesRRm::runMpiGibbs() {
             // sum of the abs values !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             if (nranks > 1) { 
                 double sumDeltaBetas = 0.0;
-		MPI_Barrier(MPI_COMM_WORLD);
-		double tb = MPI_Wtime();
+                MPI_Barrier(MPI_COMM_WORLD);
+                double tb = MPI_Wtime();
                 check_mpi(MPI_Allreduce(&deltaBeta, &sumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-		double te = MPI_Wtime();
-		tot_sync_ar1  += te - tb;
+                double te = MPI_Wtime();
+                tot_sync_ar1  += te - tb;
                 it_sync_ar1   += te - tb;
-		tot_nsync_ar1 += 1;
-		it_nsync_ar1  += 1;
+                tot_nsync_ar1 += 1;
+                it_nsync_ar1  += 1;
                 cumSumDeltaBetas += sumDeltaBetas;
             } else {
                 cumSumDeltaBetas += deltaBeta;
@@ -1524,24 +1524,24 @@ int BayesRRm::runMpiGibbs() {
             if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
 
                 // Update local copy of epsilon
-	        MPI_Barrier(MPI_COMM_WORLD);
+                MPI_Barrier(MPI_COMM_WORLD);
                 if (nranks > 1) {
- 		    double tb = MPI_Wtime();
+                    double tb = MPI_Wtime();
                     check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-		    double te = MPI_Wtime();
+                    double te = MPI_Wtime();
                     tot_sync_ar2  += te - tb;
                     it_sync_ar2   += te - tb;
                     tot_nsync_ar2 += 1;
-		    it_nsync_ar2  += 1;
+                    it_nsync_ar2  += 1;
                     sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
                 } else {
                     count__sum_vectors_f64_v2 += 1;
                     //double t1 = -mysecond();
                     //for (int ii=0; ii<100; ii++) {
-                        sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
-                        //}
-                        //t1 += mysecond();
-                        //printf("kernel 1 BW = %g\n", double(Ntot) * 3.0 * sizeof(double) / 1024. / 1024. / (t1 / 100.0));
+                    sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
+                    //}
+                    //t1 += mysecond();
+                    //printf("kernel 1 BW = %g\n", double(Ntot) * 3.0 * sizeof(double) / 1024. / 1024. / (t1 / 100.0));
                 }
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
@@ -1574,7 +1574,7 @@ int BayesRRm::runMpiGibbs() {
         // Transfer global to local
         // ------------------------
         if (nranks > 1) {
-	    MPI_Barrier(MPI_COMM_WORLD);
+            MPI_Barrier(MPI_COMM_WORLD);
             check_mpi(MPI_Allreduce(&beta_squaredNorm, &sum_beta_squaredNorm, 1,        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             check_mpi(MPI_Allreduce(v.data(),          sum_v.data(),          v.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             v                = sum_v;
@@ -1592,31 +1592,31 @@ int BayesRRm::runMpiGibbs() {
         // 
         // ---------------
         /*
-        if (iteration >= 0) {
+          if (iteration >= 0) {
             
-            double max_sg = 0.0;
-            MPI_Allreduce(&sigmaG, &max_sg, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-            if (rank == 0) printf("INFO   : max sigmaG of iteration %d is %15.10f with sync rate of %d\n", iteration, max_sg, sync_rate);
+          double max_sg = 0.0;
+          MPI_Allreduce(&sigmaG, &max_sg, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+          if (rank == 0) printf("INFO   : max sigmaG of iteration %d is %15.10f with sync rate of %d\n", iteration, max_sg, sync_rate);
 
-            if (max_sg > 1.0) {
-                if (sync_rate == 0) {
-                    if (rank == 0) {
-                        printf("CRITICAL: detected task with sigmaG = %15.10f and sync rate of %d\n", max_sg, sync_rate); 
-                        printf("          => desperate situation, aborting...\n");
-                    }
-                    MPI_Abort(MPI_COMM_WORLD, 1);
-                } else {
-                    if (rank == 0)
-                        printf("          => will do an attempt with setting sync_rate to 0\n");
-                    replay_it = true;
-                    continue;
-                }
-            }
+          if (max_sg > 1.0) {
+          if (sync_rate == 0) {
+          if (rank == 0) {
+          printf("CRITICAL: detected task with sigmaG = %15.10f and sync rate of %d\n", max_sg, sync_rate); 
+          printf("          => desperate situation, aborting...\n");
+          }
+          MPI_Abort(MPI_COMM_WORLD, 1);
+          } else {
+          if (rank == 0)
+          printf("          => will do an attempt with setting sync_rate to 0\n");
+          replay_it = true;
+          continue;
+          }
+          }
 
-            //if ( m0 > 1.2 * previt_m0 || m0 < 0.8 * previt_m0) {
-            //    printf("CRITICAL: divergence detected! Will cancel iteration and set up a lower sync rate\n");
-            //}
-        }
+          //if ( m0 > 1.2 * previt_m0 || m0 < 0.8 * previt_m0) {
+          //    printf("CRITICAL: divergence detected! Will cancel iteration and set up a lower sync rate\n");
+          //}
+          }
         */
 
         // For the fixed effects
@@ -1859,10 +1859,10 @@ int BayesRRm::runMpiGibbs() {
     const auto du3 = std::chrono::duration_cast<std::chrono::milliseconds>(dt3).count();
     if (rank == 0)
         printf("INFO   : rank %4d, time to process the data: %.3f sec, with %.3f (%.3f, %.3f) = %4.1f%% spent on allred (%d, %d)\n",
-	       rank, du3 / double(1000.0),
-	       tot_sync_ar1 + tot_sync_ar2, tot_sync_ar1, tot_sync_ar2,
-	       (tot_sync_ar1 + tot_sync_ar2) / (du3 / double(1000.0)) * 100.0,
-	       tot_nsync_ar1, tot_nsync_ar2);
+               rank, du3 / double(1000.0),
+               tot_sync_ar1 + tot_sync_ar2, tot_sync_ar1, tot_sync_ar2,
+               (tot_sync_ar1 + tot_sync_ar2) / (du3 / double(1000.0)) * 100.0,
+               tot_nsync_ar1, tot_nsync_ar2);
 
     return 0;
 }
@@ -2251,11 +2251,11 @@ int BayesRRm::runGibbs()
             Cx = getSnpData(marker);
             
             /*
-            double sqn = 0.0;
-            for (int i=0; i<N; i++) {
-                sqn += Cx[i] * Cx[i];
-            }
-            printf("beta = %20.15f, mean = %20.15f and sqne = %20.15f sqn = %20.15f\n", beta_old, Cx.mean(), Cx.squaredNorm(), sqn);
+              double sqn = 0.0;
+              for (int i=0; i<N; i++) {
+              sqn += Cx[i] * Cx[i];
+              }
+              printf("beta = %20.15f, mean = %20.15f and sqne = %20.15f sqn = %20.15f\n", beta_old, Cx.mean(), Cx.squaredNorm(), sqn);
             */
 
             // residual update only if marker was previously included in model
@@ -2267,11 +2267,11 @@ int BayesRRm::runGibbs()
                 y_tilde = epsilon;
             }
             /*
-            if (beta(marker) != 0.0) {
-                y_tilde = epsilon + beta_old*Cx;
-            } else {
-                y_tilde = epsilon;
-            }
+              if (beta(marker) != 0.0) {
+              y_tilde = epsilon + beta_old*Cx;
+              } else {
+              y_tilde = epsilon;
+              }
             */
 
 
@@ -2303,8 +2303,8 @@ int BayesRRm::runGibbs()
             const double logLScale = sigmaG / sigmaE * NM1;
             logL = pi.array().log(); // First component probabilities remain unchanged
             logL.segment(1, km1) = logL.segment(1, km1).array()
-                    		        - 0.5 * ((logLScale * cVa.segment(1, km1).array() + 1).array().log())
-                    		        + 0.5 * (muk.segment(1, km1).array() * num) / sigmaE;
+                - 0.5 * ((logLScale * cVa.segment(1, km1).array() + 1).array().log())
+                + 0.5 * (muk.segment(1, km1).array() * num) / sigmaE;
 
             double p(dist.unif_rng());
 
@@ -2351,11 +2351,11 @@ int BayesRRm::runGibbs()
             }
 
             /*
-            if (beta(marker) != 0.0) {
-                epsilon=y_tilde - beta(marker)*Cx;
-            } else {
-                epsilon=y_tilde;
-            }
+              if (beta(marker) != 0.0) {
+              epsilon=y_tilde - beta(marker)*Cx;
+              } else {
+              epsilon=y_tilde;
+              }
             */
             //printf("%d %d epssqn = %15.10f\n", iteration, marker, epsilon.squaredNorm());
         }
