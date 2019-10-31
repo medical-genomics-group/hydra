@@ -226,6 +226,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if(!strcmp(argv[i], "--covariates")) {
             covariates = true;
             covariatesFile = argv[++i];
+            //cout << "covariatesFile = " << covariatesFile << endl;
             ss << "--covariates " << argv[i] << "\n";
         }
         else {

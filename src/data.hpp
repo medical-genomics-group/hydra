@@ -326,6 +326,8 @@ public:
 
     void readPhenotypeFile(const string &phenFile);
 
+    void readPhenCovFiles(const string &phenFile, const string covFile, const int numberIndividuals, VectorXd& dest, const int rank);
+
     void readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest);
     void readPhenotypeFiles(const vector<string> &phenFile, const int numberIndividuals, MatrixXd& dest);
 

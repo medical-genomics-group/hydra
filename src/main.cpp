@@ -53,9 +53,12 @@ int main(int argc, const char * argv[]) {
 
 
         if (opt.bedToSparse || opt.checkRam) {
+
             data.readFamFile(opt.bedFile + ".fam");
             data.readBimFile(opt.bedFile + ".bim");
+
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+
             if (opt.bedToSparse) {
                 analysis.write_sparse_data_files(opt.blocksPerRank);
             } else if (opt.checkRam) {
@@ -78,15 +81,19 @@ int main(int argc, const char * argv[]) {
             } else { // Read from sparse representation files
 
                 if (opt.multi_phen) {
+                    throw("EO: Disabled for now");
                     data.readPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals, data.phenosData);
-                } else {                    
-                    data.readPhenotypeFile(opt.phenotypeFiles[0], opt.numberIndividuals, data.y);
+                } else {
+                    if (opt.covariates) { // Then combine reading of the .phen & .cov
+                        data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
+                    } else {
+                        data.readPhenotypeFile(opt.phenotypeFiles[0], opt.numberIndividuals, data.y);
+                    }
                 }
-
-                if (opt.covariates) {
-                    //std::cout << "reading covariates file: "  << opt.covariatesFile << endl;
-                    data.readCovariateFile(opt.covariatesFile);
-                }
+                //if (opt.covariates) {
+                //    std::cout << "reading covariates file: "  << opt.covariatesFile << endl;
+                //    data.readCovariateFile(opt.covariatesFile);
+                //}
             }
 
             if (opt.markerBlocksFile != "") {

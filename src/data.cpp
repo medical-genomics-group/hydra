@@ -1595,6 +1595,74 @@ void Data::readPhenotypeFileAndSetNanMask(const string &phenFile, const int numb
     //printf("nonas = %d, nas = %d\n", nonas, nas);
 }
 
+//EO: combined reading of a .phen and .cov files
+//    Assume .cov and .phen to be consistent with .fam and .bed!
+//--------------------------------------------------------------
+void Data::readPhenCovFiles(const string &phenFile, const string covFile, const int numberIndividuals, VectorXd& dest, const int rank) {
+
+    numInds = numberIndividuals;
+    dest.setZero(numInds);
+
+    ifstream inp(phenFile.c_str());
+    if (!inp)
+        throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
+
+    ifstream inc(covFile.c_str());
+    if (!inc)
+        throw ("Error: can not open the covariates file [" + covFile + "] to read.");
+
+    uint line = 0, nas = 0, nonas = 0;
+    string sep(" \t");
+    Gadget::Tokenizer colDataP,  colDataC;
+    string            inputStrP, inputStrC;
+    std::vector<double> values;
+
+    while (getline(inp, inputStrP)) {
+
+        getline(inc, inputStrC);
+
+        colDataP.getTokens(inputStrP, sep);
+        colDataC.getTokens(inputStrC, sep);
+
+        bool naC = false;
+        for (int i=2; i<colDataC.size(); i++) {
+            if (colDataC[i] == "NA") {
+                naC = true;
+                break;
+            }
+        }
+ 
+        if (colDataP[1+1] != "NA" && naC == false) {
+            dest[nonas] = double( atof(colDataP[1+1].c_str()) );
+            for (int i=2; i<colDataC.size(); i++) {
+                values.push_back(std::stod(colDataC[i]));
+            }
+            nonas += 1;
+        } else {
+            if (rank == 0)
+                cout << "NA(s) detected on line " << line << ": naC? " << naC << ", naP? " << colDataP[1+1] << endl;
+            NAsInds.push_back(line);
+            nas += 1;
+        }
+        line += 1;
+    }
+    inp.close();
+    inc.close();
+    
+    assert(nonas + nas == numInds);
+    assert(line == numInds);
+
+    numFixedEffects = values.size() / (line - nas);
+    cout << "numFixedEffect = " << numFixedEffects << endl;
+
+    X = Map<const Matrix<double, Dynamic, Dynamic, RowMajor>>(values.data(), (line - nas), numFixedEffects);
+
+    numNAs = nas;
+
+    dest.conservativeResize(numInds-nas);
+}
+
+
 
 void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest) {
     numInds = numberIndividuals;

@@ -1880,7 +1880,8 @@ int BayesRRm::runMpiGibbs() {
  
         if (opt.covariates) {
 
-            cout << "COVARIATES" << endl;
+            if (iteration == 0 && rank == 0)
+                cout << "COVARIATES with X of size " << data.X.rows() << "x" << data.X.cols() << endl;
 
             std::shuffle(xI.begin(), xI.end(), dist.rng);            
 
