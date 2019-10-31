@@ -264,9 +264,11 @@ public:
 	    t1 += mysecond();
 	    totime += t1;
 	    bytes += size_t(count) * size_t(dtsize);
-	    printf("INFO   : rank %3d cumulated read time at %2d/%2d: %7.3f sec, avg time %7.3f, BW = %7.3f GB/s\n",
-		   rank, i+1, NREADS, totime, totime / (i + 1), double(bytes) / totime / 1E9 );
-	    fflush(stdout);
+        if (rank % 10 == 0) {
+            printf("INFO   : rank %3d cumulated read time at %2d/%2d: %7.3f sec, avg time %7.3f, BW = %7.3f GB/s\n",
+                   rank, i+1, NREADS, totime, totime / (i + 1), double(bytes) / totime / 1E9 );
+            fflush(stdout);
+        }
 
 	    //MPI_Barrier(MPI_COMM_WORLD);
         }

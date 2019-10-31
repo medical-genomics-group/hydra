@@ -516,10 +516,13 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
 
     totalBytes =  (N1tot + N2tot + NMtot) * sizeof(uint);
 
-    printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
-    printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
-    printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1 + N2 + NM) * sizeof(uint) / 1E9);
-    printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", double(totalBytes) * 1E-9);
+    if (rank % 10 == 0) {
+        printf("INFO   : rank %3d/%3d  N1max = %15lu, N2max = %15lu, NMmax = %15lu\n", rank, nranks, N1max, N2max, NMmax);
+        printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
+        printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1 + N2 + NM) * sizeof(uint) / 1E9);
+    }
+    if (rank == 0) 
+        printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", double(totalBytes) * 1E-9);
     fflush(stdout);
 
     I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
@@ -549,10 +552,11 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     check_mpi(MPI_Allreduce(&NREADS2, &MAX_NREADS2, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allreduce(&NREADSM, &MAX_NREADSM, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-    printf("INFO   : rank %d, numbers of calls to read the sparse files: NREADS1,2,M = %3d, %3d, %3d vs MAX_NREADS1,2,M = %3d, %3d, %3d\n",
-	   rank, NREADS1, NREADS2, NREADSM, MAX_NREADS1, MAX_NREADS2, MAX_NREADSM);
-    fflush(stdout);
-
+    if (rank % 10 ==0) {
+        printf("INFO   : rank %d, numbers of calls to read the sparse files: NREADS1,2,M = %3d, %3d, %3d vs MAX_NREADS1,2,M = %3d, %3d, %3d\n",
+               rank, NREADS1, NREADS2, NREADSM, MAX_NREADS1, MAX_NREADS2, MAX_NREADSM);
+        fflush(stdout);
+    }
     //read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);
     //read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], NREADS2, I2);
     //read_sparse_data_file(sparseOut + ".sim", NM, NMS[0], NREADSM, IM);    

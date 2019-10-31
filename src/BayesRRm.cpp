@@ -50,6 +50,20 @@ BayesRRm::~BayesRRm()
 {
 }
 
+
+void BayesRRm::offset_vector_f64(double* __restrict__ vec, const double offset, const int N) {
+#ifdef __INTEL_COMPILER
+    __assume_aligned(vec,   64);
+#endif
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int i=0; i<N; i++) {
+        vec[i] += offset;
+    }
+}
+
+
 void BayesRRm::set_vector_f64(double* __restrict__ vec, const double val, const int N) {
   
     const int N8 = (N/8) * 8;
@@ -231,9 +245,9 @@ inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, c
 }
 
 
-inline void partial_sparse_scaadd(double*       __restrict__ vec,
-                                  const double               val,
-                                  const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
+inline void sparse_set(double*       __restrict__ vec,
+                       const double               val,
+                       const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
 #ifdef __INTEL_COMPILER
     __assume_aligned(vec, 64);
     __assume_aligned(IX,  64);
@@ -245,6 +259,23 @@ inline void partial_sparse_scaadd(double*       __restrict__ vec,
         vec[ IX[i] ] = val;
     }
 }
+
+
+inline void sparse_add(double*       __restrict__ vec,
+                       const double               val,
+                       const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
+#ifdef __INTEL_COMPILER
+    __assume_aligned(vec, 64);
+    __assume_aligned(IX,  64);
+#endif
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (size_t i=NXS; i<NXS+NXL; ++i) {
+        vec[ IX[i] ] += val;
+    }
+}
+
 
 void BayesRRm::sparse_scaadd(double*     __restrict__ vout,
                              const double  dMULT,
@@ -262,18 +293,18 @@ void BayesRRm::sparse_scaadd(double*     __restrict__ vout,
     } else {
 
         double aux = mu * sig_inv * dMULT;
-
+        //printf("sparse_scaadd aux = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", aux, mu, sig_inv * dMULT);
         set_vector_f64(vout, -aux, N);
 
-        partial_sparse_scaadd(vout, 0.0, IM, NMS, NML);
+        sparse_set(vout, 0.0, IM, NMS, NML);
 
         aux = dMULT * (1.0 - mu) * sig_inv;
 
-        partial_sparse_scaadd(vout, aux, I1, N1S, N1L);
+        sparse_set(vout, aux, I1, N1S, N1L);
 
         aux = dMULT * (2.0 - mu) * sig_inv;
 
-        partial_sparse_scaadd(vout, aux, I2, N2S, N2L);
+        sparse_set(vout, aux, I2, N2S, N2L);
     }
 }
 
@@ -908,7 +939,9 @@ int BayesRRm::runMpiGibbs() {
     mpi_assign_blocks_to_tasks(data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot, nranks, rank, MrankS, MrankL, lmin, lmax);
 
     uint M = MrankL[rank];
-    printf("INFO   : rank %4d will handle a block of %6d markers starting at %d\n", rank, MrankL[rank], MrankS[rank]);
+    if (rank % 10 == 0) {
+        printf("INFO   : rank %4d will handle a block of %6d markers starting at %d\n", rank, MrankL[rank], MrankS[rank]);
+    }
 
 
     // EO: Define blocks of individuals (for dumping epsilon)
@@ -937,6 +970,10 @@ int BayesRRm::runMpiGibbs() {
     //daniel The following variables are related to the restarting
     typedef Matrix<bool, Dynamic, 1> VectorXb;
     VectorXb            adaV(M);   //daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0
+
+    std::vector<int>     mark2sync;
+    std::vector<double>  dbet2sync;
+
 
     //marion : for annotation code
     /*
@@ -1302,6 +1339,21 @@ int BayesRRm::runMpiGibbs() {
     int    tot_nsync_ar1 = 0;
     int    tot_nsync_ar2 = 0;
 
+    int *Tots1,   *Tots2,   *Totsm;
+    int *Totdis1, *Totdis2, *Totdism;
+    int *Nm2sync, *Dm2sync;
+    if (opt.sparseSync) {
+        Tots1   = (int*) _mm_malloc(size_t(nranks) * sizeof(int), 64);  check_malloc(Tots1, __LINE__, __FILE__);
+        Tots2   = (int*) _mm_malloc(size_t(nranks) * sizeof(int), 64);  check_malloc(Tots2, __LINE__, __FILE__);
+        Totsm   = (int*) _mm_malloc(size_t(nranks) * sizeof(int), 64);  check_malloc(Totsm, __LINE__, __FILE__);
+        Totdis1 = (int*) _mm_malloc(size_t(nranks) * sizeof(int), 64);  check_malloc(Totdis1, __LINE__, __FILE__);
+        Totdis2 = (int*) _mm_malloc(size_t(nranks) * sizeof(int), 64);  check_malloc(Totdis2, __LINE__, __FILE__);
+        Totdism = (int*) _mm_malloc(size_t(nranks) * sizeof(int), 64);  check_malloc(Totdism, __LINE__, __FILE__);
+        Nm2sync = (int*) _mm_malloc(size_t(nranks) * sizeof(int), 64);  check_malloc(Nm2sync, __LINE__, __FILE__);
+        Dm2sync = (int*) _mm_malloc(size_t(nranks) * sizeof(int), 64);  check_malloc(Dm2sync, __LINE__, __FILE__);
+    }
+
+
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
 
         double start_it = MPI_Wtime();
@@ -1482,15 +1534,25 @@ int BayesRRm::runMpiGibbs() {
 
                 // Compute delta epsilon
                 if (deltaBeta != 0.0) {
-
-                    sparse_scaadd(deltaEps, deltaBeta, 
-                                  I1, N1S[marker], N1L[marker], 
-                                  I2, N2S[marker], N2L[marker], 
-                                  IM, NMS[marker], NML[marker], 
-                                  mave[marker], mstd[marker], Ntot);
                     
-                    // Update local sum of delta epsilon
-                    sum_vectors_f64(dEpsSum, deltaEps, Ntot);
+                    //printf("it %d, task %3d, marker %5d has non-zero deltaBeta = %15.10f (%15.10f, %15.10f) => %15.10f) 1,2,M: %lu, %lu, %lu\n", iteration, rank, marker, deltaBeta, mave[marker], mstd[marker],  deltaBeta * mstd[marker], N1L[marker], N2L[marker], NML[marker]);
+
+                    if (opt.sparseSync && nranks > 1) {
+
+                        mark2sync.push_back(marker);
+                        dbet2sync.push_back(deltaBeta);
+
+                    } else {
+
+                        sparse_scaadd(deltaEps, deltaBeta, 
+                                      I1, N1S[marker], N1L[marker],
+                                      I2, N2S[marker], N2L[marker],
+                                      IM, NMS[marker], NML[marker],
+                                      mave[marker], mstd[marker], Ntot);
+                        
+                        // Update local sum of delta epsilon
+                        sum_vectors_f64(dEpsSum, deltaEps, Ntot);
+                    }
                 }
             }
 
@@ -1505,18 +1567,23 @@ int BayesRRm::runMpiGibbs() {
 
             // Check whether we have a non-zero beta somewhere
             // sum of the abs values !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if (nranks > 1) { 
+            if (nranks > 1) {
                 double sumDeltaBetas = 0.0;
                 MPI_Barrier(MPI_COMM_WORLD);
                 double tb = MPI_Wtime();
+
                 check_mpi(MPI_Allreduce(&deltaBeta, &sumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
                 double te = MPI_Wtime();
                 tot_sync_ar1  += te - tb;
                 it_sync_ar1   += te - tb;
                 tot_nsync_ar1 += 1;
                 it_nsync_ar1  += 1;
+
                 cumSumDeltaBetas += sumDeltaBetas;
+
             } else {
+
                 cumSumDeltaBetas += deltaBeta;
             } 
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
@@ -1525,16 +1592,201 @@ int BayesRRm::runMpiGibbs() {
 
                 // Update local copy of epsilon
                 MPI_Barrier(MPI_COMM_WORLD);
+
                 if (nranks > 1) {
+
                     double tb = MPI_Wtime();
-                    check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                    // Sparse synchronization
+                    // ----------------------
+                    if (opt.sparseSync) {
+
+                        int nm2sync = mark2sync.size();
+
+                        // Gather and prepare task's 1,2,M to send
+                        int* tn1S = (int*) _mm_malloc(nm2sync * sizeof(int), 64);  check_malloc(tn1S, __LINE__, __FILE__);
+                        int* tn2S = (int*) _mm_malloc(nm2sync * sizeof(int), 64);  check_malloc(tn2S, __LINE__, __FILE__);
+                        int* tnmS = (int*) _mm_malloc(nm2sync * sizeof(int), 64);  check_malloc(tnmS, __LINE__, __FILE__);
+                        int* tn1L = (int*) _mm_malloc(nm2sync * sizeof(int), 64);  check_malloc(tn1L, __LINE__, __FILE__);
+                        int* tn2L = (int*) _mm_malloc(nm2sync * sizeof(int), 64);  check_malloc(tn2L, __LINE__, __FILE__);
+                        int* tnmL = (int*) _mm_malloc(nm2sync * sizeof(int), 64);  check_malloc(tnmL, __LINE__, __FILE__);
+
+                        double* tmus = (double*) _mm_malloc(nm2sync * sizeof(double), 64);  check_malloc(tmus, __LINE__, __FILE__);
+                        double* tdbs = (double*) _mm_malloc(nm2sync * sizeof(double), 64);  check_malloc(tdbs, __LINE__, __FILE__);
+
+                        int s1 = 0, s2 = 0, sm = 0;
+
+                        for (int i=0; i<nm2sync; i++) {
+                            int n1li = (int) N1L[ mark2sync[i] ];
+                            int n2li = (int) N2L[ mark2sync[i] ];
+                            int nmli = (int) NML[ mark2sync[i] ];
+                            tn1L[i] = n1li;  tn2L[i] = n2li;  tnmL[i] = nmli;
+                            tn1S[i] = s1;    tn2S[i] = s2;    tnmS[i] = sm;
+                            s1     += n1li;  s2     += n2li;  sm     += nmli;
+                            tmus[i] = mave[ mark2sync[i] ];
+                            tdbs[i] = dbet2sync[i] * mstd[ mark2sync[i] ];
+                        }
+                        //printf("it %d, rank %d has %d 1s, %d 2s, %d ms to sync over %d markers\n", iteration, rank, s1, s2, sm, nm2sync);
+
+                        // Alloc and create concatenated array to send
+                        uint* t1s = (uint*) _mm_malloc(size_t(s1) * sizeof(uint), 64);  check_malloc(t1s, __LINE__, __FILE__);
+                        uint* t2s = (uint*) _mm_malloc(size_t(s2) * sizeof(uint), 64);  check_malloc(t2s, __LINE__, __FILE__);
+                        uint* tms = (uint*) _mm_malloc(size_t(sm) * sizeof(uint), 64);  check_malloc(tms, __LINE__, __FILE__);
+                        
+                        for (int i=0; i<nm2sync; i++) {
+                            for (uint ii = 0; ii < tn1L[i]; ii++)  t1s[tn1S[i] + ii] = I1[ N1S[ mark2sync[i] ] + ii ];
+                            for (uint ii = 0; ii < tn2L[i]; ii++)  t2s[tn2S[i] + ii] = I2[ N2S[ mark2sync[i] ] + ii ];
+                            for (uint ii = 0; ii < tnmL[i]; ii++)  tms[tnmS[i] + ii] = IM[ NMS[ mark2sync[i] ] + ii ];
+                        }
+                        
+                        // Compute cumulated size of indices
+                        int tots1 = 0, tots2 = 0, totsm = 0;
+                        check_mpi(MPI_Allreduce(&s1, &tots1, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allreduce(&s2, &tots2, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allreduce(&sm, &totsm, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        //printf("mark2sync tots1 = %d, tots2 = %d, totsm = %d\n", tots1, tots2, totsm);
+
+                        // Gather number of markers to sync from each task
+                        //int nm2sync_tot_ = 0;
+                        //check_mpi(MPI_Allreduce(&nm2sync, &nm2sync_tot_, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        //if (rank == 0)  printf("it %d has %d markers to sync overall.\n", iteration, nm2sync_tot);
+
+                        check_mpi(MPI_Allgather(&nm2sync, 1, MPI_INT, Nm2sync, 1, MPI_INT, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        int nm2sync_tot = 0;
+                        for (int i=0; i<nranks; i++) {
+                            //if (rank == 0)  printf("rank %d sends %d mark to sync\n", i, Nm2sync[i]);
+                            Dm2sync[i] = nm2sync_tot;
+                            nm2sync_tot += Nm2sync[i];
+                        }
+                        //assert(nm2sync_tot == nm2sync_tot_);
+
+                        // Gather lengths of all markers to sync & stats
+                        int* l1 = (int*) _mm_malloc(size_t(nm2sync_tot) * sizeof(int), 64);  check_malloc(l1, __LINE__, __FILE__);
+                        int* l2 = (int*) _mm_malloc(size_t(nm2sync_tot) * sizeof(int), 64);  check_malloc(l2, __LINE__, __FILE__);
+                        int* lm = (int*) _mm_malloc(size_t(nm2sync_tot) * sizeof(int), 64);  check_malloc(lm, __LINE__, __FILE__);
+                        check_mpi(MPI_Allgatherv(tn1L, nm2sync, MPI_INT, l1, Nm2sync, Dm2sync, MPI_INT, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allgatherv(tn2L, nm2sync, MPI_INT, l2, Nm2sync, Dm2sync, MPI_INT, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allgatherv(tnmL, nm2sync, MPI_INT, lm, Nm2sync, Dm2sync, MPI_INT, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                        double* mus = (double*)_mm_malloc(size_t(nm2sync_tot) * sizeof(double), 64);  check_malloc(mus, __LINE__, __FILE__);
+                        double* dbs = (double*)_mm_malloc(size_t(nm2sync_tot) * sizeof(double), 64);  check_malloc(dbs, __LINE__, __FILE__);
+                        check_mpi(MPI_Allgatherv(tmus, nm2sync, MPI_DOUBLE, mus, Nm2sync, Dm2sync, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allgatherv(tdbs, nm2sync, MPI_DOUBLE, dbs, Nm2sync, Dm2sync, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                        int* d1 = (int*) _mm_malloc(size_t(nm2sync_tot) * sizeof(int), 64);  check_malloc(d1, __LINE__, __FILE__);
+                        int* d2 = (int*) _mm_malloc(size_t(nm2sync_tot) * sizeof(int), 64);  check_malloc(d2, __LINE__, __FILE__);
+                        int* dm = (int*) _mm_malloc(size_t(nm2sync_tot) * sizeof(int), 64);  check_malloc(dm, __LINE__, __FILE__);
+                        int dis1 = 0, dis2 = 0, dism = 0;
+                        for (int i=0; i<nm2sync_tot; i++) {
+                            //if (rank == 0)  printf(" * will sync marker %d (%15.10f, %15.10f) with N1=%d, N2=%d, NM=%d elements\n", i, mus[i], dbs[i], l1[i], l2[i], lm[i]);
+                            d1[i] = dis1;   d2[i] = dis2;   dm[i] = dism;
+                            dis1 += l1[i];  dis2 += l2[i];  dism += lm[i];
+                        }
+
+                        // Gather lengths of cumulted markers from each task
+                        check_mpi(MPI_Allgather(&s1, 1, MPI_INT, Tots1, 1, MPI_INT, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allgather(&s2, 1, MPI_INT, Tots2, 1, MPI_INT, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allgather(&sm, 1, MPI_INT, Totsm, 1, MPI_INT, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                        int td1 = 0, td2 = 0, tdm = 0;
+                        for (int i=0; i<nranks; i++) {
+                            //if (rank == 0)  printf("rank %d tot lengths: %d, %d, %d\n", i, Tots1[i], Tots2[i], Totsm[i]);
+                            Totdis1[i] = td1;
+                            Totdis2[i] = td2;
+                            Totdism[i] = tdm;
+                            //if (rank == 0)  printf("rank %d tots1: len %d, disp %d\n", i, Tots1[i], Totdis1[i]);
+                            td1 += Tots1[i];
+                            td2 += Tots2[i];
+                            tdm += Totsm[i];                            
+                        }
+
+                        // Gather indices
+                        uint* ind1 = (uint*) _mm_malloc(size_t(tots1) * sizeof(uint), 64);  check_malloc(ind1, __LINE__, __FILE__);
+                        uint* ind2 = (uint*) _mm_malloc(size_t(tots2) * sizeof(uint), 64);  check_malloc(ind2, __LINE__, __FILE__);
+                        uint* indm = (uint*) _mm_malloc(size_t(totsm) * sizeof(uint), 64);  check_malloc(indm, __LINE__, __FILE__);
+                        check_mpi(MPI_Allgatherv(t1s, s1, MPI_UNSIGNED, ind1, Tots1, Totdis1, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allgatherv(t2s, s2, MPI_UNSIGNED, ind2, Tots2, Totdis2, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allgatherv(tms, sm, MPI_UNSIGNED, indm, Totsm, Totdism, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                        // Compute the deltaEps
+                        //double* deps = (double*)_mm_malloc(NDB, 64);  check_malloc(deps,     __LINE__, __FILE__);
+                        //set_vector_f64(deps, 0.0, Ntot);
+
+                        // Loop over all contributing markers
+                        for (int i=0; i<nm2sync_tot; i++) {
+                            
+                            double lambda0 = dbs[i] * mus[i] * -1.0;
+                            //printf("rank %d lambda0 = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", rank, lambda0, mus[i], dbs[i]);
+                            
+                            // Set all to zero contribution
+                            if (i == 0) {
+                                set_vector_f64(deltaSum, lambda0, Ntot);
+                            } else {
+                                //offset_vector_f64(deps, lambda0, Ntot);
+                                offset_vector_f64(deltaSum, lambda0, Ntot);
+                            }
+
+                            // M -> revert lambda 0 (so that equiv to add 0.0)
+                            //sparse_add(deps, -lambda0, indm, dm[i], lm[i]);
+                            sparse_add(deltaSum, -lambda0, indm, dm[i], lm[i]);
+
+                            // 1 -> add dbet * sig * ( 1.0 - mu)
+                            double lambda = dbs[i] * (1.0 - mus[i]);
+                            //sparse_add(deps, lambda - lambda0, ind1, d1[i], l1[i]);
+                            sparse_add(deltaSum, lambda - lambda0, ind1, d1[i], l1[i]);
+
+                            // 2 -> add dbet * sig * ( 2.0 - mu)
+                            lambda = dbs[i] * (2.0 - mus[i]);
+                            //sparse_add(deps, lambda - lambda0, ind2, d2[i], l2[i]);
+                            sparse_add(deltaSum, lambda - lambda0, ind2, d2[i], l2[i]);
+                        }
+                                                
+                        //sum_vectors_f64(epsilon, tmpEps, deps, Ntot);
+                        
+                        mark2sync.clear();
+                        dbet2sync.clear();
+
+                        _mm_free(tn1S);
+                        _mm_free(tn2S);
+                        _mm_free(tnmS);
+                        _mm_free(tn1L);
+                        _mm_free(tn2L);
+                        _mm_free(tnmL);
+                        _mm_free(tmus);
+                        _mm_free(tdbs);
+                        _mm_free(t1s);
+                        _mm_free(t2s);
+                        _mm_free(tms);
+                        _mm_free(l1);
+                        _mm_free(l2);
+                        _mm_free(lm);
+                        _mm_free(mus);
+                        _mm_free(dbs);
+                        _mm_free(d1);
+                        _mm_free(d2);
+                        _mm_free(dm);
+                        //_mm_free(deps);
+                        _mm_free(ind1);
+                        _mm_free(ind2);
+                        _mm_free(indm);
+
+                    } else {
+
+                        check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                        //sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
+                    }
+
+                    sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
+
                     double te = MPI_Wtime();
                     tot_sync_ar2  += te - tb;
                     it_sync_ar2   += te - tb;
                     tot_nsync_ar2 += 1;
                     it_nsync_ar2  += 1;
-                    sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
-                } else {
+
+                } else { // case nranks == 1
+
                     count__sum_vectors_f64_v2 += 1;
                     //double t1 = -mysecond();
                     //for (int ii=0; ii<100; ii++) {
@@ -1556,6 +1808,10 @@ int BayesRRm::runMpiGibbs() {
                 cumSumDeltaBetas = 0.0;
 
                 sinceLastSync = 0;
+
+                mark2sync.clear();
+                dbet2sync.clear();
+
             } else {
                 sinceLastSync += 1;
             }
@@ -1564,7 +1820,6 @@ int BayesRRm::runMpiGibbs() {
 
         //PROFILE
         //continue;
-
 
         beta_squaredNorm = Beta.squaredNorm();
         //printf("rank %d it %d  beta_squaredNorm = %15.10f\n", rank, iteration, beta_squaredNorm);
@@ -1624,6 +1879,8 @@ int BayesRRm::runMpiGibbs() {
         uint gamma_length = 0;
  
         if (opt.covariates) {
+
+            cout << "COVARIATES" << endl;
 
             std::shuffle(xI.begin(), xI.end(), dist.rng);            
 
@@ -1852,7 +2109,17 @@ int BayesRRm::runMpiGibbs() {
     _mm_free(NMS);
     _mm_free(NML);
     _mm_free(IM);
-
+        
+    if (opt.sparseSync) {
+        _mm_free(Tots1);
+        _mm_free(Tots2);
+        _mm_free(Totsm);
+        _mm_free(Totdis1);
+        _mm_free(Totdis2);
+        _mm_free(Totdism);
+        _mm_free(Nm2sync);
+        _mm_free(Dm2sync);
+    }
 
     const auto et3 = std::chrono::high_resolution_clock::now();
     const auto dt3 = et3 - st3;

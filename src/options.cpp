@@ -22,6 +22,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             restart = true;
             ss << "--restart " << "\n";
         }
+        else if (!strcmp(argv[i], "--sparse-sync")) {
+            sparseSync = true;
+            ss << "--sparse-sync " << "\n";
+        }
         else if (!strcmp(argv[i], "--mpibayes")) {
             analysisType = "RAM";
             bayesType = argv[++i];

@@ -96,6 +96,7 @@ class BayesRRm
 
     void   setDebugEnabled(bool enabled) { showDebug = enabled; }
     bool   isDebugEnabled() const { return showDebug; }    
+    void   offset_vector_f64(double* __restrict__ vec, const double offset, const int N);
     void   set_vector_f64(double* __restrict__ vec, const double val, const int N);
     void   sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2, const int N);
     void   sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N);
