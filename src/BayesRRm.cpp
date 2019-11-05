@@ -1337,9 +1337,6 @@ int BayesRRm::runMpiGibbs() {
     // Main iteration loop
     // -------------------
     //bool replay_it = false;
-
-    int count__sum_vectors_f64_v2 = 0;
-    
     double tot_sync_ar1  = 0.0;
     double tot_sync_ar2  = 0.0;
     int    tot_nsync_ar1 = 0;
@@ -1417,6 +1414,7 @@ int BayesRRm::runMpiGibbs() {
         for (int i=0; i<Ntot; ++i) tmpEps[i] = epsilon[i];
 
         double cumSumDeltaBetas = 0.0;
+        double task_sum_abs_deltabeta = 0.0;
         int    sinceLastSync    = 0;
 
 
@@ -1551,14 +1549,15 @@ int BayesRRm::runMpiGibbs() {
                 set_vector_f64(deltaEps, 0.0, Ntot);
             }
 
-            // Check whether we have a non-zero beta somewhere
-            // sum of the abs values !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-            if (nranks > 1) {
-                double sumDeltaBetas = 0.0;
-                MPI_Barrier(MPI_COMM_WORLD);
-                double tb = MPI_Wtime();
+            task_sum_abs_deltabeta += fabs(deltaBeta);
 
-                check_mpi(MPI_Allreduce(&deltaBeta, &sumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            // Check whether we have a non-zero beta somewhere
+            if (nranks > 1 && (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1)) {
+                
+                //MPI_Barrier(MPI_COMM_WORLD);
+                double tb = MPI_Wtime();                
+
+                check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta, &cumSumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
                 double te = MPI_Wtime();
                 tot_sync_ar1  += te - tb;
@@ -1566,33 +1565,31 @@ int BayesRRm::runMpiGibbs() {
                 tot_nsync_ar1 += 1;
                 it_nsync_ar1  += 1;
 
-                cumSumDeltaBetas += sumDeltaBetas;
-
             } else {
 
-                cumSumDeltaBetas += deltaBeta;
-            } 
+                cumSumDeltaBetas = task_sum_abs_deltabeta;
+            }
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
-            
-            if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
 
+            if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
+                
                 // Update local copy of epsilon
-                MPI_Barrier(MPI_COMM_WORLD);
+                //MPI_Barrier(MPI_COMM_WORLD);
 
                 if (nranks > 1) {
-
+    
                     double tb = MPI_Wtime();
-
+                    
                     // Sparse synchronization
                     // ----------------------
                     if (opt.sparseSync) {
-
+                            
                         uint task_m2s = (uint) mark2sync.size();
                         
                         // Build task markers to sync statistics: mu | dbs | mu | dbs | ...
                         double* task_stat = (double*) _mm_malloc(size_t(task_m2s) * 2 * sizeof(double), 64);
                         check_malloc(task_stat, __LINE__, __FILE__);
-
+                        
                         // Compute total number of elements to be sent by each task
                         uint task_size = 0;
                         for (int i=0; i<task_m2s; i++) {
@@ -1603,16 +1600,16 @@ int BayesRRm::runMpiGibbs() {
                         }
                         //printf("Task %3d final task_size = %8d elements to send from task_m2s = %d markers to sync.\n", rank, task_size, task_m2s);
                         //fflush(stdout);
-
+                        
                         // Get the total numbers of markers and corresponding indices to gather
-
+                        
                         const int NEL = 2;
                         uint task_info[NEL] = {};                        
                         task_info[0] = task_m2s;
                         task_info[1] = task_size;
                         
                         check_mpi(MPI_Allgather(task_info, NEL, MPI_UNSIGNED, glob_info, NEL, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
-
+                        
                         int tdisp_ = 0, sdisp_ = 0, glob_m2s = 0, glob_size = 0;
                         for (int i=0; i<nranks; i++) {
                             tasks_len[i]  = glob_info[2 * i + 1];
@@ -1625,15 +1622,15 @@ int BayesRRm::runMpiGibbs() {
                             glob_m2s     += glob_info[2 * i];
                         }
                         //printf("glob_info: markers to sync: %d, with glob_size = %7d elements (sum of all task_size)\n", glob_m2s, glob_size);
-                     
-                        fflush(stdout);
- 
+                        //fflush(stdout);
+                        
+
                         // Build task's array to spread: | marker 1                             | marker 2
                         //                               | n1 | n2 | nm | data1 | data2 | datam | n1 | n2 | nm | data1 | ...
                         // -------------------------------------------------------------------------------------------------
                         uint* task_dat = (uint*) _mm_malloc(size_t(task_size) * sizeof(uint), 64);
                         check_malloc(task_dat, __LINE__, __FILE__);
-
+                        
                         int loc = 0;
                         for (int i=0; i<task_m2s; i++) {
                             task_dat[loc] = N1L[ mark2sync[i] ];                 loc += 1;
@@ -1650,27 +1647,27 @@ int BayesRRm::runMpiGibbs() {
                             }
                         }                        
                         assert(loc == task_size);
-
+                            
                         // Allocate receive buffer for all the data
                         uint* glob_dat = (uint*) _mm_malloc(size_t(glob_size) * sizeof(uint), 64);
                         check_malloc(glob_dat, __LINE__, __FILE__);
-
+                        
                         check_mpi(MPI_Allgatherv(task_dat, task_size, MPI_UNSIGNED,
                                                  glob_dat, tasks_len, tasks_dis, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
                         _mm_free(task_dat);
-
+                        
                         double* glob_stats = (double*) _mm_malloc(size_t(glob_size * 2) * sizeof(double), 64);
                         check_malloc(glob_stats, __LINE__, __FILE__);
                         
                         check_mpi(MPI_Allgatherv(task_stat, task_m2s * 2, MPI_DOUBLE,
                                                  glob_stats, stats_len, stats_dis, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__);                        
                         _mm_free(task_stat);
-
+                        
                         
                         // Compute global delta epsilon deltaSum
                         size_t loci = 0;
                         for (int i=0; i<glob_m2s ; i++) {
-
+                            
                             //printf("m2s %d/%d (loci = %d): %d, %d, %d\n", i, glob_m2s, loci, glob_dat[loci], glob_dat[loci + 1], glob_dat[loci + 2]);
                             
                             double lambda0 = glob_stats[2 * i + 1] * (0.0 - glob_stats[2 * i]);
@@ -1682,13 +1679,13 @@ int BayesRRm::runMpiGibbs() {
                             } else {
                                 offset_vector_f64(deltaSum, lambda0, Ntot);
                             }
-
+                            
                             // M -> revert lambda 0 (so that equiv to add 0.0)
                             size_t S = loci + (size_t) (3 + glob_dat[loci] + glob_dat[loci + 1]);
                             size_t L = glob_dat[loci + 2];
                             //cout << "task " << rank << " M: start = " << S << ", len = " << L <<  endl;
                             sparse_add(deltaSum, -lambda0, glob_dat, S, L);
-
+                            
                             // 1 -> add dbet * sig * ( 1.0 - mu)
                             double lambda = glob_stats[2 * i + 1] * (1.0 - glob_stats[2 * i]);
                             //printf("1: lambda = %15.10f, l-l0 = %15.10f\n", lambda, lambda - lambda0);
@@ -1696,65 +1693,61 @@ int BayesRRm::runMpiGibbs() {
                             L = glob_dat[loci];
                             //cout << "1: start = " << S << ", len = " << L <<  endl;
                             sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
-
+                            
                             // 2 -> add dbet * sig * ( 2.0 - mu)
                             lambda = glob_stats[2 * i + 1] * (2.0 - glob_stats[2 * i]);
                             S = loci + 3 + glob_dat[loci];
                             L = glob_dat[loci + 1];
                             //cout << "2: start = " << S << ", len = " << L <<  endl;
                             sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
-
+                            
                             loci += 3 + glob_dat[loci] + glob_dat[loci + 1] + glob_dat[loci + 2];
                         }
                         
                         _mm_free(glob_stats);
                         _mm_free(glob_dat);                        
-
+                        
                         mark2sync.clear();
-                        dbet2sync.clear();
-
+                        dbet2sync.clear();                            
+                        
                     } else {
-
+                        
                         check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                    
                     }
-
+                    
                     sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
-
+                    
                     double te = MPI_Wtime();
                     tot_sync_ar2  += te - tb;
                     it_sync_ar2   += te - tb;
                     tot_nsync_ar2 += 1;
-                    it_nsync_ar2  += 1;
+                    it_nsync_ar2  += 1;    
 
                 } else { // case nranks == 1
-
-                    count__sum_vectors_f64_v2 += 1;
-                    //double t1 = -mysecond();
-                    //for (int ii=0; ii<100; ii++) {
+                    
                     sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
-                    //}
-                    //t1 += mysecond();
-                    //printf("kernel 1 BW = %g\n", double(Ntot) * 3.0 * sizeof(double) / 1024. / 1024. / (t1 / 100.0));
                 }
+                    
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
-
+                
                 // Store epsilon state at last synchronization
                 copy_vector_f64(tmpEps, epsilon, Ntot);
-
+                
                 // Reset local sum of delta epsilon
                 set_vector_f64(dEpsSum, 0.0, Ntot);
                 
                 // Reset cumulated sum of delta betas
-                cumSumDeltaBetas = 0.0;
-
+                cumSumDeltaBetas       = 0.0;
+                task_sum_abs_deltabeta = 0.0;
+                
                 sinceLastSync = 0;
-
-                //mark2sync.clear();
-                //dbet2sync.clear();
-
+                
             } else {
                 sinceLastSync += 1;
+                
+                //task_sum_abs_deltabeta += fabs(deltaBeta);
             }
 
         } // END PROCESSING OF ALL MARKERS
@@ -2017,9 +2010,6 @@ int BayesRRm::runMpiGibbs() {
 
         MPI_Barrier(MPI_COMM_WORLD);
     }
-
-    //printf(">.CHECK.< int count__sum_vectors_f64_v2 = %d\n", count__sum_vectors_f64_v2);
-
 
     // Close output files
     check_mpi(MPI_File_close(&outfh), __LINE__, __FILE__);
