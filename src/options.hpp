@@ -48,6 +48,10 @@ public:
     Eigen::MatrixXd mS;
     string groupFile;
     string mSfile;
+    string failureFile;
+    string bayesW_version;
+    string quad_points;
+
 
     string title;
     string analysisType;

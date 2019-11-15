@@ -40,6 +40,8 @@ endif()
 
 add_library(libbrr-dev
     BayesRRm.cpp
+    BayesW.cpp
+    BayesW_arms.cpp
     BayesRRmz.cpp
     data.cpp
     distributions_boost.cpp
@@ -55,6 +57,8 @@ add_library(libbrr-dev
 add_executable(${PROJECT_NAME}
     main.cpp
     BayesRRm.cpp
+    BayesW.cpp
+    BayesW_arms.cpp
     BayesRRmz.cpp
     data.cpp
     distributions_boost.cpp

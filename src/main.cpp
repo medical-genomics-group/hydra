@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include "BayesRRm.h"
+#include "BayesW.hpp"
 #include "BayesRRm_mt.h"
 #include "data.hpp"
 #include "options.hpp"
@@ -64,7 +65,7 @@ int main(int argc, const char * argv[]) {
             } else if (opt.checkRam) {
                 analysis.checkRamUsage();
             }
-        } else if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
+        } else if ((opt.bayesType == "bayesMPI" || opt.bayesType == "bayesWMPI") && opt.analysisType == "RAM") {
             
             if (opt.readFromBedFile) {
                 //printf("INFO   : reading from BED file\n");
@@ -102,7 +103,12 @@ int main(int argc, const char * argv[]) {
             if (opt.multi_phen) {
                 //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 //analysis.runMpiGibbsMultiTraits();
-            } else {
+            }else if(opt.bayesType == "bayesWMPI"){
+	        data.readBedFile_noMPI_unstandardised(opt.bedFile+".bed"); // This part to read the non-standardised data
+		BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+                analysis.runMpiGibbs();
+	     }
+	     else {
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs();
             }

@@ -1483,6 +1483,113 @@ void Data::readBedFile_noMPI(const string &bedFile) {
 }
 
 
+void Data::readBedFile_noMPI_unstandardised(const string &bedFile){
+	unsigned i = 0, j = 0, k = 0;
+
+	if (numSnps == 0) throw ("Error: No SNP is retained for analysis.");
+	if (numInds == 0) throw ("Error: No individual is retained for analysis.");
+
+	Zones.resize(numSnps);
+	Ztwos.resize(numSnps);
+	means.resize(numSnps);
+	sds.resize(numSnps);
+	mean_sd_ratio.resize(numSnps);
+
+	//	Z.resize(numInds, numSnps);
+	//	ZPZdiag.resize(numSnps);
+	snp2pq.resize(numSnps);
+
+	// Read bed file
+	char ch[1];
+	bitset<8> b;
+	unsigned allele1=0, allele2=0;
+	ifstream BIT(bedFile.c_str(), ios::binary);
+	if (!BIT) throw ("Error: can not open the file [" + bedFile + "] to read.");
+	cout << "Reading PLINK BED file from [" + bedFile + "] in SNP-major format ..." << endl;
+	for (i = 0; i < 3; i++) BIT.read(ch, 1); // skip the first three bytes
+	SnpInfo *snpInfo = NULL;
+	unsigned snp = 0, ind = 0;
+	unsigned nmiss = 0;
+	float mean = 0.0;
+	float sqn = 0.0;
+
+	for (j = 0, snp = 0; j < numSnps; j++) { // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
+		snpInfo = snpInfoVec[j];
+		mean = 0.0;
+		sqn = 0.0;
+		nmiss = 0;
+		if (!snpInfo->included) {
+			for (i = 0; i < numInds; i += 4) BIT.read(ch, 1);
+			continue;
+		}
+		for (i = 0, ind = 0; i < numInds;) {
+			BIT.read(ch, 1);
+			if (!BIT) throw ("Error: problem with the BED file ... has the FAM/BIM file been changed?");
+			b = ch[0];
+			k = 0;
+			while (k < 7 && i < numInds) {
+				if (!indInfoVec[i]->kept) k += 2;
+				else {
+					allele1 = (!b[k++]);
+					allele2 = (!b[k++]);
+					//Assume no missing genotypes
+					//if (allele1 == 0 && allele2 == 1) {  // missing genotype
+					//	Z(ind++, snp) = -9;
+					//++nmiss;
+					//	} else {
+					int all_sum = allele1 + allele2;
+					if(all_sum == 1 ){
+						Zones[j].push_back(ind++); //Save the index of the individual to the vector of ones
+					}else if(all_sum == 2){
+						Ztwos[j].push_back(ind++);
+					}else{
+						ind++;
+					}
+
+					if (allele1 == 0 && allele2 == 1) {  // missing genotype
+						cout << "MISSING " << endl;
+					}
+
+					mean += all_sum;
+					sqn += all_sum*all_sum;
+					//	}
+				}
+				i++;
+			}
+		}
+		// fill missing values with the mean
+		mean /= float(numInds-nmiss);
+
+		//Assume non-missingness
+
+		/*	if (nmiss) {
+			for (i=0; i<numInds; ++i) {
+				if (Z(i,snp) == -9) Z(i,snp) = mean;
+			}
+		}
+		 */
+		// compute allele frequency
+		snpInfo->af = 0.5f*mean;
+		snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
+
+		// standardize genotypes
+
+		sqn -= numInds * mean * mean;
+		means(j) = mean;
+		sds(j) = sqrt(sqn / float(numInds));
+
+		mean_sd_ratio(j) = means(j)/sds(j);
+
+		if (++snp == numSnps) break;
+	}
+	BIT.clear();
+	BIT.close();
+
+	cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
+}
+
+
+
 void Data::center_and_scale(double* __restrict__ vec, int* __restrict__ mask, const uint N, const uint nas) {
 
     // Compute mean
@@ -1787,6 +1894,25 @@ M Data::readCSVFile (const string &path) {
 
 void Data::readCovariateFile(const string &covariateFile ) {
 	X = readCSVFile<MatrixXd>(covariateFile);
+}
+
+
+void Data::readFailureFile(const string &failureFile){
+	ifstream input(failureFile);
+	vector<double> tmp;
+	int col;
+	if(!input.is_open()){
+		cout << "Error opening the file" << endl;
+		return;
+	}
+
+	while(true){
+		input >> col ;
+		if(input.eof()) break;
+		tmp.push_back(col);
+	}
+	input.close();
+	fail = Eigen::VectorXd::Map(tmp.data(), tmp.size());
 }
 
 
