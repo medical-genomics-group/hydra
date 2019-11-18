@@ -1921,7 +1921,9 @@ int BayesW::runMpiGibbs() {
         //------------------------------------------------------------------------
         
 	// Calculate the vector of exponent of the adjusted residuals
-	vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
+// This is used originally:
+	vi = (used_data.alpha*(*epsilon)-EuMasc).exp();
+//	vi = (used_data.alpha*epsilon-EuMasc).exp();
 
 	if (opt.shuffleMarkers) {
             std::shuffle(markerI.begin(), markerI.end(), dist.rng);
@@ -2245,7 +2247,7 @@ int BayesW::runMpiGibbs() {
                 + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double))
                 + size_t(MrankS[rank]) * sizeof(double);
             check_mpi(MPI_File_write_at_all(betfh, betoff, Beta.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
-            check_mpi(MPI_File_write_at_all(acufh, betoff, Acum.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
+    //        check_mpi(MPI_File_write_at_all(acufh, betoff, Acum.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
 
             cpnoff = sizeof(uint) + sizeof(uint)
                 + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int))

@@ -23,7 +23,7 @@ CXXFLAGS += -D USE_MPI
 
 LIBS     = -lz
 
-SRC = data.cpp BayesRRm.cpp BayesW.cpp BayesW_arms.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
+SRC = data.cpp  BayesW.cpp BayesW_arms.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
 
 OBJ = $(SRC:.cpp = .o)
 
