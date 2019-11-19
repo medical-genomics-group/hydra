@@ -809,13 +809,14 @@ void BayesW::write_sparse_data_files(const uint bpr) {
     if (rank == 0)   std::cout << "INFO   : time to convert the data: " << du2 / double(1000.0) << " seconds." << std::endl;
 }
 
-
+//Already defined in BayesRRm.cpp
+/*
 size_t get_file_size(const std::string& filename) {
     struct stat st;
     if(stat(filename.c_str(), &st) != 0) { return 0; }
     return st.st_size;   
 }
-
+*/
 
 
 void BayesW::mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax) {
@@ -1387,8 +1388,18 @@ void BayesW::sampleBeta(int marker){
 
 	// Calculate the sums of vi elements
 	double vi_sum = vi.sum();
-	double vi_2 = vi(data.Ztwos[marker]).sum();
-	double vi_1 = vi(data.Zones[marker]).sum();
+
+	double vi_2 = 0.0; 
+        for (int i=0; i < data.Ztwos[marker].size(); i++){
+        	vi_2 += vi[data.Ztwos[marker][i]];
+        }
+        double vi_1 = 0.0; 
+        for (int i=0; i < data.Zones[marker].size(); i++){
+                vi_1 += vi[data.Zones[marker][i]];
+        }
+
+//	double vi_2 = vi(data.Ztwos[marker]).sum();
+//	double vi_1 = vi(data.Zones[marker]).sum();
 	double vi_0 = vi_sum - vi_1 - vi_2;
 
 	/* Calculate the mixture probability */
@@ -1514,6 +1525,9 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 	//residual vector
 	epsilon = VectorXd();
 
+	//vi vector
+	vi = VectorXd(individualCount);
+
 	// Resize the vectors in the structure
 	used_data.X_j = VectorXd(individualCount);
 	used_data.epsilon.resize(individualCount);
@@ -1628,7 +1642,6 @@ int BayesW::runMpiGibbs() {
     char   buff[LENBUF]; 
     int    nranks, rank, name_len, result;
     double dalloc = 0.0;
-
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
@@ -1921,14 +1934,18 @@ int BayesW::runMpiGibbs() {
         //------------------------------------------------------------------------
         
 	// Calculate the vector of exponent of the adjusted residuals
-// This is used originally:
-	vi = (used_data.alpha*(*epsilon)-EuMasc).exp();
+//Test option
+//	vi = (used_data.alpha*(*epsilon)-EuMasc).exp();
+//Originally
 //	vi = (used_data.alpha*epsilon-EuMasc).exp();
+
+	for(int i=0; i<Ntot; ++i){
+		vi[i] <- exp(used_data.alpha * epsilon[i] - EuMasc);
+	}
 
 	if (opt.shuffleMarkers) {
             std::shuffle(markerI.begin(), markerI.end(), dist.rng);
         }
-        
         m0 = 0.0;
         v.setOnes();
 
@@ -2192,7 +2209,10 @@ int BayesW::runMpiGibbs() {
 
 	//Update the sqrt(2sigmab) variable
 	used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
-
+	//Print results
+//	cout << iteration << ". " << Mtot - v[0] +1 <<"; "<<v[1]-1 << "; "<<v[2]-1 << "; " << v[3]-1  <<"; " << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
+        cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; " << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
+	
 	// 5. Sample prior mixture component probability from Dirichlet distribution
 	pi_L = dist.dirichilet_rng(v.array());
 
