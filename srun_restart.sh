@@ -42,7 +42,8 @@ COV=""
 # DATASETS DEFINITION
 # -------------------
 S="1.0,0.1"
-DS=1
+DS=2
+
 if [ $DS == 0 ]; then
     datadir=./test/data
     dataset=uk10k_chr1_1mb
@@ -126,22 +127,29 @@ echo "output dir:" $outdir
 echo "======================================"
 echo
 
-CLR=33; CLF=18;
+CLR=20; CLF=15;
 if [ "$CLF" -ge "$CLR" ]; then
     echo "FATAL: failing iteration CLF(=$CLF) must be strictly lower than full chain length CLR(=$CLR)!"
     exit 1;
 fi
 
 
-SEED=10
+SEED=13
 SR=0
 SM=1
-THIN=1
-SAVE=5
+THIN=3
+SAVE=6
+
+if [ "$SAVE" -ge "$CLF" ]; then
+    echo "FATAL: failing iteration CLF(=$CLF) must be strictly greater that SAVE(=$SAVE) rate!"
+    exit 1;
+fi
+
+
 TOCONV_T=$((($CLR - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
-TPN=9
+TPN=36
 BPR=5
 
 
