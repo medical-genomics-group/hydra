@@ -30,7 +30,7 @@
 
 #include <omp.h>
 #include "BayesW_arms.h"
-
+#include <math.h>
 
 /* Pre-calculate used constants */
 #define PI 3.14159
@@ -1321,6 +1321,13 @@ void BayesW::sampleMu(){
 
 	double xl = 2;
 	double xr = 5;   //xl and xr and the maximum and minimum values between which we sample
+//	cout << "Eps sum2= " << (epsilon.array() * epsilon.array()).sum() << endl;
+//	cout << "mu_ = " << mu << endl;
+//        cout << "alpha = " << used_data.alpha << endl;
+//        cout << "d = " << used_data.d << endl;
+//        cout << "sigma_mu = " << used_data.sigma_mu << endl;
+
+//	cout << epsilon[0] << "," << epsilon[1] << "," << epsilon[2] << endl;
 
 	used_data.epsilon = epsilon.array() + mu;// we add to epsilon =Y+mu-X*beta
 
@@ -1331,6 +1338,9 @@ void BayesW::sampleMu(){
 	errorCheck(err); // If there is error, stop the program
 	mu = xsamp[0];   // Save the sampled value
 	epsilon = used_data.epsilon.array() - mu;// we substract again now epsilon =Y-mu-X*beta
+
+	cout << epsilon[0] << "," << epsilon[1] << "," << epsilon[2] << endl;
+	
 }
 
 // Function for sampling fixed effect (theta_i)
@@ -1490,7 +1500,7 @@ void BayesW::sampleAlpha(){
 
 	// Initial left and right (pseudo) extremes
 	double xl = 0.0;
-	double xr = 25.0;
+	double xr = 20.0;
 
 	//Give the residual to alpha structure
 	used_data_alpha.epsilon = epsilon;
@@ -1664,6 +1674,8 @@ int BayesW::runMpiGibbs() {
     uint Ntot = set_Ntot(rank);
     const uint Mtot = set_Mtot(rank);
     init(Mtot, Ntot, numFixedEffects);
+
+	
     if (rank == 0)
         printf("INFO   : Full dataset includes Mtot=%d markers and Ntot=%d individuals.\n", Mtot, Ntot);
 
@@ -1730,7 +1742,7 @@ int BayesW::runMpiGibbs() {
 
 //Deleted the restart part
         
-        dist.reset_rng((uint)(opt.seed + rank*1000));
+    //    dist.reset_rng((uint)(opt.seed + rank*1000));
 
     // Build a list of the files to tar
     // --------------------------------
@@ -1891,7 +1903,10 @@ int BayesW::runMpiGibbs() {
 
 
     // Copy, center and scale phenotype observations
+    // In bW we are not scaling and centering phenotypes
     for (int i=0; i<Ntot; ++i) y[i] = data.y(i);
+    for (int i=0; i<Ntot; ++i)  epsilon[i] = y[i] - mu;	
+
 
     double   sum_beta_squaredNorm;
     double   beta, betaOld, deltaBeta, beta_squaredNorm, p, acum, e_sqn;
@@ -1928,7 +1943,7 @@ int BayesW::runMpiGibbs() {
 
 	/* 1. Intercept (mu) */
 	sampleMu();
-
+	cout << "Mu= " << mu << endl;
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
         //------------------------------------------------------------------------
@@ -1940,12 +1955,17 @@ int BayesW::runMpiGibbs() {
 //	vi = (used_data.alpha*epsilon-EuMasc).exp();
 
 	for(int i=0; i<Ntot; ++i){
-		vi[i] <- exp(used_data.alpha * epsilon[i] - EuMasc);
+		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
+		if(i < 20){
+		      cout << i << ". " << epsilon[i] << ", "<< vi[i] << endl;
+		}
+		//cout << i << ". " <<  << endl;
 	}
-
+cout << "vi sum= " << vi.array().sum() << endl;	
 	if (opt.shuffleMarkers) {
-            std::shuffle(markerI.begin(), markerI.end(), dist.rng);
-        }
+        //    std::shuffle(markerI.begin(), markerI.end(), dist.rng);
+       	      std::random_shuffle(markerI.begin(), markerI.end());
+	}
         m0 = 0.0;
         v.setOnes();
 
