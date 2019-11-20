@@ -1942,8 +1942,44 @@ int BayesW::runMpiGibbs() {
         int    it_nsync_ar2 = 0;
 
 	/* 1. Intercept (mu) */
-	sampleMu();
+//	sampleMu();
+ 	//Removed sampleMu function on its own 
+	int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
+        int neval;
+        double xsamp[0], xcent[10], qcent[10] = {5., 30., 70., 95.};
+        double convex = 1.0;
+        int dometrop = 0;
+        double xprev = 0.0;
+        double xinit[4] = {0.995*mu, mu,  1.005*mu, 1.01*mu};     // Initial abscissae
+        double *p_xinit = xinit;
+
+        double xl = 2;
+        double xr = 5;   //xl and xr and the maximum and minimum values between which we sample
+//      cout << "Eps sum2= " << (epsilon.array() * epsilon.array()).sum() << endl;
+//      cout << "mu_ = " << mu << endl;
+//        cout << "alpha = " << used_data.alpha << endl;
+//        cout << "d = " << used_data.d << endl;
+//        cout << "sigma_mu = " << used_data.sigma_mu << endl;
+
+	
+	//Update before sampling
+	for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
+		(used_data.epsilon)[mu_ind] = epsilon[mu_ind] + mu;// we add to epsilon =Y+mu-X*beta
+	}
+        // Use ARS to sample mu (with density mu_dens, using parameters from used_data)
+        err = arms(xinit,ninit,&xl,&xr,mu_dens,&used_data,&convex,
+                        npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+
+        errorCheck(err); // If there is error, stop the program
+        mu = xsamp[0];   // Save the sampled value
+
+        //Update after sampling
+        for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
+                epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
+        }
+
 	cout << "Mu= " << mu << endl;
+////////// End sampling mu
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
         //------------------------------------------------------------------------
@@ -1984,8 +2020,135 @@ cout << "vi sum= " << vi.array().sum() << endl;
 	 
             if (j < M) {
                 marker  = markerI[j];
-                sampleBeta(marker);   
-            }
+		if(j <1000 ){
+			cout <<j << ". " << epsilon[0] << "," << epsilon[1] << "," << epsilon[2] << endl; 
+                }
+
+      //          sampleBeta(marker);   
+/////////////////////////////////////////////////////////
+	//Replace the sampleBeta function with the inside of the function        
+ //Save sum(X_j*failure) to structure
+        used_data_beta.sum_failure = sum_failure(marker);
+
+        used_data_beta.mean = data.means(marker);
+        used_data_beta.sd = data.sds(marker);
+        used_data_beta.mean_sd_ratio = data.mean_sd_ratio(marker);
+
+        //Change the residual vector only if the previous beta was non-zero
+        if(Beta(marker) != 0){
+                //epsilon = epsilon.array() - used_data_beta.mean_sd_ratio * Beta(marker);  //Adjust for every memeber
+                for(int i=0; i<Ntot; ++i){
+                	epsilon[i] = epsilon[i] - used_data_beta.mean_sd_ratio * Beta(marker);
+                 }
+		//And adjust even further for specific 1 and 2 allele values
+                for(int i=0; i < data.Zones[marker].size(); i++){
+                        epsilon[data.Zones[marker][i]] += Beta(marker)/used_data_beta.sd;
+                }
+                for(int i=0; i < data.Ztwos[marker].size(); i++){
+                        epsilon[data.Ztwos[marker][i]] += 2*Beta(marker)/used_data_beta.sd;
+                }
+                //Also find the transformed residuals
+                //vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
+		for(int i=0; i<Ntot; ++i){
+                        vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc) ;
+                }
+        }
+
+        // Calculate the sums of vi elements
+        double vi_sum = vi.sum();
+
+        double vi_2 = 0.0;
+        for (int i=0; i < data.Ztwos[marker].size(); i++){
+                vi_2 += vi[data.Ztwos[marker][i]];
+        }
+        double vi_1 = 0.0;
+        for (int i=0; i < data.Zones[marker].size(); i++){
+                vi_1 += vi[data.Zones[marker][i]];
+        }
+
+//      double vi_2 = vi(data.Ztwos[marker]).sum();
+//      double vi_1 = vi(data.Zones[marker]).sum();
+        double vi_0 = vi_sum - vi_1 - vi_2;
+
+        /* Calculate the mixture probability */
+        double p = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)    
+
+    // Calculate the (ratios of) marginal likelihoods
+        marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, data.means(marker),data.sds(marker),data.mean_sd_ratio(marker));
+        // Calculate the probability that marker is 0
+        double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
+
+        //Loop through the possible mixture classes
+        for (int k = 0; k < K; k++) {
+                if (p <= acum) {
+                        //if zeroth component
+                        if (k == 0) {
+                                Beta(marker) = 0;
+                                v[k] += 1.0;
+                                components[marker] = k;
+                        }
+                        // If is not 0th component then sample using ARS
+                        else {
+                                used_data_beta.used_mixture = k-1;
+
+                                used_data_beta.vi_0 = vi_0;
+                                used_data_beta.vi_1 = vi_1;
+                                used_data_beta.vi_2 = vi_2;
+
+                                double safe_limit = 2 * sqrt(used_data_beta.sigma_b * used_data_beta.mixture_classes(k-1));
+
+                                // ARS parameters
+                                int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
+                                int neval;
+                                double xsamp[0], xcent[10], qcent[10] = {5., 30., 70., 95.};
+                                double convex = 1.0;
+                                int dometrop = 0;
+                                double xprev = 0.0;
+                                double xinit[4] = {Beta(marker) - safe_limit/10 , Beta(marker),  Beta(marker) + safe_limit/20, Beta(marker) + safe_limit/10};     // Initial abscissae
+                                double *p_xinit = xinit;
+
+                                double xl = Beta(marker) - safe_limit  ; //Construct the hull around previous beta value
+                                double xr = Beta(marker) + safe_limit;
+
+                                // Sample using ARS
+                                err = arms(xinit,ninit,&xl,&xr,beta_dens,&used_data_beta,&convex,
+                                                npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+                                errorCheck(err);
+
+                                Beta(marker) = xsamp[0];  // Save the new result
+
+                                //Re-update the residual vector
+                                //epsilon = epsilon.array() + used_data_beta.mean_sd_ratio * Beta(marker);  //Adjust for every memeber
+                                for(int i=0; i < Ntot; ++i){
+                        		epsilon[i] = epsilon[i] + used_data_beta.mean_sd_ratio * Beta(marker);
+                 		}
+
+				//And adjust even further for specific 1 and 2 allele values
+                                for(int i=0; i < data.Zones[marker].size(); i++){
+                                        epsilon[data.Zones[marker][i]] -= Beta(marker)/used_data_beta.sd;
+                                }
+                                for(int i=0; i < data.Ztwos[marker].size(); i++){
+                                        epsilon[data.Ztwos[marker][i]] -= 2*Beta(marker)/used_data_beta.sd;
+                                }
+
+                                //vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
+				for(int i=0; i<Ntot; ++i){
+                        		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc) ;
+                		}			
+	
+                                v[k] += 1.0;
+                                components[marker] = k;
+                        }
+                        break;
+                } else {
+                        if((k+1) == (K-1)){
+                                acum = 1; // In the end probability will be 1
+                        }else{
+                                acum += marginal_likelihoods(k+1)/marginal_likelihoods.sum();
+                        }
+                }
+        }
+}
 
             // Make the contribution of tasks beyond their last marker nill
             // ------------------------------------------------------------
