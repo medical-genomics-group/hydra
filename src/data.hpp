@@ -175,8 +175,10 @@ public:
                                    VectorXd&    Beta);
 
     void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                   double& sigmaG, double& sigmaE, double& mu, VectorXd& pi,
-                                   uint& iteration_restart);
+                                   double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart);
+
+    void read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration_restart, const int thin,
+                                   double& mu);
 
     void sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
                                     size_t*       N1L,       size_t* N2L,       size_t* NML,

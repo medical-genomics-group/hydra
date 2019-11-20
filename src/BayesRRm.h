@@ -81,6 +81,7 @@ class BayesRRm
     std::vector<int> markerI_restart; //   idem for markerI found in .mrk* file
     VectorXd         gamma_restart;   //   idem for gamma vector found in .gam* file
     std::vector<int> xI_restart;      //   idem for xI vector found in .xiv
+    double           mu_restart;      //   to store task-wise mu read back from .mus.rank file
 
     VectorXd y;
     VectorXd Cx;

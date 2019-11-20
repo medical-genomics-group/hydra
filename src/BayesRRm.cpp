@@ -867,7 +867,7 @@ void BayesRRm::init_from_scratch() {
 void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot,
                                  const int* MrankS, const int* MrankL) {
     
-    data.read_mcmc_output_csv_file(opt.mcmcOut, opt.save, K, sigmaG, sigmaE, mu, pi, iteration_restart);
+    data.read_mcmc_output_csv_file(opt.mcmcOut, opt.save, K, sigmaG, sigmaE, pi, iteration_restart);
 
     MPI_Barrier(MPI_COMM_WORLD);
     
@@ -885,6 +885,9 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
     
     data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_restart,
                                    markerI_restart);
+
+    data.read_mcmc_output_mus_file(opt.mcmcOut, iteration_restart, opt.thin,
+                                   mu_restart);
 
     if (opt.covariates) {
         data.read_mcmc_output_gam_file(opt.mcmcOut, data.X.cols(), iteration_restart,
@@ -917,10 +920,12 @@ int BayesRRm::runMpiGibbs() {
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File   outfh, betfh, epsfh, gamfh, cpnfh, acufh, mrkfh, xivfh;
+    MPI_File   outfh, betfh, epsfh, gamfh, cpnfh, acufh, mrkfh, xivfh, musfh;
     MPI_Status status;
     MPI_Info   info;
-    MPI_Offset offset, betoff, cpnoff, epsoff;
+    MPI_Offset offset, betoff, cpnoff, epsoff, musoff;
+    
+    musoff = size_t(0);
 
     // Set up processing options
     // -------------------------
@@ -1017,6 +1022,7 @@ int BayesRRm::runMpiGibbs() {
     string xivfp = opt.mcmcOut + ".xiv." + std::to_string(rank);
     string epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
     string gamfp = opt.mcmcOut + ".gam." + std::to_string(rank);
+    string musfp = opt.mcmcOut + ".mus." + std::to_string(rank);
 
     priorPi.resize(K);
     priorPi.setZero();
@@ -1083,6 +1089,7 @@ int BayesRRm::runMpiGibbs() {
         xivfp = opt.mcmcOut + ".xiv." + std::to_string(rank);
         epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
         gamfp = opt.mcmcOut + ".gam." + std::to_string(rank);
+        musfp = opt.mcmcOut + ".mus." + std::to_string(rank);
 
     } else { 
 
@@ -1090,7 +1097,9 @@ int BayesRRm::runMpiGibbs() {
         
         dist.reset_rng((uint)(opt.seed + rank*1000));
 
+        //EO: sample sigmaG and broadcast from rank 0 to all the others
         sigmaG = dist.beta_rng(1.0, 1.0);
+        check_mpi(MPI_Bcast(&sigmaG, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
     }
 
 
@@ -1109,6 +1118,7 @@ int BayesRRm::runMpiGibbs() {
         listFile << opt.mcmcOut + ".xiv." + std::to_string(i) << "\n";
         listFile << opt.mcmcOut + ".eps." + std::to_string(i) << "\n";
         listFile << opt.mcmcOut + ".gam." + std::to_string(i) << "\n";
+        listFile << opt.mcmcOut + ".mus." + std::to_string(i) << "\n";
     }
     listFile.close();
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1127,6 +1137,7 @@ int BayesRRm::runMpiGibbs() {
     MPI_File_delete(mrkfp.c_str(), MPI_INFO_NULL);
     MPI_File_delete(xivfp.c_str(), MPI_INFO_NULL);
     MPI_File_delete(gamfp.c_str(), MPI_INFO_NULL);
+    MPI_File_delete(musfp.c_str(), MPI_INFO_NULL);
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -1139,6 +1150,7 @@ int BayesRRm::runMpiGibbs() {
     check_mpi(MPI_File_open(MPI_COMM_SELF,  mrkfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &mrkfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_SELF,  xivfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xivfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_SELF,  gamfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &gamfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_SELF,  musfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &musfh), __LINE__, __FILE__);
 
 
     // First element of the .bet, .cpn and .acu files is the
@@ -1298,12 +1310,17 @@ int BayesRRm::runMpiGibbs() {
     if (opt.restart) {
         for (int i=0; i<Ntot; ++i)  epsilon[i] = epsilon_restart[i];
         markerI = markerI_restart;
+        mu      = mu_restart;
     } else {
         for (int i=0; i<Ntot; ++i)  epsilon[i] = y[i];
         sigmaE = 0.0;
         for (int i=0; i<Ntot; ++i)  sigmaE += epsilon[i] * epsilon[i];
         //printf("<sigmaE = %15.13f\n", sigmaE);
-        sigmaE = sigmaE / dN * 0.5;        
+        sigmaE = sigmaE / dN * 0.5;
+        
+        //EO: no need to broacast here, sigmaE is the same over all tasks as we start from phenotype data
+        //EO: broadcast sigmaE from rank 0 to all the others
+        //check_mpi(MPI_Bcast(&sigmaE, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
     }
     //printf("sigmaE = %15.13f\n", sigmaE);
 
@@ -1585,7 +1602,9 @@ int BayesRRm::runMpiGibbs() {
                     if (opt.sparseSync) {
                             
                         uint task_m2s = (uint) mark2sync.size();
-                        
+                        //printf("task %3d has %3d markers to share at %d\n", rank, task_m2s, sinceLastSync);
+                        //fflush(stdout);
+
                         // Build task markers to sync statistics: mu | dbs | mu | dbs | ...
                         double* task_stat = (double*) _mm_malloc(size_t(task_m2s) * 2 * sizeof(double), 64);
                         check_malloc(task_stat, __LINE__, __FILE__);
@@ -1600,16 +1619,16 @@ int BayesRRm::runMpiGibbs() {
                         }
                         //printf("Task %3d final task_size = %8d elements to send from task_m2s = %d markers to sync.\n", rank, task_size, task_m2s);
                         //fflush(stdout);
-                        
+
                         // Get the total numbers of markers and corresponding indices to gather
-                        
+
                         const int NEL = 2;
                         uint task_info[NEL] = {};                        
                         task_info[0] = task_m2s;
                         task_info[1] = task_size;
-                        
+
                         check_mpi(MPI_Allgather(task_info, NEL, MPI_UNSIGNED, glob_info, NEL, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
-                        
+
                         int tdisp_ = 0, sdisp_ = 0, glob_m2s = 0, glob_size = 0;
                         for (int i=0; i<nranks; i++) {
                             tasks_len[i]  = glob_info[2 * i + 1];
@@ -1623,7 +1642,6 @@ int BayesRRm::runMpiGibbs() {
                         }
                         //printf("glob_info: markers to sync: %d, with glob_size = %7d elements (sum of all task_size)\n", glob_m2s, glob_size);
                         //fflush(stdout);
-                        
 
                         // Build task's array to spread: | marker 1                             | marker 2
                         //                               | n1 | n2 | nm | data1 | data2 | datam | n1 | n2 | nm | data1 | ...
@@ -1638,7 +1656,7 @@ int BayesRRm::runMpiGibbs() {
                             task_dat[loc] = NML[ mark2sync[i] ];                 loc += 1;
                             for (uint ii = 0; ii < N1L[ mark2sync[i] ]; ii++) {
                                 task_dat[loc] = I1[ N1S[ mark2sync[i] ] + ii ];  loc += 1;
-                            }
+                            }                  
                             for (uint ii = 0; ii < N2L[ mark2sync[i] ]; ii++) {
                                 task_dat[loc] = I2[ N2S[ mark2sync[i] ] + ii ];  loc += 1;
                             }
@@ -1647,8 +1665,10 @@ int BayesRRm::runMpiGibbs() {
                             }
                         }                        
                         assert(loc == task_size);
-                            
+  
                         // Allocate receive buffer for all the data
+                        //if (rank == 0)
+                        //    printf("glob_size = %d\n", glob_size);
                         uint* glob_dat = (uint*) _mm_malloc(size_t(glob_size) * sizeof(uint), 64);
                         check_malloc(glob_dat, __LINE__, __FILE__);
                         
@@ -1662,7 +1682,6 @@ int BayesRRm::runMpiGibbs() {
                         check_mpi(MPI_Allgatherv(task_stat, task_m2s * 2, MPI_DOUBLE,
                                                  glob_stats, stats_len, stats_dis, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__);                        
                         _mm_free(task_stat);
-                        
                         
                         // Compute global delta epsilon deltaSum
                         size_t loci = 0;
@@ -1700,20 +1719,19 @@ int BayesRRm::runMpiGibbs() {
                             L = glob_dat[loci + 1];
                             //cout << "2: start = " << S << ", len = " << L <<  endl;
                             sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
-                            
+
                             loci += 3 + glob_dat[loci] + glob_dat[loci + 1] + glob_dat[loci + 2];
                         }
-                        
                         _mm_free(glob_stats);
                         _mm_free(glob_dat);                        
-                        
+
                         mark2sync.clear();
                         dbet2sync.clear();                            
                         
                     } else {
                         
                         check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-                    
+
                     }
                     
                     sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
@@ -1722,7 +1740,7 @@ int BayesRRm::runMpiGibbs() {
                     tot_sync_ar2  += te - tb;
                     it_sync_ar2   += te - tb;
                     tot_nsync_ar2 += 1;
-                    it_nsync_ar2  += 1;    
+                    it_nsync_ar2  += 1;
 
                 } else { // case nranks == 1
                     
@@ -1774,7 +1792,11 @@ int BayesRRm::runMpiGibbs() {
         // ------------------------
         m0      = double(Mtot) - v[0];
         sigmaG  = dist.inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0));
-        //printf("sigmaG = %15.10f\n", sigmaG);
+        //printf("rank %d own sigmaG = %15.10f with Mtot = %d and m0 = %d\n", rank, sigmaG, Mtot, int(m0));
+
+        // Broadcast sigmaG of rank 0
+        check_mpi(MPI_Bcast(&sigmaG, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        //printf("rank %d has sigmaG = %15.10f\n", rank, sigmaG);
 
 
         // Check iteration
@@ -1842,7 +1864,7 @@ int BayesRRm::runMpiGibbs() {
                     //cout << "adding " << (gamma_old - gamma(xI[i])) * data.X(k, xI[i]) << endl;
                 }
             }
-            //the next line should be uncommented if we want to use ridge for the other covariates.
+            //the next line should be uncommented if we want to use ridge for the other cvoariates.
             //sigmaF = inv_scaled_chisq_rng(0.001 + F, (gamma.squaredNorm() + 0.001)/(0.001+F));
             sigmaF = s02F;
         }
@@ -1853,7 +1875,9 @@ int BayesRRm::runMpiGibbs() {
         for (int i=0; i<Ntot; ++i) e_sqn += epsilon[i] * epsilon[i];
         //printf("e_sqn = %15.10f\n", e_sqn);
 
+        //EO: sample sigmaE and broadcast the one from rank 0 to all the others
         sigmaE  = dist.inv_scaled_chisq_rng(v0E+dN, (e_sqn + v0E*s02E)/(v0E+dN));
+        check_mpi(MPI_Bcast(&sigmaE, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //printf("sigmaE = %15.10f\n", sigmaE);
 
         double end_it = MPI_Wtime();
@@ -1878,13 +1902,34 @@ int BayesRRm::runMpiGibbs() {
         //printf("sigmaG = %20.15f, sigmaE = %20.15f, e_sqn = %20.15f\n", sigmaG, sigmaE, e_sqn);
         //printf("it %6d, rank %3d: epsilon[0] = %15.10f, y[0] = %15.10f, m0=%10.1f,  sigE=%15.10f,  sigG=%15.10f [%6d / %6d]\n", iteration, rank, epsilon[0], y[0], m0, sigmaE, sigmaG, markerI[0], markerI[M-1]);
 
+        //BCAST
         pi = dist.dirichilet_rng(v.array() + 1.0);
-
+        check_mpi(MPI_Bcast(pi.data(), pi.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        //for (int i=0; i<pi.size(); i++) {
+        //    printf("rank %3d: pi[%d] = %15.10f after glob sync\n", rank, i, pi[i]);
+        //}
 
         // Write output files
         // ------------------
         if (iteration%opt.thin == 0) {
             
+            //EO: now only global parameters to out
+            if (rank == 0) {
+                left = snprintf(buff, LENBUF, "%5d, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), int(m0), int(pi.size()));
+                assert(left > 0);
+                
+                for (int ii=0; ii<pi.size(); ++ii) {
+                    left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), ", %20.15f", pi(ii));
+                    assert(left > 0);
+                }
+                left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), "\n");
+                assert(left > 0);
+                
+                offset = size_t(n_thinned_saved) * strlen(buff);
+                check_mpi(MPI_File_write_at(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+            }
+
+            /*
             left = snprintf(buff, LENBUF, "%5d, %4d, %20.15f, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, rank, mu, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), int(m0), int(pi.size()));
             assert(left > 0);
 
@@ -1897,6 +1942,7 @@ int BayesRRm::runMpiGibbs() {
 
             offset = (size_t(n_thinned_saved) * size_t(nranks) + size_t(rank)) * strlen(buff);
             check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+            */
 
             // Write iteration number
             if (rank == 0) {
@@ -1917,6 +1963,13 @@ int BayesRRm::runMpiGibbs() {
                 + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int))
                 + size_t(MrankS[rank]) * sizeof(int);
             check_mpi(MPI_File_write_at_all(cpnfh, cpnoff, components.data(), M, MPI_INTEGER, &status), __LINE__, __FILE__);
+
+            //EO: only iteration number and mu value (double) for the task-wise mus files
+            musoff = size_t(n_thinned_saved) * ( sizeof(uint) + sizeof(double) );
+            check_mpi(MPI_File_write_at(musfh, musoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            musoff += sizeof(uint);
+            check_mpi(MPI_File_write_at(musfh, musoff, &mu,        1, MPI_DOUBLE,   &status), __LINE__, __FILE__);
+
 
             //if (iteration == 0) {
             //    printf("rank %d dumping bet: %15.10f %15.10f\n", rank, Beta[0], Beta[MrankL[rank]-1]);
@@ -2020,6 +2073,7 @@ int BayesRRm::runMpiGibbs() {
     check_mpi(MPI_File_close(&mrkfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&xivfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&gamfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&musfh), __LINE__, __FILE__);
 
 
     // Release memory

@@ -98,7 +98,7 @@ void Data::read_mcmc_output_gam_file(const string mcmcOut, const int gamma_lengt
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at_all(gamfh, gamoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read cvs iteration: %d vs %d\n", iteration_restart, iteration_);
+        printf("Mismatch between expected and read gamma iteration: %d vs %d\n", iteration_restart, iteration_);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -145,7 +145,7 @@ void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, co
     uint iteration_   = UINT_MAX;
     check_mpi(MPI_File_read_at_all(epsfh, epsoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read cvs iteration: %d vs %d\n", iteration_restart, iteration_);
+        printf("Mismatch between expected and read eps iteration: %d vs %d\n", iteration_restart, iteration_);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -169,6 +169,45 @@ void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, co
 
     check_mpi(MPI_File_close(&epsfh), __LINE__, __FILE__);
 }
+
+
+//EO: Watch out the saving frequency of the betas (--thin)
+//    Each line contains simple the iteration (uint) and the value of mu (double)
+void Data::read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration_restart, const int thin, double& mu) {
+
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    const string musfp = mcmcOut + ".mus." + std::to_string(rank);
+
+    MPI_Status status;
+
+    MPI_File musfh;
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, musfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &musfh), __LINE__, __FILE__);
+
+    MPI_Offset musoff = size_t(0);
+
+    // 1. get and validate iteration number that we are about to read
+    assert(iteration_restart%thin == 0);
+    int n_thinned_saved = iteration_restart / thin;
+    musoff = size_t(n_thinned_saved) * (sizeof(uint) + sizeof(double));
+    uint iteration_ = UINT_MAX;
+    check_mpi(MPI_File_read_at_all(musfh, musoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (iteration_ != iteration_restart) {
+        printf("Mismatch between expected and read mus iteration: %d vs %d\n", iteration_restart, iteration_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 2. read the value of mu
+    musoff += sizeof(uint);
+    check_mpi(MPI_File_read_at(musfh, musoff, &mu, 1, MPI_DOUBLE, &status), __LINE__, __FILE__);
+    //printf("reading back mu = %15.10f at iteration %d\n", mu, iteration_);
+
+    check_mpi(MPI_File_close(&musfh), __LINE__, __FILE__);
+}
+
+
 
 
 //EO: Watch out the saving frequency of the betas (--thin)
@@ -273,8 +312,7 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
 //EO: consider moving the csv output file from ASCII to BIN
 //
 void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                     double& sigmaG, double& sigmaE, double& mu, VectorXd& pi,
-                                     uint& iteration_restart) {
+                                     double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart) {
     
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -291,13 +329,13 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
         std::string str;
         while (std::getline(file, str)) {
             if (str.length() > 0) {
-                int nread = sscanf(str.c_str(), "%5d, %4d", &it_, &rank_);
-                if (rank_ == rank && it_%optSave == 0) {
+                int nread = sscanf(str.c_str(), "%5d", &it_);
+                if (it_%optSave == 0) {
                     lastSavedIt = it_;
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
-                    nread = sscanf(cstr, "%5d, %4d, %lf, %lf, %lf, %lf, %7d, %2d, %n",
-                                   &it_, &rank_, &mu_, &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
+                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %7d, %2d, %n",
+                                   &it_, &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
                     string pis = str.substr(nchar, str.length()-nchar);
                     char   pic[pis.length()+1];
                     strcpy(pic, pis.c_str());
@@ -322,43 +360,16 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     //for (int i=0; i<K; i++)  printf("%15.10f ", pipi[i]);
     //printf("\n");
     
-    MPI_Barrier(MPI_COMM_WORLD);
-    
-    
-    // Check that all ranks are on the same last iteration
-    int* allit_, lastit = -1;
-    if (rank == 0) {
-        allit_ = (int*)_mm_malloc(sizeof(int) * nranks, 64);  check_malloc(allit_, __LINE__, __FILE__);
-    }
-
-    MPI_Gather(&lastSavedIt, 1, MPI_INT, allit_, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-    if (rank == 0) {
-        int refit_ = allit_[0];
-        for (int i=0; i<nranks; ++i) {
-            if (allit_[i] != refit_) {
-                printf("*FATAL*: not all ranks on the same last iteration! (%d vs %d for rank %d)\n",
-                       refit_, allit_[i], rank);
-                MPI_Abort(MPI_COMM_WORLD, 1);
-            }
-        }
-        _mm_free(allit_);
-        lastit = refit_;
-    }
-
-    MPI_Bcast(&lastit, 1, MPI_INT, 0, MPI_COMM_WORLD);
-
-    // Assign
-    assert(lastit % optSave == 0);
-    assert(lastit >= 0);
-    assert(lastit <= UINT_MAX);
-    iteration_restart = lastit;
+    // Sanity checks and assign
+    assert(lastSavedIt % optSave == 0);
+    assert(lastSavedIt >= 0);
+    assert(lastSavedIt <= UINT_MAX);
+    iteration_restart = lastSavedIt;
     sigmaG            = sigg_;
     sigmaE            = sige_;
-    mu                = mu_;
-    for (int i=0; i<K; i++)  pi[i] = pipi[i];
+    for (int i=0; i<K; i++) 
+        pi[i] = pipi[i];
 }
-
 
 
 void Data::sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
