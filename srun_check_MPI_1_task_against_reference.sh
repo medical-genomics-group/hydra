@@ -36,7 +36,7 @@ elif [ $DS == 2 ]; then
     sparsebsn=${dataset}_uint
     NUMINDS=500000
     NUMSNPS=1270420
-    NUMSNPS=20000
+    NUMSNPS=2000
 elif [ $DS == 3 ]; then
     sparsedir=/scratch/orliac/UKBgen/
     sparsebsn=epfl_test_data_sparse
@@ -99,6 +99,18 @@ echo "@@@ MPI 1-task solution reading from SPARSE files @@@"
 echo
 sol=mpi1tsparse
 cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
+echo ----------------------------------------------------------------------------------
+echo $cmd
+echo ----------------------------------------------------------------------------------
+$cmd || exit 1
+
+
+echo
+echo
+echo "@@@ MPI 1-task solution reading from SPARSE files and sparse sync @@@"
+echo
+sol=mpi1tsparse_sparseSync
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --sparse-sync --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------
