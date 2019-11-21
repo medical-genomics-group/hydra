@@ -48,7 +48,7 @@ BayesW::BayesW(Data &data, Options &opt, const long memPageSize)
     , max_iterations(opt.chainLength)
     , thinning(opt.thin)
     , burn_in(opt.burnin)
-      //, dist(opt.seed)
+    //, dist(opt.seed) //Was commented out
     , usePreprocessedData(opt.analysisType == "PPBayes")
     , showDebug(false)
 {
@@ -1674,6 +1674,8 @@ int BayesW::runMpiGibbs() {
     uint Ntot = set_Ntot(rank);
     const uint Mtot = set_Mtot(rank);
     init(Mtot, Ntot, numFixedEffects);
+    //Reset the dist
+    dist.reset_rng((uint)(opt.seed + rank*1000));
 
 	
     if (rank == 0)
@@ -1978,7 +1980,7 @@ int BayesW::runMpiGibbs() {
                 epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
 
-	cout << "Mu= " << mu << endl;
+//	cout << "Mu= " << mu << endl;
 ////////// End sampling mu
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
@@ -1992,15 +1994,15 @@ int BayesW::runMpiGibbs() {
 
 	for(int i=0; i<Ntot; ++i){
 		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
-		if(i < 20){
-		      cout << i << ". " << epsilon[i] << ", "<< vi[i] << endl;
-		}
+	//	if(i < 20){
+	//	      cout << i << ". " << epsilon[i] << ", "<< vi[i] << endl;
+	//	}
 		//cout << i << ". " <<  << endl;
 	}
-cout << "vi sum= " << vi.array().sum() << endl;	
+//cout << "vi sum= " << vi.array().sum() << endl;	
 	if (opt.shuffleMarkers) {
-        //    std::shuffle(markerI.begin(), markerI.end(), dist.rng);
-       	      std::random_shuffle(markerI.begin(), markerI.end());
+            std::shuffle(markerI.begin(), markerI.end(), dist.rng);
+       	//      std::random_shuffle(markerI.begin(), markerI.end());
 	}
         m0 = 0.0;
         v.setOnes();
@@ -2020,9 +2022,14 @@ cout << "vi sum= " << vi.array().sum() << endl;
 	 
             if (j < M) {
                 marker  = markerI[j];
-		if(j <1000 ){
-			cout <<j << ". " << epsilon[0] << "," << epsilon[1] << "," << epsilon[2] << endl; 
-                }
+	//	if(j <100 ){
+	//		double temp_eps_sum = 0;
+	//		for(int eps_i=0; eps_i < Ntot; eps_i++ ){
+	//			temp_eps_sum = temp_eps_sum + epsilon[eps_i]*epsilon[eps_i];
+	//		}
+	//		cout << j << ". "<< temp_eps_sum <<", " <<vi.array().sum() <<", " <<epsilon[0]  << endl;
+	//		temp_eps_sum = 0;
+        //        }
 
       //          sampleBeta(marker);   
 /////////////////////////////////////////////////////////
@@ -2072,7 +2079,9 @@ cout << "vi sum= " << vi.array().sum() << endl;
 
         /* Calculate the mixture probability */
         double p = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)    
-
+if(j < 1) {
+	cout << marker <<". "  << p << ", " << vi_0 << ", " << vi_1 << ", " << vi_2 << endl; 
+}
     // Calculate the (ratios of) marginal likelihoods
         marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, data.means(marker),data.sds(marker),data.mean_sd_ratio(marker));
         // Calculate the probability that marker is 0
@@ -2148,6 +2157,15 @@ cout << "vi sum= " << vi.array().sum() << endl;
                         }
                 }
         }
+//	if(j < 5 ){
+ //                double temp_eps_sum = 0;
+//                 for(int eps_i=0; eps_i < Ntot; eps_i++ ){
+//                        temp_eps_sum = temp_eps_sum + epsilon[eps_i]*epsilon[eps_i];
+//                 }
+//                 cout << j << ". "<< temp_eps_sum <<", " <<vi.array().sum() <<", " <<epsilon[0] << ", "<< marginal_likelihoods(1) << endl;
+//                 temp_eps_sum = 0;
+//        }
+	
 }
 
             // Make the contribution of tasks beyond their last marker nill
@@ -2382,7 +2400,39 @@ cout << "vi sum= " << vi.array().sum() << endl;
         // Update global parameters
         // ------------------------
         m0      = double(Mtot) - v[0];
-	sampleAlpha();
+
+	//sampleAlpha();
+	// ARS parameters
+        
+        neval = 0;
+	xsamp[0] = 0;
+        convex = 1.0;
+        dometrop = 0;
+        xprev = 0.0;
+        xinit[0] = (used_data.alpha)*0.5;     // Initial abscissae
+        xinit[1] =  used_data.alpha;
+        xinit[2] = (used_data.alpha)*1.15;
+        xinit[3] = (used_data.alpha)*1.5; 
+        cout << xinit[0] <<"," << xinit[1] << endl;
+	// double *p_xinit = xinit;
+
+        // Initial left and right (pseudo) extremes
+        xl = 0.0;
+        xr = 20.0;
+
+        //Give the residual to alpha structure
+        //used_data_alpha.epsilon = epsilon;
+        for(int alpha_ind=0; alpha_ind < Ntot; alpha_ind++){
+                (used_data_alpha.epsilon)[alpha_ind] = epsilon[alpha_ind];
+        }
+
+        //Sample using ARS
+        err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
+                        npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+        errorCheck(err);
+        used_data.alpha = xsamp[0];
+        used_data_beta.alpha = xsamp[0];
+
 
         MPI_Barrier(MPI_COMM_WORLD);
 
@@ -2394,7 +2444,7 @@ cout << "vi sum= " << vi.array().sum() << endl;
 	used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
 	//Print results
 //	cout << iteration << ". " << Mtot - v[0] +1 <<"; "<<v[1]-1 << "; "<<v[2]-1 << "; " << v[3]-1  <<"; " << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
-        cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; " << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
+        cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; "<< setprecision(8) << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
 	
 	// 5. Sample prior mixture component probability from Dirichlet distribution
 	pi_L = dist.dirichilet_rng(v.array());
