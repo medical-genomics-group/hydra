@@ -34,6 +34,8 @@ class BayesRRm
     const double       s02F    = 1.0;
     const size_t       LENBUF  = 300;
 
+    const bool use_xfiles_in_restart = true; // Restart from .xbet rather than .bet file
+
     VectorXd    cva;
 
     Distributions_boost dist;
@@ -126,7 +128,7 @@ class BayesRRm
 
 #ifdef USE_MPI
     void   init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
-                             const int* MrankS, const int* MrankL);
+                             const int* MrankS, const int* MrankL, const bool use_xbet);
     void   init_from_scratch();
 
     string mpi_get_sparse_output_filebase(const int rank);

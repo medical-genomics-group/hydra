@@ -213,14 +213,15 @@ void Data::read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration
 //EO: Watch out the saving frequency of the betas (--thin)
 void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot, 
                                      const uint  iteration_restart, const int thin,
-                                     const int*   MrankS,  const int* MrankL,
+                                     const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                      VectorXi& components) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    const string cpnfp = mcmcOut + ".cpn";
+    string cpnfp = mcmcOut + ".cpn";
+    if (use_xfiles) cpnfp = mcmcOut + ".xcpn";
 
     MPI_Status status;
 
@@ -239,7 +240,10 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
     // 2. get and validate iteration number that we are about to read
     assert(iteration_restart%thin == 0);
     int n_thinned_saved = iteration_restart / thin;
+
     cpnoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(int));
+    if (use_xfiles) cpnoff = sizeof(uint);
+
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at_all(cpnfh, cpnoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     if (iteration_ != iteration_restart) {
@@ -251,6 +255,9 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
     cpnoff = sizeof(uint) + sizeof(uint) 
         + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(int))
         + size_t(MrankS[rank]) * sizeof(int);
+    if (use_xfiles) {
+        cpnoff = sizeof(uint) + sizeof(uint) + size_t(MrankS[rank]) * sizeof(int);
+    }
     check_mpi(MPI_File_read_at_all(cpnfh, cpnoff, components.data(), MrankL[rank], MPI_INTEGER, &status), __LINE__, __FILE__);
 
     //printf("reading back cpn: %d %d\n", components[0], components[MrankL[rank]-1]);
@@ -262,14 +269,15 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
 //EO: Watch out the saving frequency of the betas (--thin)
 void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
                                      const uint  iteration_restart, const int thin,
-                                     const int*   MrankS,  const int* MrankL,
+                                     const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                      VectorXd& Beta) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    const string betfp = mcmcOut + ".bet";
+    string betfp = mcmcOut + ".bet";
+    if (use_xfiles) betfp = mcmcOut + ".xbet";
 
     MPI_Status status;
 
@@ -288,7 +296,10 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
     // 2. get and validate iteration number that we are about to read
     assert(iteration_restart%thin == 0);
     int n_thinned_saved = iteration_restart / thin;
+
     betoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(double));
+    if (use_xfiles) betoff = sizeof(uint);
+
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at_all(betfh, betoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     if (iteration_ != iteration_restart) {
@@ -300,6 +311,10 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
     betoff = sizeof(uint) + sizeof(uint) 
         + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(double))
         + size_t(MrankS[rank]) * sizeof(double);
+    if (use_xfiles) { 
+        betoff =  sizeof(uint) + sizeof(uint) + size_t(MrankS[rank]) * sizeof(double);
+    }
+
     check_mpi(MPI_File_read_at_all(betfh, betoff, Beta.data(), MrankL[rank], MPI_DOUBLE, &status), __LINE__, __FILE__);
 
     //printf("rank %d reading back bet: %15.10f %15.10f\n", rank, Beta[0], Beta[MrankL[rank]-1]);

@@ -71,7 +71,7 @@ elif [ $DS == 2 ]; then
     sparsebsn=${dataset}_uint_test
     NUMINDS=500000
     NUMSNPS=1270420
-    NUMSNPS=10000
+    NUMSNPS=1000
 elif [ $DS == 3 ]; then
     sparsedir=/scratch/orliac/UKBgen/
     sparsebsn=epfl_test_data_sparse
@@ -127,7 +127,7 @@ echo "output dir:" $outdir
 echo "======================================"
 echo
 
-CLR=20; CLF=15;
+CLR=17; CLF=7;
 if [ "$CLF" -ge "$CLR" ]; then
     echo "FATAL: failing iteration CLF(=$CLF) must be strictly lower than full chain length CLR(=$CLR)!"
     exit 1;
@@ -149,13 +149,13 @@ fi
 TOCONV_T=$((($CLR - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
-TPN=36
+TPN=11
 BPR=5
 
 
-# Select what to run ------------------------------------
-bed_to_sparse=0;  run_bed=1;  run_sparse=0;  run_comp=0;
-# -------------------------------------------------------
+# Select what to run ----------------------
+bed_to_sparse=0;  run_bed=1;  run_sparse=0;
+# -----------------------------------------
 
 
 # Convert bed to sparse
@@ -217,21 +217,4 @@ if [ $run_sparse == 1 ]; then
     ./beta_converter       $sol2".bet" $TOCONV_T > $sol2".bet.txt"
     ./epsilon_converter    $sol2".eps"           > $sol2".eps.txt"
     ./components_converter $sol2".cpn" $TOCONV_T > $sol2".cpn.txt"
-fi
-
-echo; echo
-
-if [ $run_comp == 1 ] && [ $run_bed == 1 ] && [ $run_sparse == 1 ]; then
-    echo diff bin .bet
-    diff $sol".bet" $sol2".bet"
-    echo diff bin .eps
-    diff $sol".eps" $sol2".eps"
-    echo diff bin .cpn
-    diff $sol".cpn" $sol2".cpn"
-    echo diff txt .bet
-    diff $sol".bet.txt" $sol2".bet.txt"
-    echo diff txt .eps
-    diff $sol".eps.txt" $sol2".eps.txt"
-    echo diff txt .cpn
-    diff $sol".cpn.txt" $sol2".cpn.txt"
 fi

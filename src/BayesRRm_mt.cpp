@@ -467,7 +467,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
         cout << "ADJUST RESTART IN MT" << endl;
         exit(1);
 
-        init_from_restart(K, M, Mtot, Ntot, MrankS, MrankL);
+        init_from_restart(K, M, Mtot, Ntot, MrankS, MrankL, use_xfiles_in_restart);
 
         if (rank == 0)
             data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_restart, iteration_start);

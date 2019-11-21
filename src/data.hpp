@@ -166,12 +166,12 @@ public:
 
     void read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
                                    const uint   iteration_restart, const int thin,
-                                   const int*   MrankS,  const int* MrankL,
+                                   const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                    VectorXi&    components);
 
     void read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
                                    const uint   iteration_restart, const int thin,
-                                   const int*   MrankS,  const int* MrankL,
+                                   const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                    VectorXd&    Beta);
 
     void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
