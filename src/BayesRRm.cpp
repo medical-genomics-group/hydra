@@ -1068,7 +1068,7 @@ int BayesRRm::runMpiGibbs() {
     // ----------------------------------------------------
     if (opt.restart) {
 
-        init_from_restart(K, M, Mtot, Ntot, MrankS, MrankL);
+        init_from_restart(K, M, Mtot, Ntot - data.numNAs, MrankS, MrankL);
 
         if (rank == 0)
             data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_restart, iteration_start);
