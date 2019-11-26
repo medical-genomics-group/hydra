@@ -1562,9 +1562,11 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 
 	//initialize epsilon vector as the phenotype vector
 	y = data.y.cast<double>().array();
+//        cout << "ysum= " << setprecision(17) << y.sum() << endl;
+
 	epsilon = y;
 	mu = y.mean();       // mean or intercept
-
+//	cout << "Initial mu= " << setprecision(17) << mu << endl;
 	// Initialize the variables in structures
 	//Save variance classes
 	used_data.mixture_classes.resize(km1);
@@ -1858,13 +1860,16 @@ int BayesW::runMpiGibbs() {
     mstd = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
     dalloc += 2 * size_t(M) * sizeof(double) / 1E9;
 
-    double tmp0, tmp1, tmp2;
+//    double tmp0, tmp1, tmp2;
     for (int i=0; i<M; ++i) {
-        mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
-        tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
-        tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
-        tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
-        mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
+	// For now use the old way to compute means
+        //mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
+        mave[i] = data.means(i);
+//	tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
+//        tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
+//        tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
+        //mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
+        mstd[i] = data.sds(i);
         //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
 
@@ -1885,10 +1890,15 @@ int BayesW::runMpiGibbs() {
     const auto st3 = std::chrono::high_resolution_clock::now();
  
     //double *y, *epsilon, *tmpEps, *previt_eps, *deltaEps, *dEpsSum, *deltaSum;
-    double *y, *tmpEps, *deltaEps, *dEpsSum, *deltaSum, *epsilon ;
+    double *y, *tmpEps, *deltaEps, *dEpsSum, *deltaSum, *epsilon ,*vi , *tmp_vi, *tmpEps_vi;
     const size_t NDB = size_t(Ntot) * sizeof(double);
     y          = (double*)_mm_malloc(NDB, 64);  check_malloc(y,          __LINE__, __FILE__);
     epsilon    = (double*)_mm_malloc(NDB, 64);  check_malloc(epsilon,    __LINE__, __FILE__);
+    vi    = (double*)_mm_malloc(NDB, 64);  check_malloc(vi,    __LINE__, __FILE__);
+
+    tmpEps_vi    = (double*)_mm_malloc(NDB, 64);  check_malloc(tmpEps_vi,    __LINE__, __FILE__);
+    tmp_vi    = (double*)_mm_malloc(NDB, 64);  check_malloc(tmp_vi,    __LINE__, __FILE__);
+
     tmpEps     = (double*)_mm_malloc(NDB, 64);  check_malloc(tmpEps,     __LINE__, __FILE__);
     //previt_eps = (double*)malloc(NDB);  check_malloc(previt_eps, __LINE__, __FILE__);
     deltaEps   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaEps,   __LINE__, __FILE__);
@@ -1957,12 +1967,11 @@ int BayesW::runMpiGibbs() {
 
         double xl = 2;
         double xr = 5;   //xl and xr and the maximum and minimum values between which we sample
-//      cout << "Eps sum2= " << (epsilon.array() * epsilon.array()).sum() << endl;
-//      cout << "mu_ = " << mu << endl;
-//        cout << "alpha = " << used_data.alpha << endl;
-//        cout << "d = " << used_data.d << endl;
-//        cout << "sigma_mu = " << used_data.sigma_mu << endl;
-
+	
+//	double eps_temp = 0;
+//	for(int eps_i=0; eps_i < Ntot; eps_i++){
+//		eps_temp += epsilon[eps_i] * epsilon[eps_i];
+//	}
 	
 	//Update before sampling
 	for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
@@ -1974,13 +1983,13 @@ int BayesW::runMpiGibbs() {
 
         errorCheck(err); // If there is error, stop the program
         mu = xsamp[0];   // Save the sampled value
+	
 
         //Update after sampling
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
                 epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
 
-//	cout << "Mu= " << mu << endl;
 ////////// End sampling mu
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
@@ -1994,10 +2003,6 @@ int BayesW::runMpiGibbs() {
 
 	for(int i=0; i<Ntot; ++i){
 		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
-	//	if(i < 20){
-	//	      cout << i << ". " << epsilon[i] << ", "<< vi[i] << endl;
-	//	}
-		//cout << i << ". " <<  << endl;
 	}
 //cout << "vi sum= " << vi.array().sum() << endl;	
 	if (opt.shuffleMarkers) {
@@ -2022,56 +2027,69 @@ int BayesW::runMpiGibbs() {
 	 
             if (j < M) {
                 marker  = markerI[j];
-	//	if(j <100 ){
-	//		double temp_eps_sum = 0;
-	//		for(int eps_i=0; eps_i < Ntot; eps_i++ ){
-	//			temp_eps_sum = temp_eps_sum + epsilon[eps_i]*epsilon[eps_i];
-	//		}
-	//		cout << j << ". "<< temp_eps_sum <<", " <<vi.array().sum() <<", " <<epsilon[0]  << endl;
-	//		temp_eps_sum = 0;
-        //        }
 
       //          sampleBeta(marker);   
 /////////////////////////////////////////////////////////
 	//Replace the sampleBeta function with the inside of the function        
- //Save sum(X_j*failure) to structure
-        used_data_beta.sum_failure = sum_failure(marker);
+        double vi_sum = 0.0;
+        double vi_1 = 0.0;
+        double vi_2 = 0.0;
 
-        used_data_beta.mean = data.means(marker);
-        used_data_beta.sd = data.sds(marker);
-        used_data_beta.mean_sd_ratio = data.mean_sd_ratio(marker);
 
         //Change the residual vector only if the previous beta was non-zero
         if(Beta(marker) != 0){
                 //epsilon = epsilon.array() - used_data_beta.mean_sd_ratio * Beta(marker);  //Adjust for every memeber
                 for(int i=0; i<Ntot; ++i){
-                	epsilon[i] = epsilon[i] - used_data_beta.mean_sd_ratio * Beta(marker);
+                        tmpEps_vi[i] = epsilon[i] - data.mean_sd_ratio(marker) * Beta(marker);
+	//	 	epsilon[i] = epsilon[i] - data.mean_sd_ratio(marker) * Beta(marker);
                  }
 		//And adjust even further for specific 1 and 2 allele values
                 for(int i=0; i < data.Zones[marker].size(); i++){
-                        epsilon[data.Zones[marker][i]] += Beta(marker)/used_data_beta.sd;
+                  //      epsilon[data.Zones[marker][i]] += Beta(marker)/mstd[marker];
+                	tmpEps_vi[data.Zones[marker][i]] += Beta(marker)/mstd[marker];
                 }
                 for(int i=0; i < data.Ztwos[marker].size(); i++){
-                        epsilon[data.Ztwos[marker][i]] += 2*Beta(marker)/used_data_beta.sd;
+                       // epsilon[data.Ztwos[marker][i]] += 2*Beta(marker)/mstd[marker];
+                        tmpEps_vi[data.Ztwos[marker][i]] += 2*Beta(marker)/mstd[marker];
                 }
                 //Also find the transformed residuals
                 //vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
 		for(int i=0; i<Ntot; ++i){
-                        vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc) ;
+                        //vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc) ;
+                        tmp_vi[i] = exp(used_data.alpha * tmpEps_vi[i] - EuMasc) ;
+			vi_sum += tmp_vi[i];
                 }
-        }
+	        for (int i=0; i < data.Ztwos[marker].size(); i++){
+          	      vi_2 += tmp_vi[data.Ztwos[marker][i]];
+        	}
+        	for (int i=0; i < data.Zones[marker].size(); i++){
+                	vi_1 += tmp_vi[data.Zones[marker][i]];
+        	}
+        }else{
+		// Calculate the sums of vi elements
+        	for (int i=0; i < Ntot; i++){
+                	vi_sum += vi[i];
+        	}
+        	for (int i=0; i < data.Ztwos[marker].size(); i++){
+                	vi_2 += vi[data.Ztwos[marker][i]];
+        	}
+        	for (int i=0; i < data.Zones[marker].size(); i++){
+                	vi_1 += vi[data.Zones[marker][i]];
+        	}
+
+	}
 
         // Calculate the sums of vi elements
-        double vi_sum = vi.sum();
-
-        double vi_2 = 0.0;
+/*	for (int i=0; i < Ntot; i++){
+                vi_sum += vi[i];
+        }
         for (int i=0; i < data.Ztwos[marker].size(); i++){
                 vi_2 += vi[data.Ztwos[marker][i]];
         }
-        double vi_1 = 0.0;
         for (int i=0; i < data.Zones[marker].size(); i++){
                 vi_1 += vi[data.Zones[marker][i]];
         }
+*/
 
 //      double vi_2 = vi(data.Ztwos[marker]).sum();
 //      double vi_1 = vi(data.Zones[marker]).sum();
@@ -2079,11 +2097,9 @@ int BayesW::runMpiGibbs() {
 
         /* Calculate the mixture probability */
         double p = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)    
-if(j < 1) {
-	cout << marker <<". "  << p << ", " << vi_0 << ", " << vi_1 << ", " << vi_2 << endl; 
-}
-    // Calculate the (ratios of) marginal likelihoods
-        marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, data.means(marker),data.sds(marker),data.mean_sd_ratio(marker));
+    
+	// Calculate the (ratios of) marginal likelihoods
+        marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, mave[marker],mstd[marker],data.mean_sd_ratio(marker));
         // Calculate the probability that marker is 0
         double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
 
@@ -2098,6 +2114,11 @@ if(j < 1) {
                         }
                         // If is not 0th component then sample using ARS
                         else {
+		 //Save sum(X_j*failure) to structure
+		 		used_data_beta.sum_failure = sum_failure(marker);
+				used_data_beta.mean = mave[marker];
+        			used_data_beta.sd = mstd[marker];
+        			used_data_beta.mean_sd_ratio = data.mean_sd_ratio(marker);
                                 used_data_beta.used_mixture = k-1;
 
                                 used_data_beta.vi_0 = vi_0;
@@ -2128,23 +2149,23 @@ if(j < 1) {
 
                                 //Re-update the residual vector
                                 //epsilon = epsilon.array() + used_data_beta.mean_sd_ratio * Beta(marker);  //Adjust for every memeber
-                                for(int i=0; i < Ntot; ++i){
+ /*                               for(int i=0; i < Ntot; ++i){
                         		epsilon[i] = epsilon[i] + used_data_beta.mean_sd_ratio * Beta(marker);
                  		}
 
 				//And adjust even further for specific 1 and 2 allele values
                                 for(int i=0; i < data.Zones[marker].size(); i++){
-                                        epsilon[data.Zones[marker][i]] -= Beta(marker)/used_data_beta.sd;
+                                        epsilon[data.Zones[marker][i]] -= Beta(marker)/mstd[marker];
                                 }
                                 for(int i=0; i < data.Ztwos[marker].size(); i++){
-                                        epsilon[data.Ztwos[marker][i]] -= 2*Beta(marker)/used_data_beta.sd;
+                                        epsilon[data.Ztwos[marker][i]] -= 2*Beta(marker)/mstd[marker];
                                 }
 
                                 //vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
 				for(int i=0; i<Ntot; ++i){
                         		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc) ;
                 		}			
-	
+*/	
                                 v[k] += 1.0;
                                 components[marker] = k;
                         }
@@ -2157,15 +2178,33 @@ if(j < 1) {
                         }
                 }
         }
-//	if(j < 5 ){
- //                double temp_eps_sum = 0;
-//                 for(int eps_i=0; eps_i < Ntot; eps_i++ ){
-//                        temp_eps_sum = temp_eps_sum + epsilon[eps_i]*epsilon[eps_i];
-//                 }
-//                 cout << j << ". "<< temp_eps_sum <<", " <<vi.array().sum() <<", " <<epsilon[0] << ", "<< marginal_likelihoods(1) << endl;
-//                 temp_eps_sum = 0;
-//        }
-	
+                betaOld   = beta;
+                beta      = Beta(marker);
+                deltaBeta = betaOld - beta;
+                //printf("deltaBeta = %15.10f\n", deltaBeta);
+
+                // Compute delta epsilon
+                if (deltaBeta != 0.0) {
+                    
+                    //printf("it %d, task %3d, marker %5d has non-zero deltaBeta = %15.10f (%15.10f, %15.10f) => %15.10f) 1,2,M: %lu, %lu, %lu\n", iteration, rank, marker, deltaBeta, mave[marker], mstd[marker],  deltaBeta * mstd[marker], N1L[marker], N2L[marker], NML[marker]);
+
+                    if (opt.sparseSync && nranks > 1) {
+
+                        mark2sync.push_back(marker);
+                        dbet2sync.push_back(deltaBeta);
+
+                    } else {
+
+                        sparse_scaadd(deltaEps, deltaBeta, 
+                                      I1, N1S[marker], N1L[marker],
+                                      I2, N2S[marker], N2L[marker],
+                                      IM, NMS[marker], NML[marker],
+                                      mave[marker], 1/mstd[marker], Ntot); //Use here 1/sd
+                        
+                        // Update local sum of delta epsilon
+                        sum_vectors_f64(dEpsSum, deltaEps, Ntot);
+                    }
+                }	
 }
 
             // Make the contribution of tasks beyond their last marker nill
@@ -2223,7 +2262,7 @@ if(j < 1) {
                         for (int i=0; i<task_m2s; i++) {
                             task_size += (N1L[ mark2sync[i] ] + N2L[ mark2sync[i] ] + NML[ mark2sync[i] ] + 3);
                             task_stat[2 * i + 0] = mave[ mark2sync[i] ];
-                            task_stat[2 * i + 1] = mstd[ mark2sync[i] ] * dbet2sync[i];
+                            task_stat[2 * i + 1] = mstd[ mark2sync[i] ] * dbet2sync[i]; //CHANGE mstd later!
                             //printf("Task %3d, m2s %d/%d: 1: %8lu, 2: %8lu, m: %8lu, info: 3); stats are (%15.10f, %15.10f)\n", rank, i, task_m2s, N1L[ mark2sync[i] ], N2L[ mark2sync[i] ], NML[ mark2sync[i] ], task_stat[2 * i + 0], task_stat[2 * i + 1]);
                         }
                         //printf("Task %3d final task_size = %8d elements to send from task_m2s = %d markers to sync.\n", rank, task_size, task_m2s);
@@ -2352,11 +2391,15 @@ if(j < 1) {
                     tot_nsync_ar2 += 1;
                     it_nsync_ar2  += 1;    
 
-                } else { // case nranks == 1
-                    
+                } else { // case nranks == 1    
                     sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
                 }
-                    
+		// Do a update currently locally for vi vector
+		for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
+			vi[vi_ind] = exp(used_data.alpha * epsilon[vi_ind] - EuMasc);
+		}		
+                
+ 
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
                 
@@ -2413,7 +2456,6 @@ if(j < 1) {
         xinit[1] =  used_data.alpha;
         xinit[2] = (used_data.alpha)*1.15;
         xinit[3] = (used_data.alpha)*1.5; 
-        cout << xinit[0] <<"," << xinit[1] << endl;
 	// double *p_xinit = xinit;
 
         // Initial left and right (pseudo) extremes
@@ -2444,7 +2486,7 @@ if(j < 1) {
 	used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
 	//Print results
 //	cout << iteration << ". " << Mtot - v[0] +1 <<"; "<<v[1]-1 << "; "<<v[2]-1 << "; " << v[3]-1  <<"; " << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
-        cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; "<< setprecision(8) << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
+        cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; "<< setprecision(17) << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
 	
 	// 5. Sample prior mixture component probability from Dirichlet distribution
 	pi_L = dist.dirichilet_rng(v.array());

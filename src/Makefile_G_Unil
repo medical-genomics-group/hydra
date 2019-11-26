@@ -8,7 +8,7 @@ EXE       = mpi_gibbs
 
 CXX       = mpic++
 
-CXXFLAGS  = -O3
+CXXFLAGS  = -O2
 #CXXFLAGS += g
 CXXFLAGS += -std=c++17
 #CXXFLAGS += -march=native
