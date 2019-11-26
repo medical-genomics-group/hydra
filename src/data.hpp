@@ -108,6 +108,7 @@ public:
     VectorXi G; 			 // groups
     MatrixXd mS;			 // mixtures in groups
 
+  
     MatrixXf XPX;            // X'X the MME lhs
     MatrixXf ZPX;            // Z'X the covariance matrix of SNPs and fixed effects
     VectorXf XPXdiag;        // X'X diagonal
@@ -175,7 +176,7 @@ public:
                                    VectorXd&    Beta);
 
     void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                   double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart);
+                                   VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart);
 
     void read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration_restart, const int thin,
                                    double& mu);
@@ -341,7 +342,7 @@ public:
     void readCovariateFile(const string &covariateFile);
 
     // marion : annotation variables
-    unsigned numGroups;	// number of annotations
+    unsigned numGroups = 1;	// number of annotations
     void readGroupFile(const string &groupFile);
     void readGroupFile_new(const string &groupFile);
     void readmSFile(const string& mSfile);

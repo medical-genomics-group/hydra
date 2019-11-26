@@ -128,8 +128,9 @@ int main(int argc, const char * argv[]) {
 
             // Option bayesType="bayesMmap" is going to be deprecated
             if (opt.bayesType == "bayesMmap" || opt.bayesType == "bayes"){
-                BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
-                analysis.runGibbs();
+	      //BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+	      // analysis.runGibbs();
+	      std::cout<< "Deprecated function" << std::endl;
             } else if (opt.bayesType == "horseshoe") {
                 //TODO Finish horseshoe
             } else if (opt.bayesType == "bayesW") {

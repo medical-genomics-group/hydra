@@ -310,9 +310,9 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
 
 
 //EO: consider moving the csv output file from ASCII to BIN
-//
+//TODO improve reading from file for multi group, now sigmaG is a vector and pi is a numgroups*components vector, read in rowise manner
 void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                     double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart) {
+                                     VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
     
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -321,8 +321,9 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     string csv = mcmcOut + ".csv";
     std::ifstream file(csv);
     int it_ = 1E9, rank_ = -1, m0_ = -1, pisize_ = -1, nchar = 0;
-    double mu_, sigg_, sige_, rat_;
-    double pipi[K];
+    double mu_, sige_, rat_;
+    VectorXd sigg_(numGroups);
+    MatrixXd pipi(numGroups,K);
     int lastSavedIt = 0;
     
     if (file.is_open()) {
@@ -334,8 +335,14 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
                     lastSavedIt = it_;
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
-                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %7d, %2d, %n",
-                                   &it_, &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
+		    //we read iteration number
+                    nread = sscanf(cstr, "%5d", &it_);
+		    //here we have to loop over the number of sigmaG elements
+		    for(int jj=0; jj < num; ++jj)
+
+		    ", %lf, %lf, %lf, %7d, %2d, %n",
+                                  
+				   &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
                     string pis = str.substr(nchar, str.length()-nchar);
                     char   pic[pis.length()+1];
                     strcpy(pic, pis.c_str());

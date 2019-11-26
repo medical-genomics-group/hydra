@@ -40,16 +40,16 @@ class BayesRRm
     Distributions_boost dist8[8];
     bool usePreprocessedData;
     bool showDebug;
-    double betasqn;
+    VectorXd betasqn;
 
     MatrixXd X;         // "fixed effects" matrix.
     VectorXd gamma;     // fixed effects coefficients
 
     // Component variables
-    VectorXd priorPi;   // prior probabilities for each component
-    VectorXd pi;        // mixture probabilities
+    MatrixXd priorPi;   // prior probabilities for each component
+    MatrixXd pi;        // mixture probabilities
     MatrixXd pi8;
-    VectorXd cVa;       // component-specific variance
+    MatrixXd cVa;       // component-specific variance
     VectorXd logL;      // log likelihood of component
     VectorXd muk;       // mean of k-th component marker effect size
     VectorXd denom;     // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
@@ -61,7 +61,7 @@ class BayesRRm
 
     // Mean and residual variables
     double mu;          // mean or intercept
-    double sigmaG;      // genetic variance
+    VectorXd sigmaG;      // genetic variance
     double sigmaE;      // residuals variance
     double sigmaF;      // covariates variance if using ridge;
 
@@ -122,8 +122,6 @@ class BayesRRm
                           const int                  N,
                           const int                  marker);
 
-    int    runGibbs();
-
 #ifdef USE_MPI
     void   init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
                              const int* MrankS, const int* MrankL);
@@ -144,9 +142,7 @@ class BayesRRm
 #endif
     
 private:
-    void     init(int K, unsigned int markerCount, unsigned int individualCount, unsigned int missingPhenCount);
-    VectorXd getSnpData(unsigned int marker) const;
-    void     printDebugInfo() const;
+
 };
 
 #endif /* SRC_BAYESRRM_H_ */
