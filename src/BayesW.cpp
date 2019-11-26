@@ -1983,12 +1983,16 @@ int BayesW::runMpiGibbs() {
 
         errorCheck(err); // If there is error, stop the program
         mu = xsamp[0];   // Save the sampled value
-	
-
+cout << "Mu = " << setprecision(17) <<mu << endl;	
         //Update after sampling
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
                 epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
+      double eps_temp = 0;
+            for(int eps_i=0; eps_i < Ntot; eps_i++){
+                    eps_temp += epsilon[eps_i] * epsilon[eps_i];
+            }
+cout << eps_temp << endl;
 
 ////////// End sampling mu
         //EO: watch out, std::shuffle is not portable, so do no expect identical
@@ -2027,6 +2031,7 @@ int BayesW::runMpiGibbs() {
 	 
             if (j < M) {
                 marker  = markerI[j];
+                beta =  Beta(marker);
 
       //          sampleBeta(marker);   
 /////////////////////////////////////////////////////////
@@ -2330,7 +2335,7 @@ int BayesW::runMpiGibbs() {
                                                  glob_stats, stats_len, stats_dis, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__);                        
                         _mm_free(task_stat);
                         
-                        
+                         
                         // Compute global delta epsilon deltaSum
                         size_t loci = 0;
                         for (int i=0; i<glob_m2s ; i++) {
@@ -2394,6 +2399,15 @@ int BayesW::runMpiGibbs() {
                 } else { // case nranks == 1    
                     sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
                 }
+	/*	if(j<100){
+			double tmp_eps_sum = 0.0;
+			for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
+                        	tmp_eps_sum += epsilon[vi_ind] * epsilon[vi_ind];
+               		}
+			cout << marker << ". "<< setprecision(17) <<tmp_eps_sum << endl;
+	
+		}
+*/
 		// Do a update currently locally for vi vector
 		for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
 			vi[vi_ind] = exp(used_data.alpha * epsilon[vi_ind] - EuMasc);
@@ -2505,7 +2519,7 @@ int BayesW::runMpiGibbs() {
                    sigmaG, sigmaE, beta_squaredNorm, int(m0));
             fflush(stdout);
         }*/
-
+ 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
         //printf("inv scaled parameters %20.15f __ %20.15f\n", v0G+m0, (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
         //sigmaE = dist.inv_scaled_chisq_rng(v0E+Ntot,((epsilon).squaredNorm()+v0E*s02E)/(v0E+Ntot));
@@ -2515,9 +2529,13 @@ int BayesW::runMpiGibbs() {
         // Write output files
         // ------------------
         if (iteration%opt.thin == 0) {
-            
+		cout << LENBUF << endl;
+	//	cout << buff << endl;            
             left = snprintf(buff, LENBUF, "%5d, %4d, %20.15f, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, rank, mu, used_data.alpha, used_data_beta.sigma_b ,  used_data_beta.sigma_b/(PI2*6*used_data.alpha*used_data.alpha) , int(m0), K);
             assert(left > 0);
+		//cout <<  << endl;
+cout <<"a" << endl;
+                cout << outfh << endl;
 
             for (int ii=0; ii < K; ++ii) {
                 left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), ", %20.15f", pi_L(ii));
@@ -2576,12 +2594,12 @@ int BayesW::runMpiGibbs() {
 
             // Each task writes its own rng file
             dist.write_rng_state_to_file(rngfp);
-
             epsoff  = size_t(0);
             check_mpi(MPI_File_write_at(epsfh, epsoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             check_mpi(MPI_File_write_at(mrkfh, epsoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             epsoff += sizeof(uint);
-            check_mpi(MPI_File_write_at(epsfh, epsoff, &Ntot,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+ 
+           check_mpi(MPI_File_write_at(epsfh, epsoff, &Ntot,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             check_mpi(MPI_File_write_at(mrkfh, epsoff, &M,            1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             epsoff = sizeof(uint) + sizeof(uint);
             check_mpi(MPI_File_write_at(epsfh, epsoff, epsilon,        Ntot,           MPI_DOUBLE, &status), __LINE__, __FILE__);
@@ -2615,10 +2633,12 @@ int BayesW::runMpiGibbs() {
 
                 printf("INFO   : will create tarball %s in %s with file listed in %s.\n",
                        targz, opt.mcmcOutDir.c_str(), lstfp.c_str());
+
                 //std::system(("ls " + opt.mcmcOut + ".*").c_str());
                 string cmd = "tar -czf " + opt.mcmcOutDir + "/tarballs/" + targz + " -T " + lstfp;
-                //cout << "cmd >>" << cmd << "<<" << endl;
+
                 std::system(cmd.c_str());
+
             }
             MPI_Barrier(MPI_COMM_WORLD);
 #endif
