@@ -239,6 +239,7 @@ int arms (double *xinit, int ninit, double *xl, double *xr,
   return 0;
 }
 
+
 /* *********************************************************************** */
 
 int initial (double *xinit, int ninit, double xl, double xr, int npoint,

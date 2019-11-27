@@ -1307,41 +1307,6 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
 	}
 }
 
-// Function for sampling intercept (mu)
-void BayesW::sampleMu(){
-	// ARS parameters
-	int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
-	int neval;
-	double xsamp[0], xcent[10], qcent[10] = {5., 30., 70., 95.};
-	double convex = 1.0;
-	int dometrop = 0;
-	double xprev = 0.0;
-	double xinit[4] = {0.995*mu, mu,  1.005*mu, 1.01*mu};     // Initial abscissae
-	double *p_xinit = xinit;
-
-	double xl = 2;
-	double xr = 5;   //xl and xr and the maximum and minimum values between which we sample
-//	cout << "Eps sum2= " << (epsilon.array() * epsilon.array()).sum() << endl;
-//	cout << "mu_ = " << mu << endl;
-//        cout << "alpha = " << used_data.alpha << endl;
-//        cout << "d = " << used_data.d << endl;
-//        cout << "sigma_mu = " << used_data.sigma_mu << endl;
-
-//	cout << epsilon[0] << "," << epsilon[1] << "," << epsilon[2] << endl;
-
-	used_data.epsilon = epsilon.array() + mu;// we add to epsilon =Y+mu-X*beta
-
-	// Use ARS to sample mu (with density mu_dens, using parameters from used_data)
-	err = arms(xinit,ninit,&xl,&xr,mu_dens,&used_data,&convex,
-			npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
-
-	errorCheck(err); // If there is error, stop the program
-	mu = xsamp[0];   // Save the sampled value
-	epsilon = used_data.epsilon.array() - mu;// we substract again now epsilon =Y-mu-X*beta
-
-	cout << epsilon[0] << "," << epsilon[1] << "," << epsilon[2] << endl;
-	
-}
 
 // Function for sampling fixed effect (theta_i)
 void BayesW::sampleTheta(int fix_i){
@@ -1370,147 +1335,6 @@ void BayesW::sampleTheta(int fix_i){
 
 	theta(fix_i) = xsamp[0];  // Save the new result
 	epsilon = used_data.epsilon - used_data.X_j * theta(fix_i); // Adjust residual
-}
-
-// Function for sampling marker effect (beta_i)
-void BayesW::sampleBeta(int marker){
-
-	//Save sum(X_j*failure) to structure
-	used_data_beta.sum_failure = sum_failure(marker);
-
-	used_data_beta.mean = data.means(marker);
-	used_data_beta.sd = data.sds(marker);
-	used_data_beta.mean_sd_ratio = data.mean_sd_ratio(marker);
-
-	//Change the residual vector only if the previous beta was non-zero
-	if(Beta(marker) != 0){
-		epsilon = epsilon.array() - used_data_beta.mean_sd_ratio * Beta(marker);  //Adjust for every memeber
-		//And adjust even further for specific 1 and 2 allele values
-		for(int i=0; i < data.Zones[marker].size(); i++){
-			epsilon[data.Zones[marker][i]] += Beta(marker)/used_data_beta.sd;
-		}
-		for(int i=0; i < data.Ztwos[marker].size(); i++){
-			epsilon[data.Ztwos[marker][i]] += 2*Beta(marker)/used_data_beta.sd;
-		}
-		//Also find the transformed residuals
-		vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
-	}
-
-	// Calculate the sums of vi elements
-	double vi_sum = vi.sum();
-
-	double vi_2 = 0.0; 
-        for (int i=0; i < data.Ztwos[marker].size(); i++){
-        	vi_2 += vi[data.Ztwos[marker][i]];
-        }
-        double vi_1 = 0.0; 
-        for (int i=0; i < data.Zones[marker].size(); i++){
-                vi_1 += vi[data.Zones[marker][i]];
-        }
-
-//	double vi_2 = vi(data.Ztwos[marker]).sum();
-//	double vi_1 = vi(data.Zones[marker]).sum();
-	double vi_0 = vi_sum - vi_1 - vi_2;
-
-	/* Calculate the mixture probability */
-	double p = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)
-
-	// Calculate the (ratios of) marginal likelihoods
-	marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, data.means(marker),data.sds(marker),data.mean_sd_ratio(marker));
-	// Calculate the probability that marker is 0
-	double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
-
-	//Loop through the possible mixture classes
-	for (int k = 0; k < K; k++) {
-		if (p <= acum) {
-			//if zeroth component
-			if (k == 0) {
-				Beta(marker) = 0;
-				v[k] += 1.0;
-				components[marker] = k;
-			}
-			// If is not 0th component then sample using ARS
-			else {
-				used_data_beta.used_mixture = k-1;
-
-				used_data_beta.vi_0 = vi_0;
-				used_data_beta.vi_1 = vi_1;
-				used_data_beta.vi_2 = vi_2;
-
-				double safe_limit = 2 * sqrt(used_data_beta.sigma_b * used_data_beta.mixture_classes(k-1));
-
-				// ARS parameters
-				int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
-				int neval;
-				double xsamp[0], xcent[10], qcent[10] = {5., 30., 70., 95.};
-				double convex = 1.0;
-				int dometrop = 0;
-				double xprev = 0.0;
-				double xinit[4] = {Beta(marker) - safe_limit/10 , Beta(marker),  Beta(marker) + safe_limit/20, Beta(marker) + safe_limit/10};     // Initial abscissae
-				double *p_xinit = xinit;
-
-				double xl = Beta(marker) - safe_limit  ; //Construct the hull around previous beta value
-				double xr = Beta(marker) + safe_limit;
-
-				// Sample using ARS
-				err = arms(xinit,ninit,&xl,&xr,beta_dens,&used_data_beta,&convex,
-						npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
-				errorCheck(err);
-
-				Beta(marker) = xsamp[0];  // Save the new result
-
-				//Re-update the residual vector
-			//	used_data.epsilon = used_data.epsilon - data.Z.col(marker).cast<double>() * beta(marker); //now epsilon contains Y-mu - X*beta+ X.col(marker)*beta(marker)_old- X.col(marker)*beta(marker)_new
-				epsilon = epsilon.array() + used_data_beta.mean_sd_ratio * Beta(marker);  //Adjust for every memeber
-				//And adjust even further for specific 1 and 2 allele values
-				for(int i=0; i < data.Zones[marker].size(); i++){
-					epsilon[data.Zones[marker][i]] -= Beta(marker)/used_data_beta.sd;
-				}
-				for(int i=0; i < data.Ztwos[marker].size(); i++){
-					epsilon[data.Ztwos[marker][i]] -= 2*Beta(marker)/used_data_beta.sd;
-				}
-
-				vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
-
-				v[k] += 1.0;
-				components[marker] = k;
-			}
-			break;
-		} else {
-			if((k+1) == (K-1)){
-				acum = 1; // In the end probability will be 1
-			}else{
-				acum += marginal_likelihoods(k+1)/marginal_likelihoods.sum();
-			}
-		}
-	}
-}
-
-// Function for sampling Weibull shape parameter (alpha)
-void BayesW::sampleAlpha(){
-	// ARS parameters
-	int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
-	int neval;
-	double xsamp[0], xcent[10], qcent[10] = {5., 30., 70., 95.};
-	double convex = 1.0;
-	int dometrop = 0;
-	double xprev = 0.0;
-	double xinit[4] = {(used_data.alpha)*0.5, used_data.alpha,  (used_data.alpha)*1.15, (used_data.alpha)*1.5};     // Initial abscissae
-	double *p_xinit = xinit;
-
-	// Initial left and right (pseudo) extremes
-	double xl = 0.0;
-	double xr = 20.0;
-
-	//Give the residual to alpha structure
-	used_data_alpha.epsilon = epsilon;
-
-	//Sample using ARS
-	err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
-			npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
-	errorCheck(err);
-	used_data.alpha = xsamp[0];
-	used_data_beta.alpha = xsamp[0];
 }
 
 void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsigned int fixedCount)
@@ -1946,7 +1770,6 @@ int BayesW::runMpiGibbs() {
 
    //Set iteration_start=0
     for (uint iteration=0; iteration<opt.chainLength; iteration++) {
-
         double start_it = MPI_Wtime();
         double it_sync_ar1  = 0.0;
         double it_sync_ar2  = 0.0;
@@ -1972,7 +1795,7 @@ int BayesW::runMpiGibbs() {
 //	for(int eps_i=0; eps_i < Ntot; eps_i++){
 //		eps_temp += epsilon[eps_i] * epsilon[eps_i];
 //	}
-	
+
 	//Update before sampling
 	for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
 		(used_data.epsilon)[mu_ind] = epsilon[mu_ind] + mu;// we add to epsilon =Y+mu-X*beta
@@ -1983,16 +1806,16 @@ int BayesW::runMpiGibbs() {
 
         errorCheck(err); // If there is error, stop the program
         mu = xsamp[0];   // Save the sampled value
-cout << "Mu = " << setprecision(17) <<mu << endl;	
         //Update after sampling
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
                 epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
-      double eps_temp = 0;
-            for(int eps_i=0; eps_i < Ntot; eps_i++){
-                    eps_temp += epsilon[eps_i] * epsilon[eps_i];
-            }
-cout << eps_temp << endl;
+//        eps_temp = 0;
+//            for(int eps_i=0; eps_i < Ntot; eps_i++){
+//                    eps_temp += epsilon[eps_i] * epsilon[eps_i];
+//            }
+//        cout <<"Eps after=" <<eps_temp << endl;
+
 
 ////////// End sampling mu
         //EO: watch out, std::shuffle is not portable, so do no expect identical
@@ -2008,7 +1831,6 @@ cout << eps_temp << endl;
 	for(int i=0; i<Ntot; ++i){
 		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
 	}
-//cout << "vi sum= " << vi.array().sum() << endl;	
 	if (opt.shuffleMarkers) {
             std::shuffle(markerI.begin(), markerI.end(), dist.rng);
        	//      std::random_shuffle(markerI.begin(), markerI.end());
@@ -2084,20 +1906,6 @@ cout << eps_temp << endl;
 
 	}
 
-        // Calculate the sums of vi elements
-/*	for (int i=0; i < Ntot; i++){
-                vi_sum += vi[i];
-        }
-        for (int i=0; i < data.Ztwos[marker].size(); i++){
-                vi_2 += vi[data.Ztwos[marker][i]];
-        }
-        for (int i=0; i < data.Zones[marker].size(); i++){
-                vi_1 += vi[data.Zones[marker][i]];
-        }
-*/
-
-//      double vi_2 = vi(data.Ztwos[marker]).sum();
-//      double vi_1 = vi(data.Zones[marker]).sum();
         double vi_0 = vi_sum - vi_1 - vi_2;
 
         /* Calculate the mixture probability */
@@ -2107,7 +1915,7 @@ cout << eps_temp << endl;
         marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, mave[marker],mstd[marker],data.mean_sd_ratio(marker));
         // Calculate the probability that marker is 0
         double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
-
+ 
         //Loop through the possible mixture classes
         for (int k = 0; k < K; k++) {
                 if (p <= acum) {
@@ -2120,6 +1928,7 @@ cout << eps_temp << endl;
                         // If is not 0th component then sample using ARS
                         else {
 		 //Save sum(X_j*failure) to structure
+
 		 		used_data_beta.sum_failure = sum_failure(marker);
 				used_data_beta.mean = mave[marker];
         			used_data_beta.sd = mstd[marker];
@@ -2130,25 +1939,33 @@ cout << eps_temp << endl;
                                 used_data_beta.vi_1 = vi_1;
                                 used_data_beta.vi_2 = vi_2;
 
+
+ 		/*	if(j<500){
+                        	cout << marker << ". "<< setprecision(17) << ", "<< vi_0 <<", "<< vi_1 << ", " << vi_2 << ", "<< used_data_beta.alpha << ", " << used_data_beta.sigma_b <<", " << used_data_beta.sd << ", " << used_data_beta.mean_sd_ratio << endl;
+                	} */
+
                                 double safe_limit = 2 * sqrt(used_data_beta.sigma_b * used_data_beta.mixture_classes(k-1));
 
                                 // ARS parameters
-                                int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
-                                int neval;
-                                double xsamp[0], xcent[10], qcent[10] = {5., 30., 70., 95.};
-                                double convex = 1.0;
-                                int dometrop = 0;
-                                double xprev = 0.0;
-                                double xinit[4] = {Beta(marker) - safe_limit/10 , Beta(marker),  Beta(marker) + safe_limit/20, Beta(marker) + safe_limit/10};     // Initial abscissae
-                                double *p_xinit = xinit;
+                            
+       				 neval = 0;
+			         xsamp[0] = 0;
+			         convex = 1.0;
+        			 dometrop = 0;
+			         xprev = 0.0;
+			         xinit[0] = Beta(marker) - safe_limit/10;     // Initial abscissae
+			         xinit[1] = Beta(marker);
+			         xinit[2] = Beta(marker) + safe_limit/20;
+        			 xinit[3] = Beta(marker) + safe_limit/10;
+   			        
+				// Initial left and right (pseudo) extremes
 
-                                double xl = Beta(marker) - safe_limit  ; //Construct the hull around previous beta value
-                                double xr = Beta(marker) + safe_limit;
-
+                                xl = Beta(marker) - safe_limit  ; //Construct the hull around previous beta value
+                                xr = Beta(marker) + safe_limit;
                                 // Sample using ARS
                                 err = arms(xinit,ninit,&xl,&xr,beta_dens,&used_data_beta,&convex,
                                                 npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
-                                errorCheck(err);
+	                        errorCheck(err);
 
                                 Beta(marker) = xsamp[0];  // Save the new result
 
@@ -2171,6 +1988,7 @@ cout << eps_temp << endl;
                         		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc) ;
                 		}			
 */	
+
                                 v[k] += 1.0;
                                 components[marker] = k;
                         }
@@ -2183,6 +2001,7 @@ cout << eps_temp << endl;
                         }
                 }
         }
+
                 betaOld   = beta;
                 beta      = Beta(marker);
                 deltaBeta = betaOld - beta;
@@ -2399,15 +2218,14 @@ cout << eps_temp << endl;
                 } else { // case nranks == 1    
                     sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
                 }
-	/*	if(j<100){
+/*		if(j<500){
 			double tmp_eps_sum = 0.0;
 			for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
                         	tmp_eps_sum += epsilon[vi_ind] * epsilon[vi_ind];
                		}
-			cout << marker << ". "<< setprecision(17) <<tmp_eps_sum << endl;
-	
-		}
-*/
+			cout << marker << ". "<< setprecision(17) << ", "<< beta <<", "<< tmp_eps_sum << endl;
+		}*/
+
 		// Do a update currently locally for vi vector
 		for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
 			vi[vi_ind] = exp(used_data.alpha * epsilon[vi_ind] - EuMasc);
@@ -2500,7 +2318,7 @@ cout << eps_temp << endl;
 	used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
 	//Print results
 //	cout << iteration << ". " << Mtot - v[0] +1 <<"; "<<v[1]-1 << "; "<<v[2]-1 << "; " << v[3]-1  <<"; " << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
-        cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; "<< setprecision(17) << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
+        cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; "<< setprecision(17) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigma_b << endl;
 	
 	// 5. Sample prior mixture component probability from Dirichlet distribution
 	pi_L = dist.dirichilet_rng(v.array());
@@ -2529,13 +2347,8 @@ cout << eps_temp << endl;
         // Write output files
         // ------------------
         if (iteration%opt.thin == 0) {
-		cout << LENBUF << endl;
-	//	cout << buff << endl;            
             left = snprintf(buff, LENBUF, "%5d, %4d, %20.15f, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, rank, mu, used_data.alpha, used_data_beta.sigma_b ,  used_data_beta.sigma_b/(PI2*6*used_data.alpha*used_data.alpha) , int(m0), K);
             assert(left > 0);
-		//cout <<  << endl;
-cout <<"a" << endl;
-                cout << outfh << endl;
 
             for (int ii=0; ii < K; ++ii) {
                 left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), ", %20.15f", pi_L(ii));
@@ -2545,7 +2358,7 @@ cout <<"a" << endl;
             assert(left > 0);
 
             offset = (size_t(n_thinned_saved) * size_t(nranks) + size_t(rank)) * strlen(buff);
-            check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+	    check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
 
             // Write iteration number
             if (rank == 0) {

@@ -1510,8 +1510,8 @@ void Data::readBedFile_noMPI_unstandardised(const string &bedFile){
 	SnpInfo *snpInfo = NULL;
 	unsigned snp = 0, ind = 0;
 	unsigned nmiss = 0;
-	float mean = 0.0;
-	float sqn = 0.0;
+	double mean = 0.0;
+	double sqn = 0.0;
 
 	for (j = 0, snp = 0; j < numSnps; j++) { // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
 		snpInfo = snpInfoVec[j];
@@ -1558,7 +1558,7 @@ void Data::readBedFile_noMPI_unstandardised(const string &bedFile){
 			}
 		}
 		// fill missing values with the mean
-		mean /= float(numInds-nmiss);
+		mean /= double(numInds-nmiss);
 
 		//Assume non-missingness
 
@@ -1576,7 +1576,7 @@ void Data::readBedFile_noMPI_unstandardised(const string &bedFile){
 
 		sqn -= numInds * mean * mean;
 		means(j) = mean;
-		sds(j) = sqrt(sqn / float(numInds));
+		sds(j) = sqrt(sqn / double(numInds));
 
 		mean_sd_ratio(j) = means(j)/sds(j);
 
