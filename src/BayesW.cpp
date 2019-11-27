@@ -1791,10 +1791,6 @@ int BayesW::runMpiGibbs() {
         double xl = 2;
         double xr = 5;   //xl and xr and the maximum and minimum values between which we sample
 	
-//	double eps_temp = 0;
-//	for(int eps_i=0; eps_i < Ntot; eps_i++){
-//		eps_temp += epsilon[eps_i] * epsilon[eps_i];
-//	}
 
 	//Update before sampling
 	for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
@@ -1810,12 +1806,6 @@ int BayesW::runMpiGibbs() {
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
                 epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
-//        eps_temp = 0;
-//            for(int eps_i=0; eps_i < Ntot; eps_i++){
-//                    eps_temp += epsilon[eps_i] * epsilon[eps_i];
-//            }
-//        cout <<"Eps after=" <<eps_temp << endl;
-
 
 ////////// End sampling mu
         //EO: watch out, std::shuffle is not portable, so do no expect identical
@@ -1823,11 +1813,6 @@ int BayesW::runMpiGibbs() {
         //------------------------------------------------------------------------
         
 	// Calculate the vector of exponent of the adjusted residuals
-//Test option
-//	vi = (used_data.alpha*(*epsilon)-EuMasc).exp();
-//Originally
-//	vi = (used_data.alpha*epsilon-EuMasc).exp();
-
 	for(int i=0; i<Ntot; ++i){
 		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
 	}
@@ -1940,9 +1925,9 @@ int BayesW::runMpiGibbs() {
                                 used_data_beta.vi_2 = vi_2;
 
 
- 		/*	if(j<500){
-                        	cout << marker << ". "<< setprecision(17) << ", "<< vi_0 <<", "<< vi_1 << ", " << vi_2 << ", "<< used_data_beta.alpha << ", " << used_data_beta.sigma_b <<", " << used_data_beta.sd << ", " << used_data_beta.mean_sd_ratio << endl;
-                	} */
+ 		//	if(j<500){
+                  //      	cout << marker << ". "<< setprecision(25) << ", "<< vi_0 <<", "<< vi_1 << ", " << vi_2 << ", "<<  endl;
+                //	} 
 
                                 double safe_limit = 2 * sqrt(used_data_beta.sigma_b * used_data_beta.mixture_classes(k-1));
 
@@ -2218,20 +2203,20 @@ int BayesW::runMpiGibbs() {
                 } else { // case nranks == 1    
                     sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
                 }
-/*		if(j<500){
+	/*	if(j<500){
 			double tmp_eps_sum = 0.0;
 			for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
-                        	tmp_eps_sum += epsilon[vi_ind] * epsilon[vi_ind];
+//                        	tmp_eps_sum += epsilon[vi_ind] * epsilon[vi_ind];
+                                tmp_eps_sum += abs(epsilon[vi_ind] *100000);
+
                		}
-			cout << marker << ". "<< setprecision(17) << ", "<< beta <<", "<< tmp_eps_sum << endl;
-		}*/
+			cout << marker << ". "<< setprecision(25) << beta <<", "<< tmp_eps_sum << endl;
+		} */
 
 		// Do a update currently locally for vi vector
 		for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
 			vi[vi_ind] = exp(used_data.alpha * epsilon[vi_ind] - EuMasc);
-		}		
-                
- 
+		}
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
                 
@@ -2304,15 +2289,19 @@ int BayesW::runMpiGibbs() {
         err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
                         npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
         errorCheck(err);
-        used_data.alpha = xsamp[0];
-        used_data_beta.alpha = xsamp[0];
 
+        check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+	used_data.alpha = xsamp[0];
+        used_data_beta.alpha = xsamp[0];
 
         MPI_Barrier(MPI_COMM_WORLD);
 
 	// 4. Sample sigma_b
 	used_data_beta.sigma_b = dist.inv_gamma_rng((double) (used_data.alpha_sigma + 0.5 * (M - v[0]+1)),
 	(double)(used_data.beta_sigma + 0.5 * (M - v[0]+1) * Beta.squaredNorm()));
+        check_mpi(MPI_Bcast(&(used_data_beta.sigma_b), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
 
 	//Update the sqrt(2sigmab) variable
 	used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
@@ -2322,6 +2311,8 @@ int BayesW::runMpiGibbs() {
 	
 	// 5. Sample prior mixture component probability from Dirichlet distribution
 	pi_L = dist.dirichilet_rng(v.array());
+	check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
