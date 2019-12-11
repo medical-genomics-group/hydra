@@ -9,10 +9,15 @@ EXE       = mpi_gibbs
 CXX       = mpic++
 
 CXXFLAGS  = -O2
+#CXXFLAGS += -ffast-math
+#CXXFLAGS += -funroll-loops
+
 #CXXFLAGS += g
 CXXFLAGS += -std=c++17
 #CXXFLAGS += -march=native
 CXXFLAGS += -D USE_MPI
+
+CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 
 #CXXFLAGS +=  -fopt-info-vec-optimized
 
