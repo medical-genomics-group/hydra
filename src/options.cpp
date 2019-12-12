@@ -51,6 +51,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             restart = true;
             ss << "--restart " << "\n";
         }
+	else if (!strcmp(argv[i], "--raw-update")) {
+            deltaUpdate = false;
+            ss << "--raw-update " << "\n";
+        }
         else if (!strcmp(argv[i], "--check-RAM-tasks")) {
             int tmp = atoi(argv[++i]);
             if (tmp < 0) { printf("FATAL: --check-RAM-tasks passed a negative number!\n"); exit(1); }

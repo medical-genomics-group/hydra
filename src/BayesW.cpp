@@ -1386,11 +1386,9 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 
 	//initialize epsilon vector as the phenotype vector
 	y = data.y.cast<double>().array();
-//        cout << "ysum= " << setprecision(17) << y.sum() << endl;
 
 	epsilon = y;
 	mu = y.mean();       // mean or intercept
-//	cout << "Initial mu= " << setprecision(17) << mu << endl;
 	// Initialize the variables in structures
 	//Save variance classes
 	used_data.mixture_classes.resize(km1);
@@ -1432,13 +1430,6 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 	// Save the number of events
 	used_data.d = used_data_alpha.failure_vector.array().sum();
 	used_data_alpha.d = used_data.d;
-
-	// Save the sum(X_j*failure) for each j
-	//Previous preprocessed version for reading columns
-	//for(int marker=0; marker<M; marker++){
-	//	sum_failure(marker) = ((data.mappedZ.col(marker).cast<double>()).array() * used_data_alpha.failure_vector.array()).sum();
-	//}
-
 
 	// Reading the Xj*failure sum in sparse format:
 	for(int marker=0; marker < markerCount; marker++){
@@ -1685,16 +1676,22 @@ int BayesW::runMpiGibbs() {
     mstd = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
     dalloc += 2 * size_t(M) * sizeof(double) / 1E9;
 
-//    double tmp0, tmp1, tmp2;
+    double tmp0, tmp1, tmp2;
     for (int i=0; i<M; ++i) {
 	// For now use the old way to compute means
-        //mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
-        mave[i] = data.means(i);
-//	tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
-//        tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
-//        tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
-        //mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
-        mstd[i] = data.sds(i);
+        mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
+//Old method for calculating mean
+//        mave[i] = data.means(i);
+
+	tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
+        tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
+        tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
+        //TODO At some point we need to turn sd to 1/sd for speed
+	//mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
+        mstd[i] = sqrt( (tmp0+tmp1+tmp2)/double(Ntot - 1));
+
+	// Old sd
+	//mstd[i] = data.sds(i);
         //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
 
@@ -1738,7 +1735,6 @@ int BayesW::runMpiGibbs() {
 
     set_vector_f64(dEpsSum, 0.0, Ntot);
 
-
     // Copy, center and scale phenotype observations
     // In bW we are not scaling and centering phenotypes
     for (int i=0; i<Ntot; ++i) y[i] = data.y(i);
@@ -1778,7 +1774,6 @@ int BayesW::runMpiGibbs() {
         int    it_nsync_ar2 = 0;
 
 	/* 1. Intercept (mu) */
-//	sampleMu();
  	//Removed sampleMu function on its own 
 	int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
         int neval;
@@ -1786,7 +1781,7 @@ int BayesW::runMpiGibbs() {
         double convex = 1.0;
         int dometrop = 0;
         double xprev = 0.0;
-        double xinit[4] = {0.995*mu, mu,  1.005*mu, 1.01*mu};     // Initial abscissae
+        double xinit[4] = {0.95*mu, mu,  1.005*mu, 1.01*mu};     // Initial abscissae
         double *p_xinit = xinit;
 
         double xl = 2;
@@ -1819,7 +1814,6 @@ int BayesW::runMpiGibbs() {
 	}
 	if (opt.shuffleMarkers) {
             std::shuffle(markerI.begin(), markerI.end(), dist.rng);
-       	//      std::random_shuffle(markerI.begin(), markerI.end());
 	}
         m0 = 0.0;
         v.setOnes();
@@ -1841,41 +1835,29 @@ int BayesW::runMpiGibbs() {
                 marker  = markerI[j];
                 beta =  Beta(marker);
 
-      //          sampleBeta(marker);   
 /////////////////////////////////////////////////////////
 	//Replace the sampleBeta function with the inside of the function        
         double vi_sum = 0.0;
         double vi_1 = 0.0;
         double vi_2 = 0.0;
 
-
         //Change the residual vector only if the previous beta was non-zero
         if(Beta(marker) != 0){
-                //epsilon = epsilon.array() - used_data_beta.mean_sd_ratio * Beta(marker);  //Adjust for every memeber
                 for(int i=0; i<Ntot; ++i){
                         tmpEps_vi[i] = epsilon[i] - data.mean_sd_ratio(marker) * Beta(marker);
-		 	//epsilon[i] = epsilon[i] - data.mean_sd_ratio(marker) * Beta(marker);
                  }
 		//And adjust even further for specific 1 and 2 allele values
                 for(int i=0; i < data.Zones[marker].size(); i++){
-                        //epsilon[data.Zones[marker][i]] += Beta(marker)/mstd[marker];
                 	tmpEps_vi[data.Zones[marker][i]] += Beta(marker)/mstd[marker];
                 }
                 for(int i=0; i < data.Ztwos[marker].size(); i++){
-                       // epsilon[data.Ztwos[marker][i]] += 2*Beta(marker)/mstd[marker];
                         tmpEps_vi[data.Ztwos[marker][i]] += 2*Beta(marker)/mstd[marker];
                 }
                 //Also find the transformed residuals
-                //vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
 		for(int i=0; i<Ntot; ++i){
-                        tmp_vi[i] = exp(used_data.alpha * tmpEps_vi[i] - EuMasc) ;
-                	//if(j == 38501 and i == 100){
-			//	cout << tmp_vi[i] << ", " << tmpEps_vi[i] << endl;
-			//}
-		}
-		for(int i=0; i<Ntot; ++i){
+                        tmp_vi[i] = exp(used_data.alpha * tmpEps_vi[i] - EuMasc);
                         vi_sum += tmp_vi[i];
-                }
+		}
 
 	        for (int i=0; i < data.Ztwos[marker].size(); i++){
           	      vi_2 += tmp_vi[data.Ztwos[marker][i]];
@@ -1906,24 +1888,6 @@ int BayesW::runMpiGibbs() {
         marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, mave[marker],mstd[marker],data.mean_sd_ratio(marker));
         // Calculate the probability that marker is 0
         double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
-/*
-	if(j >=38500 and j <= 38501 and iteration ==4){
-		double tmp_eps_sum = 0.0;
-                        for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
-				if(Beta(marker) != 0){
-                                	tmp_eps_sum += tmpEps_vi[vi_ind] * tmpEps_vi[vi_ind];
-				}else{
-                                        tmp_eps_sum += epsilon[vi_ind] * epsilon[vi_ind];
-				}
-			//	if(j == 38501){
-			//		cout << tmp_vi[vi_ind] << endl;
-			//	}
-
-                        }
-		if(Beta(marker) != 0) cout << "Used tmp eps" << endl;
-                cout << j <<"," << marker << ". "<< setprecision(17) << vi_sum <<", " <<tmp_eps_sum<<  endl;
-        }
- */
         //Loop through the possible mixture classes
         for (int k = 0; k < K; k++) {
                 if (p <= acum) {
@@ -1935,8 +1899,6 @@ int BayesW::runMpiGibbs() {
                         }
                         // If is not 0th component then sample using ARS
                         else {
-		 //Save sum(X_j*failure) to structure
-
 		 		used_data_beta.sum_failure = sum_failure(marker);
 				used_data_beta.mean = mave[marker];
         			used_data_beta.sd = mstd[marker];
@@ -1947,15 +1909,9 @@ int BayesW::runMpiGibbs() {
                                 used_data_beta.vi_1 = vi_1;
                                 used_data_beta.vi_2 = vi_2;
 
-
- 		//	if(j >38479 and j <= 38575 and iteration ==4){
-                //        	cout << j <<"," << marker << ". "<< setprecision(17) << ", "<< vi_0 <<", "<< vi_1 << ", " << vi_2 << ", "<<  endl;
-                //	} 
-
                                 double safe_limit = 2 * sqrt(used_data_beta.sigma_b * used_data_beta.mixture_classes(k-1));
 
                                 // ARS parameters
-                            
        				 neval = 0;
 			         xsamp[0] = 0;
 			         convex = 1.0;
@@ -1976,26 +1932,6 @@ int BayesW::runMpiGibbs() {
 	                        errorCheck(err);
 
                                 Beta(marker) = xsamp[0];  // Save the new result
-
-                                //Re-update the residual vector
-                                //epsilon = epsilon.array() + used_data_beta.mean_sd_ratio * Beta(marker);  //Adjust for every memeber
- /*                               for(int i=0; i < Ntot; ++i){
-                        		epsilon[i] = epsilon[i] + used_data_beta.mean_sd_ratio * Beta(marker);
-                 		}
-
-				//And adjust even further for specific 1 and 2 allele values
-                                for(int i=0; i < data.Zones[marker].size(); i++){
-                                        epsilon[data.Zones[marker][i]] -= Beta(marker)/mstd[marker];
-                                }
-                                for(int i=0; i < data.Ztwos[marker].size(); i++){
-                                        epsilon[data.Ztwos[marker][i]] -= 2*Beta(marker)/mstd[marker];
-                                }
-
-                                //vi = (used_data.alpha*epsilon.array()-EuMasc).exp();
-				for(int i=0; i<Ntot; ++i){
-                        		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc) ;
-                		}			
-*/	
  
                                 v[k] += 1.0;
                                 components[marker] = k;
@@ -2048,7 +1984,6 @@ int BayesW::runMpiGibbs() {
                 set_vector_f64(deltaEps, 0.0, Ntot);
             }
 
-
             task_sum_abs_deltabeta += fabs(deltaBeta);
 
             // Check whether we have a non-zero beta somewhere
@@ -2056,7 +1991,6 @@ int BayesW::runMpiGibbs() {
                 
                 //MPI_Barrier(MPI_COMM_WORLD);
                 double tb = MPI_Wtime();                
-
                 check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta, &cumSumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
                 double te = MPI_Wtime();
@@ -2070,16 +2004,11 @@ int BayesW::runMpiGibbs() {
             }
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
 
-
             if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
-     //if(j<1000){
-//	          cout << j <<"," << ". " << lmax << ", " << cumSumDeltaBetas << ", " << deltaBeta << ", " << sinceLastSync << ", " << sync_rate << endl; 
-//	}
                 // Update local copy of epsilon
                 //MPI_Barrier(MPI_COMM_WORLD);
 
                 if (nranks > 1) {
-    
                     double tb = MPI_Wtime();
                     
                     // Sparse synchronization
@@ -2227,23 +2156,10 @@ int BayesW::runMpiGibbs() {
                     it_nsync_ar2  += 1;    
 
                 } else { // case nranks == 1    
-                   // sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
-			/*if(betaOld == 0){		
-				for(int i=0; i < Ntot; i++){
-                                        epsilon[i] = tmpEps_vi[i] + used_data_beta.mean_sd_ratio * Beta(marker);
-                                }
-                                //And adjust even further for specific 1 and 2 allele values
-                                for(int i=0; i < data.Zones[marker].size(); i++){
-                                        epsilon[data.Zones[marker][i]] -= Beta(marker)/used_data_beta.sd;
-                                }
-                                for(int i=0; i < data.Ztwos[marker].size(); i++){
-                                        epsilon[data.Ztwos[marker][i]] -= 2*Beta(marker)/used_data_beta.sd;
-                                }
-                //	}else{ */
- 	//		if(j<10000){
-         //                       cout << j << "," << marker << ". " << beta << endl;
-         //               }
- 				for(int i=0; i < Ntot; i++){
+                     if(opt.deltaUpdate == true){
+			sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
+ 		     }else{	
+			for(int i=0; i < Ntot; i++){
 		                        epsilon[i] = epsilon[i] - data.mean_sd_ratio(marker) * betaOld;
                                         epsilon[i] = epsilon[i] + data.mean_sd_ratio(marker) * beta;
                                 }
@@ -2256,16 +2172,8 @@ int BayesW::runMpiGibbs() {
                                         epsilon[data.Ztwos[marker][i]] += 2*betaOld/mstd[marker];
 					epsilon[data.Ztwos[marker][i]] -= 2*beta/mstd[marker];
                                 }
-		//	}
+			}
 		}
-		/*if(j >38479 and j <= 38575 and beta != 0 and iteration == 4){
-			double tmp_eps_sum = 0.0;
-			for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
-                        	tmp_eps_sum += epsilon[vi_ind] * epsilon[vi_ind];
-                                //tmp_eps_sum += abs(epsilon[vi_ind]);
-               		}
-			cout << j << ", " << marker << ". "<< setprecision(17) << beta <<", " << ", "<< tmp_eps_sum  << endl;
-		} */
    
 		// Do a update currently locally for vi vector
 		for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
@@ -2287,15 +2195,7 @@ int BayesW::runMpiGibbs() {
                 sinceLastSync = 0;
                 
             } else {
-		/*if(j<=13){
-		double tmp_eps_sum = 0.0;
-                        for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
-                                tmp_eps_sum += epsilon[vi_ind] * epsilon[vi_ind];
-                        }
-                        cout << j << ", " << marker << ". "<< setprecision(17) <<betaOld <<", "  << beta <<", "<< tmp_eps_sum << endl;
-		}*/
                 sinceLastSync += 1;
-                
                 //task_sum_abs_deltabeta += fabs(deltaBeta);
             }
 
@@ -2338,7 +2238,7 @@ int BayesW::runMpiGibbs() {
 
         // Initial left and right (pseudo) extremes
         xl = 0.0;
-        xr = 20.0;
+        xr = 30.0;
 
         //Give the residual to alpha structure
         //used_data_alpha.epsilon = epsilon;
@@ -2367,7 +2267,6 @@ int BayesW::runMpiGibbs() {
 	//Update the sqrt(2sigmab) variable
 	used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
 	//Print results
-//	cout << iteration << ". " << Mtot - v[0] +1 <<"; "<<v[1]-1 << "; "<<v[2]-1 << "; " << v[3]-1  <<"; " << used_data.alpha << "; " << used_data_beta.sigma_b << endl;
         cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; "<< setprecision(17) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigma_b << endl;
 	
 	// 5. Sample prior mixture component probability from Dirichlet distribution

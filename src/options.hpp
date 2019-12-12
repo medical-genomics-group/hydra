@@ -72,6 +72,7 @@ public:
     string covariatesFile;              // for extra covariates.
     bool   covariates = false;          // for extra covatiates.
     bool   compress  = false;
+    bool deltaUpdate = true; // Use the delta epsilon to pass the message in mpi
 
     string options_s;
 
