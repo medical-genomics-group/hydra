@@ -297,15 +297,13 @@ void BayesW::sparse_scaadd(double*     __restrict__ vout,
                              const uint* __restrict__ IM, const size_t NMS, const size_t NML,
                              const double  mu,
                              const double  sig_inv,
-				const double mu_sig_ratio,
                              const int     N) {
     
     if (dMULT == 0.0) {
         set_vector_f64(vout, 0.0, N);
 
     } else {
-        double aux = mu_sig_ratio * dMULT;
-      //  double aux = mu * sig_inv * dMULT;
+        double aux = mu * sig_inv * dMULT;
         //printf("sparse_scaadd aux = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", aux, mu, sig_inv * dMULT);
         set_vector_f64(vout, -aux, N);
 
@@ -1712,7 +1710,7 @@ int BayesW::runMpiGibbs() {
     const auto st3 = std::chrono::high_resolution_clock::now();
  
     //double *y, *epsilon, *tmpEps, *previt_eps, *deltaEps, *dEpsSum, *deltaSum;
-    double *y, *tmpEps, *deltaEps, *dEpsSum, *deltaSum, *epsilon ,*vi , *tmp_vi, *tmpEps_vi;
+    double *y, *tmpEps, *deltaEps, *dEpsSum, *deltaSum, *epsilon ,*vi , *tmp_vi, *tmpEps_vi, *tmp_deltaEps;
     const size_t NDB = size_t(Ntot) * sizeof(double);
     y          = (double*)_mm_malloc(NDB, 64);  check_malloc(y,          __LINE__, __FILE__);
     epsilon    = (double*)_mm_malloc(NDB, 64);  check_malloc(epsilon,    __LINE__, __FILE__);
@@ -1723,6 +1721,8 @@ int BayesW::runMpiGibbs() {
 
     tmpEps     = (double*)_mm_malloc(NDB, 64);  check_malloc(tmpEps,     __LINE__, __FILE__);
     //previt_eps = (double*)malloc(NDB);  check_malloc(previt_eps, __LINE__, __FILE__);
+    tmp_deltaEps   = (double*)_mm_malloc(NDB, 64);  check_malloc(tmp_deltaEps,   __LINE__, __FILE__);
+
     deltaEps   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaEps,   __LINE__, __FILE__);
     dEpsSum    = (double*)_mm_malloc(NDB, 64);  check_malloc(dEpsSum,    __LINE__, __FILE__);
     deltaSum   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaSum,   __LINE__, __FILE__);
@@ -1829,7 +1829,7 @@ int BayesW::runMpiGibbs() {
      	
 	// First element for the marginal likelihoods is always is pi_0 *sqrt(pi) for
 	marginal_likelihoods(0) = pi_L(0) * sqrtPI;  
-	 for (int j = 0; j < lmax; j++) {
+	for (int j = 0; j < lmax; j++) {
 	 
             if (j < M) {
                 marker  = markerI[j];
@@ -1843,7 +1843,8 @@ int BayesW::runMpiGibbs() {
 
         //Change the residual vector only if the previous beta was non-zero
         if(Beta(marker) != 0){
-                for(int i=0; i<Ntot; ++i){
+
+                /*for(int i=0; i<Ntot; ++i){
                         tmpEps_vi[i] = epsilon[i] - data.mean_sd_ratio(marker) * Beta(marker);
                  }
 		//And adjust even further for specific 1 and 2 allele values
@@ -1852,29 +1853,49 @@ int BayesW::runMpiGibbs() {
                 }
                 for(int i=0; i < data.Ztwos[marker].size(); i++){
                         tmpEps_vi[data.Ztwos[marker][i]] += 2*Beta(marker)/mstd[marker];
-                }
-                //Also find the transformed residuals
+                } */
+
+		//Calculate the change in epsilon if we remove the previous marker effect (-Beta(marker))
+		
+		set_vector_f64(tmp_deltaEps, 0.0, Ntot);
+		sparse_scaadd(tmp_deltaEps, Beta(marker),
+                                      I1, N1S[marker], N1L[marker],
+                                      I2, N2S[marker], N2L[marker],
+                                      IM, NMS[marker], NML[marker],
+                                      mave[marker], 1/mstd[marker] , Ntot);
+        	//Create the temporary vector to store the vector without the last Beta(marker)
+                sum_vectors_f64(tmpEps_vi, epsilon, tmp_deltaEps,  Ntot);
+
+	        //Also find the transformed residuals
 		for(int i=0; i<Ntot; ++i){
                         tmp_vi[i] = exp(used_data.alpha * tmpEps_vi[i] - EuMasc);
                         vi_sum += tmp_vi[i];
 		}
 
-	        for (int i=0; i < data.Ztwos[marker].size(); i++){
-          	      vi_2 += tmp_vi[data.Ztwos[marker][i]];
+	        for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+//                for (int i=0; i < data.Zones[marker].size(); i++){
+			vi_2 += tmp_vi[I2[i]];
+          	      //vi_2 += tmp_vi[data.Ztwos[marker][i]];
         	}
-        	for (int i=0; i < data.Zones[marker].size(); i++){
-                	vi_1 += tmp_vi[data.Zones[marker][i]];
+//        	for (int i=0; i < data.Zones[marker].size(); i++){
+                for (int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
+                        vi_1 += tmp_vi[I1[i]];
+                	//vi_1 += tmp_vi[data.Zones[marker][i]];
         	}
         }else{
 		// Calculate the sums of vi elements
         	for (int i=0; i < Ntot; i++){
                 	vi_sum += vi[i];
         	}
-        	for (int i=0; i < data.Ztwos[marker].size(); i++){
-                	vi_2 += vi[data.Ztwos[marker][i]];
+//        	for (int i=0; i < data.Ztwos[marker].size(); i++){
+                for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+//		       	vi_2 += vi[data.Ztwos[marker][i]];
+                        vi_2 += vi[I2[i]];
         	}
-        	for (int i=0; i < data.Zones[marker].size(); i++){
-                	vi_1 += vi[data.Zones[marker][i]];
+//        	for (int i=0; i < data.Zones[marker].size(); i++){
+                for (int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
+//                        vi_1 += vi[data.Zones[marker][i]];
+                        vi_1 += vi[I1[i]];
         	}
 
 	}
@@ -1885,7 +1906,7 @@ int BayesW::runMpiGibbs() {
         double p = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)    
   
 	// Calculate the (ratios of) marginal likelihoods
-        marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, mave[marker],mstd[marker],data.mean_sd_ratio(marker));
+        marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, mave[marker],mstd[marker], mave[marker]/mstd[marker]);
         // Calculate the probability that marker is 0
         double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
         //Loop through the possible mixture classes
@@ -1902,7 +1923,7 @@ int BayesW::runMpiGibbs() {
 		 		used_data_beta.sum_failure = sum_failure(marker);
 				used_data_beta.mean = mave[marker];
         			used_data_beta.sd = mstd[marker];
-        			used_data_beta.mean_sd_ratio = data.mean_sd_ratio(marker);
+        			used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
                                 used_data_beta.used_mixture = k-1;
 
                                 used_data_beta.vi_0 = vi_0;
@@ -1965,7 +1986,7 @@ int BayesW::runMpiGibbs() {
                                       I1, N1S[marker], N1L[marker],
                                       I2, N2S[marker], N2L[marker],
                                       IM, NMS[marker], NML[marker],
-                                      mave[marker], 1/mstd[marker], data.mean_sd_ratio(marker) , Ntot); //Use here 1/sd
+                                      mave[marker], 1/mstd[marker] , Ntot); //Use here 1/sd
                         
                         // Update local sum of delta epsilon
                         sum_vectors_f64(dEpsSum, deltaEps, Ntot);
@@ -2160,17 +2181,23 @@ int BayesW::runMpiGibbs() {
 			sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
  		     }else{	
 			for(int i=0; i < Ntot; i++){
-		                        epsilon[i] = epsilon[i] - data.mean_sd_ratio(marker) * betaOld;
-                                        epsilon[i] = epsilon[i] + data.mean_sd_ratio(marker) * beta;
+		                        epsilon[i] = epsilon[i] -  betaOld * mave[marker]/mstd[marker];
+                                        epsilon[i] = epsilon[i] + beta * mave[marker]/mstd[marker];
                                 }
                                 //And adjust even further for specific 1 and 2 allele values
-                                for(int i=0; i < data.Zones[marker].size(); i++){
-                                        epsilon[data.Zones[marker][i]] += betaOld/mstd[marker];
-                                        epsilon[data.Zones[marker][i]] -= beta/mstd[marker];
+                              //  for(int i=0; i < data.Zones[marker].size(); i++){
+		                for (int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
+                                        //epsilon[data.Zones[marker][i]] += betaOld/mstd[marker];
+                                        //epsilon[data.Zones[marker][i]] -= beta/mstd[marker];
+                                        epsilon[I1[i]] += betaOld/mstd[marker];
+					epsilon[I1[i]] += betaOld/mstd[marker];
                                 }
-                                for(int i=0; i < data.Ztwos[marker].size(); i++){
-                                        epsilon[data.Ztwos[marker][i]] += 2*betaOld/mstd[marker];
-					epsilon[data.Ztwos[marker][i]] -= 2*beta/mstd[marker];
+                            //    for(int i=0; i < data.Ztwos[marker].size(); i++){
+                                for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+                                        //epsilon[data.Ztwos[marker][i]] += 2*betaOld/mstd[marker];
+					//epsilon[data.Ztwos[marker][i]] -= 2*beta/mstd[marker];
+					epsilon[I2[i]] += 2*betaOld/mstd[marker];
+                                        epsilon[I2[i]] -= 2*beta/mstd[marker];
                                 }
 			}
 		}
