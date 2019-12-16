@@ -336,8 +336,6 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
         opt.printProcessingOptions();
     }
 
-    unsigned sync_rate = opt.MPISyncRate;
-
     // Set Ntot and Mtot
     // -----------------
     uint Ntot = set_Ntot(rank);
@@ -931,6 +929,8 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
         // ----------------------------
         for (int j = 0; j < lmax; j++) {
 
+            sinceLastSync += 1;
+
             if (j < M) {
 
                 marker  = markerI[j];
@@ -1120,7 +1120,8 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
             }
 
             //if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == M-1) && cumSumDeltaBetas != 0.0) {
-            if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && trigger_update) {
+            //if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && trigger_update) {
+            if ( (sinceLastSync >= opt.syncRate || j == lmax-1) && trigger_update) {
 
                 // Update local copy of epsilon
                 if (nranks > 1) {
@@ -1147,9 +1148,12 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
                     cumSumDeltaBetas8[i] = 0.0;
 
                 sinceLastSync = 0;
-            } else {
-                sinceLastSync += 1;
+
             }
+            //else {
+            //
+            //    sinceLastSync += 1;
+            //}
 
         } // END PROCESSING OF ALL MARKERS
 

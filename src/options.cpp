@@ -149,9 +149,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             ss << "--marker-blocks-file " << argv[i] << "\n";
         }
 #ifdef USE_MPI
-        else if (!strcmp(argv[i], "--mpi-sync-rate")) {    //EO
-            MPISyncRate = atoi(argv[++i]);
-            ss << "--mpi-sync-rate " << argv[i] << "\n";
+        else if (!strcmp(argv[i], "--sync-rate")) {    //EO
+            syncRate = atoi(argv[++i]);
+            if (syncRate < 1) { printf("FATAL: --sync-rate must be >= 1!\n"); exit(1); }
+            ss << "--sync-rate " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--sparse-dir")) {    //EO
             sparseDir = argv[++i];
@@ -292,8 +293,8 @@ void Options::readFile(const string &file){  // input options from file
         } else if (key == "shuffleMarkers") {
             shuffleMarkers = stoi(value);
 #ifdef USE_MPI
-        } else if (key == "MPISyncRate") {
-            MPISyncRate = stoi(value);
+        } else if (key == "syncRate") {
+            syncRate = stoi(value);
         } else if (key == "blocksPerRank") {
             blocksPerRank = stoi(value);
         }
