@@ -1434,7 +1434,7 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 	used_data_alpha.d = used_data.d;
 
 	// Reading the Xj*failure sum in sparse format:
-	for(int marker=0; marker < markerCount; marker++){
+	/*for(int marker=0; marker < markerCount; marker++){
 		std::vector<int> oneIndices = data.Zones[marker]; //Take the vector of indices
 		std::vector<int> twoIndices = data.Ztwos[marker]; //Take the vector of indices
 
@@ -1447,7 +1447,7 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 		}
 
 		sum_failure(marker) = (temp_sum - data.means(marker) * used_data_alpha.failure_vector.array().sum()) / data.sds(marker);
-	}
+	}*/
 
 	//If there are fixed effects, find the same values for them
 	if(fixedCount > 0){
@@ -1694,6 +1694,21 @@ int BayesW::runMpiGibbs_bW() {
 	//mstd[i] = data.sds(i);
         //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
+
+        // Reading the Xj*failure sum in sparse format:
+        for(int marker=0; marker < Mtot; marker++){
+                int temp_sum = 0;
+		for(int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
+                //for(int i=0; i < oneIndices.size(); i++){
+                        temp_sum += used_data_alpha.failure_vector(I1[i]);
+                }
+                for(int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+	        //for(int i=0; i < twoIndices.size(); i++){
+                        temp_sum += 2*used_data_alpha.failure_vector(I2[i]);
+                }
+
+                sum_failure(marker) = (temp_sum - mave[marker] * used_data_alpha.failure_vector.array().sum()) / mstd[marker];
+        }
 
     MPI_Barrier(MPI_COMM_WORLD);
     const auto et2 = std::chrono::high_resolution_clock::now();

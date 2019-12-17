@@ -1508,7 +1508,7 @@ void Data::readBedFile_noMPI(const string &bedFile) {
 #endif
 }
 
-
+/*
 void Data::readBedFile_noMPI_unstandardised(const string &bedFile){
 	unsigned i = 0, j = 0, k = 0;
 
@@ -1588,12 +1588,12 @@ void Data::readBedFile_noMPI_unstandardised(const string &bedFile){
 
 		//Assume non-missingness
 
-		/*	if (nmiss) {
-			for (i=0; i<numInds; ++i) {
-				if (Z(i,snp) == -9) Z(i,snp) = mean;
-			}
-		}
-		 */
+		//	if (nmiss) {
+		//	for (i=0; i<numInds; ++i) {
+		//		if (Z(i,snp) == -9) Z(i,snp) = mean;
+		//	}
+		//}
+		 
 		// compute allele frequency
 		snpInfo->af = 0.5f*mean;
 		snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
@@ -1613,7 +1613,7 @@ void Data::readBedFile_noMPI_unstandardised(const string &bedFile){
 
 	cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
 }
-
+*/
 
 
 void Data::center_and_scale(double* __restrict__ vec, int* __restrict__ mask, const uint N, const uint nas) {

@@ -104,7 +104,7 @@ int main(int argc, const char * argv[]) {
                 //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 //analysis.runMpiGibbsMultiTraits();
             }else if(opt.bayesType == "bayesWMPI"){
-	        data.readBedFile_noMPI_unstandardised(opt.bedFile+".bed"); // This part to read the non-standardised data
+	        //data.readBedFile_noMPI_unstandardised(opt.bedFile+".bed"); // This part to read the non-standardised data
 		BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs_bW();
 	     }
