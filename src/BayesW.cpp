@@ -1482,8 +1482,6 @@ int BayesW::runMpiGibbs() {
         opt.printProcessingOptions();
     }
 
-    unsigned sync_rate = opt.MPISyncRate;
-
     // Set Ntot and Mtot
     // -----------------
     uint Ntot = set_Ntot(rank);
@@ -1830,7 +1828,7 @@ int BayesW::runMpiGibbs() {
 	// First element for the marginal likelihoods is always is pi_0 *sqrt(pi) for
 	marginal_likelihoods(0) = pi_L(0) * sqrtPI;  
 	for (int j = 0; j < lmax; j++) {
-	 
+	    sinceLastSync += 1; 
             if (j < M) {
                 marker  = markerI[j];
                 beta =  Beta(marker);
@@ -2008,8 +2006,8 @@ int BayesW::runMpiGibbs() {
             task_sum_abs_deltabeta += fabs(deltaBeta);
 
             // Check whether we have a non-zero beta somewhere
-            if (nranks > 1 && (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1)) {
-                
+            //if (nranks > 1 && (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1)) {
+            if (nranks > 1 && (sinceLastSync >= opt.syncRate || j == lmax-1)) {    
                 //MPI_Barrier(MPI_COMM_WORLD);
                 double tb = MPI_Wtime();                
                 check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta, &cumSumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -2025,7 +2023,9 @@ int BayesW::runMpiGibbs() {
             }
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
 
-            if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
+ //         if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
+            if ( cumSumDeltaBetas != 0.0 && (sinceLastSync >= opt.syncRate || j == lmax-1)) {
+
                 // Update local copy of epsilon
                 //MPI_Barrier(MPI_COMM_WORLD);
 
@@ -2221,10 +2221,10 @@ int BayesW::runMpiGibbs() {
                 
                 sinceLastSync = 0;
                 
-            } else {
-                sinceLastSync += 1;
+            }// else {
+             //   sinceLastSync += 1;
                 //task_sum_abs_deltabeta += fabs(deltaBeta);
-            }
+            //}
 
         } // END PROCESSING OF ALL MARKERS
 

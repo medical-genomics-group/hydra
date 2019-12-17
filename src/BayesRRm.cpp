@@ -929,7 +929,7 @@ int BayesRRm::runMpiGibbs() {
         opt.printProcessingOptions();
     }
 
-    unsigned sync_rate = opt.MPISyncRate;
+    unsigned sync_rate = opt.syncRate;
 
     // Set Ntot and Mtot
     // -----------------
