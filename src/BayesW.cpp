@@ -7,6 +7,8 @@
 
 #include <cstdlib>
 #include "BayesW.hpp"
+#include "BayesRRm.h"
+
 #include "data.hpp"
 #include "distributions_boost.hpp"
 #include "options.hpp"
@@ -38,7 +40,7 @@
 #define sqrtPI 1.77245385090552
 #define EuMasc 0.577215664901532
 
-
+/*
 BayesW::BayesW(Data &data, Options &opt, const long memPageSize)
     : data(data)
     , opt(opt)
@@ -54,12 +56,12 @@ BayesW::BayesW(Data &data, Options &opt, const long memPageSize)
 {
     float* ptr =static_cast<float*>(&opt.S[0]);
 }
-
+*/
 BayesW::~BayesW()
 {
 }
 
-
+/*
 void BayesW::offset_vector_f64(double* __restrict__ vec, const double offset, const int N) {
 #ifdef __INTEL_COMPILER
     __assume_aligned(vec,   64);
@@ -92,7 +94,7 @@ void BayesW::set_vector_f64(double* __restrict__ vec, const double val, const in
         vec[i] = val;
     }
 }
-
+*/
 
 /*
   inline void copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
@@ -114,6 +116,7 @@ void BayesW::set_vector_f64(double* __restrict__ vec, const double val, const in
   }
 */
 
+/*
 void BayesW::copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
 #ifdef __INTEL_COMPILER
     __assume_aligned(dest,   64);
@@ -181,6 +184,7 @@ void BayesW::sum_vectors_f64(double* __restrict__ out, const double* __restrict_
         out[i] = in1[i] + in2[i];
     }
 }
+*/
 
 /*
   inline void sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
@@ -205,6 +209,7 @@ void BayesW::sum_vectors_f64(double* __restrict__ out, const double* __restrict_
   }
 */
 
+/*
 void BayesW::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N) {
     
     const int N8 = (N/8) * 8;
@@ -806,6 +811,7 @@ void BayesW::write_sparse_data_files(const uint bpr) {
     const auto du2 = std::chrono::duration_cast<std::chrono::milliseconds>(dt2).count();
     if (rank == 0)   std::cout << "INFO   : time to convert the data: " << du2 / double(1000.0) << " seconds." << std::endl;
 }
+*/
 
 //Already defined in BayesRRm.cpp
 /*
@@ -816,11 +822,9 @@ size_t get_file_size(const std::string& filename) {
 }
 */
 
-
+/*
 void BayesW::mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax) {
-
     if (numBlocks > 0) {
-
         if (nranks != numBlocks) {
             if (rank == 0) {
                 printf("FATAL  : block definition does not match number of tasks (%d versus %d).\n", numBlocks, nranks);
@@ -864,7 +868,7 @@ void BayesW::mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> 
         if (MrankL[i]<lmin) lmin = MrankL[i];
     }
 }
-
+*/
 
 /* Function to check if ARS resulted with error*/
 inline void errorCheck(int err){
@@ -1455,7 +1459,7 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 
 //EO: MPI GIBBS
 //-------------
-int BayesW::runMpiGibbs() {
+int BayesW::runMpiGibbs_bW() {
 
 #ifdef _OPENMP
 #warning "using OpenMP"
@@ -1701,8 +1705,6 @@ int BayesW::runMpiGibbs() {
     // Build list of markers    
     // ---------------------
     for (int i=0; i<M; ++i) markerI.push_back(i);
-
-
     // Processing part
     // ---------------
     const auto st3 = std::chrono::high_resolution_clock::now();
@@ -2249,9 +2251,7 @@ int BayesW::runMpiGibbs() {
         // ------------------------
         m0      = double(Mtot) - v[0];
 
-	//sampleAlpha();
 	// ARS parameters
-        
         neval = 0;
 	xsamp[0] = 0;
         convex = 1.0;
@@ -2496,6 +2496,7 @@ int BayesW::runMpiGibbs() {
 
 // Get directory and basename of bed file (passed with no extension via command line)
 // ----------------------------------------------------------------------------------
+/*
 string BayesW::mpi_get_sparse_output_filebase(const int rank) {
 
     std::string dir, bsn;
@@ -2569,10 +2570,10 @@ uint BayesW::set_Mtot(const int rank) {
 
 
 #endif
-
+*/
 
 //  ORIGINAL (SEQUENTIAL) VERSION
-
+/*
 VectorXd BayesW::getSnpData(unsigned int marker) const
 {
     if (!usePreprocessedData) {
@@ -2590,3 +2591,4 @@ void BayesW::printDebugInfo() const
     // cout << "x mean " << Cx.mean() << "\n";
     //   cout << "x sd " << sqrt(Cx.squaredNorm() / (double(N - 1))) << "\n";
 }
+*/

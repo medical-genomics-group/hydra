@@ -263,9 +263,14 @@ inline void sparse_set(double*       __restrict__ vec,
 }
 
 
-inline void sparse_add(double*       __restrict__ vec,
+//inline void sparse_add(double*       __restrict__ vec,
+//                       const double               val,
+//                       const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
+
+void BayesRRm::sparse_add(double*       __restrict__ vec,
                        const double               val,
                        const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
+
 #ifdef __INTEL_COMPILER
     __assume_aligned(vec, 64);
     __assume_aligned(IX,  64);

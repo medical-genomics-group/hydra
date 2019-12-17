@@ -4,10 +4,11 @@
  *  Created on: 5 Sep 2018
  *      Author: admin
  */
-
+ 
 #ifndef SRC_BAYESW_HPP_
 #define SRC_BAYESW_HPP_
 
+#include "BayesRRm.h"
 #include "data.hpp"
 #include "options.hpp"
 #include "distributions_boost.hpp"
@@ -79,12 +80,12 @@ struct pars_alpha{
 };
 
 
-class BayesW
+class BayesW : public BayesRRm
 {
     
- public:
+ //public:
 
-    Data               &data;            // data matrices
+/*    Data               &data;            // data matrices
     Options            &opt;
     const string       bedFile;          // bed file
     const long         memPageSize;      // size of memory
@@ -92,6 +93,7 @@ class BayesW
     const unsigned int max_iterations;
     const unsigned int burn_in;
     const int       thinning = 1;
+*/
     const double	alpha_0  = 0.01;
     const double	kappa_0     = 0.01;
     const double    sigma_mu    = 100;
@@ -99,7 +101,7 @@ class BayesW
     const double    beta_sigma   = 0.0001;
     const string 	quad_points = opt.quad_points;  // Number of Gaussian quadrature points
     const int 		K = opt.S.size()+1;  //number of mixtures + 0 class 
-
+/*
     const size_t       LENBUF  = 300;
 
 
@@ -108,23 +110,23 @@ class BayesW
     bool usePreprocessedData;
     bool showDebug;
     double betasqn;
-
+*/
 	// The ARS structures
 	struct pars used_data;
 	struct pars_beta_sparse used_data_beta;
 	struct pars_alpha used_data_alpha;
 
 
-    int      m0;        // total number of markers in model
+//    int      m0;        // total number of markers in model
     //VectorXd v;         // variable storing the component assignment
-    VectorXd cass;      // variable storing the component assignment //EO RENAMING
-    MatrixXd cass8;
+//    VectorXd cass;      // variable storing the component assignment //EO RENAMING
+//    MatrixXd cass8;
 
 	// Component variables
 	VectorXd pi_L;        // mixture probabilities
 	VectorXd marginal_likelihoods;      // likelihood for each mixture component
 	VectorXd v;         // variable storing the component assignment
-	VectorXi components; // Indicator vector stating to which mixture SNP belongs to
+//	VectorXi components; // Indicator vector stating to which mixture SNP belongs to
 
 /*  double mu8[8];
     double sigmaG8[8];
@@ -132,27 +134,29 @@ class BayesW
     double sigmaF8[8];
 */
     // Linear model variables
-    VectorXd Beta;       // effect sizes
+//    VectorXd Beta;       // effect sizes
     VectorXd theta;
     VectorXd vi;
 //    VectorXd y_tilde;    // variable containing the adjusted residuals to exclude the effects of a given marker
-    VectorXd epsilon;    // variable containing the residuals
-    MatrixXi components8;
+//    VectorXd epsilon;    // variable containing the residuals
+//    MatrixXi components8;
 
-    VectorXd y;
-	VectorXd sum_failure;
-	VectorXd sum_failure_fix;
+    //VectorXd y;
+    VectorXd sum_failure;
+    VectorXd sum_failure_fix;
     
     //Sampled variables that are not kept in structure
-    double mu;
+//    double mu;
 
     //double epsilonsum;
     //double ytildesum;
 
-    BayesW(Data &data, Options &opt, const long memPageSize);
+  public: BayesW(Data &data, Options &opt, const long memPageSize) : BayesRRm(data, opt, memPageSize)
+	{
+	};
     virtual ~BayesW();
 
-    void   setDebugEnabled(bool enabled) { showDebug = enabled; }
+/*    void   setDebugEnabled(bool enabled) { showDebug = enabled; }
     bool   isDebugEnabled() const { return showDebug; }    
     void   offset_vector_f64(double* __restrict__ vec, const double offset, const int N);
     void   set_vector_f64(double* __restrict__ vec, const double val, const int N);
@@ -178,11 +182,11 @@ class BayesW
                           const double               sig_inv,
                           const int                  N,
                           const int                  marker);
-
-    int    runGibbs();
+*/
+//    int    runGibbs();
 
 #ifdef USE_MPI
-    void   init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
+   /* void   init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
                              const int* MrankS, const int* MrankL);
     void   init_from_scratch();
 
@@ -193,25 +197,28 @@ class BayesW
     uint   set_Mtot(const int rank);
     int    runMpiGibbs();
     int    runMpiGibbsMultiTraits();
+*/
+    int    runMpiGibbs_bW();
+/*
     void   check_whole_array_was_set(const uint* array, const size_t size, const int linenumber, const char* filename);
     void   mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax);
     void   mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks);
-
+*/
 
 #endif
     
 private:
-    void init(unsigned int markerCount, unsigned int individualCount, unsigned int fixedCount);
+        void init(unsigned int markerCount, unsigned int individualCount, unsigned int fixedCount);
 	void sampleMu();
 	void sampleTheta(int fix_i);
 	void sampleBeta(int marker);
 	void sampleAlpha();
 
 	void marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n, double vi_sum, double vi_2,double vi_1, double vi_0,double mean, double sd, double mean_sd_ratio);
-		double gauss_hermite_adaptive_integral(int k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio);
+	double gauss_hermite_adaptive_integral(int k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio);
 
-	VectorXd getSnpData(unsigned int marker) const;
-    void     printDebugInfo() const;
+//	VectorXd getSnpData(unsigned int marker) const;
+//    void     printDebugInfo() const;
 };
 
 #endif /* SRC_BAYESW_HPP_ */

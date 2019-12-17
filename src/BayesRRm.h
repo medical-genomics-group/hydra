@@ -106,6 +106,9 @@ class BayesRRm
     double sum_vector_elements_f64_base(const double* __restrict__ vec, const int N);
     double sum_vector_elements_f64(const double* __restrict__ vec, const int N);
     void   copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N);
+    void   sparse_add(double*       __restrict__ vec,
+                       const double               val,
+                       const uint*   __restrict__ IX, const size_t NXS, const size_t NXL);
 
     void   sparse_scaadd(double*     __restrict__ vout,
                          const double  dMULT,

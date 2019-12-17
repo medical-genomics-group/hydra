@@ -106,7 +106,7 @@ int main(int argc, const char * argv[]) {
             }else if(opt.bayesType == "bayesWMPI"){
 	        data.readBedFile_noMPI_unstandardised(opt.bedFile+".bed"); // This part to read the non-standardised data
 		BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
-                analysis.runMpiGibbs();
+                analysis.runMpiGibbs_bW();
 	     }
 	     else {
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));

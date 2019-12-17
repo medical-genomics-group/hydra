@@ -9,15 +9,15 @@ EXE       = mpi_gibbs
 CXX       = mpic++
 
 CXXFLAGS  = -O2
-#CXXFLAGS += -ffast-math
-#CXXFLAGS += -funroll-loops
+CXXFLAGS += -ffast-math
+CXXFLAGS += -funroll-loops
 
 #CXXFLAGS += g
 CXXFLAGS += -std=c++17
 #CXXFLAGS += -march=native
 CXXFLAGS += -D USE_MPI
 
-CXXFLAGS += -D EIGEN_DONT_VECTORIZE
+#CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 
 #CXXFLAGS +=  -fopt-info-vec-optimized
 
@@ -28,7 +28,7 @@ CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 
 LIBS     = -lz
 
-SRC = data.cpp BayesRRm.cpp BayesW.cpp BayesW_arms.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
+SRC = data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW.cpp BayesW_arms.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
 
 OBJ = $(SRC:.cpp = .o)
 
