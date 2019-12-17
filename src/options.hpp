@@ -48,6 +48,10 @@ public:
     Eigen::MatrixXd mS;
     string groupFile;
     string mSfile;
+    string failureFile;
+    string bayesW_version;
+    string quad_points;
+
 
     string title;
     string analysisType;
@@ -68,6 +72,7 @@ public:
     string covariatesFile;              // for extra covariates.
     bool   covariates = false;          // for extra covatiates.
     bool   compress  = false;
+    bool deltaUpdate = true; // Use the delta epsilon to pass the message in mpi
 
     string options_s;
 

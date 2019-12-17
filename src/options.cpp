@@ -51,6 +51,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             restart = true;
             ss << "--restart " << "\n";
         }
+	else if (!strcmp(argv[i], "--raw-update")) {
+            deltaUpdate = false;
+            ss << "--raw-update " << "\n";
+        }
         else if (!strcmp(argv[i], "--check-RAM-tasks")) {
             int tmp = atoi(argv[++i]);
             if (tmp < 0) { printf("FATAL: --check-RAM-tasks passed a negative number!\n"); exit(1); }
@@ -128,7 +132,18 @@ void Options::inputOptions(const int argc, const char* argv[]){
             //for (int i=0; i<nphen; i++)
             //    cout << " " << i << ": " << phenotypeFiles[i] << endl;
         }
-        else if (!strcmp(argv[i], "--interleave-phenotypes")) {
+  	// Failure vector file
+        else if (!strcmp(argv[i], "--failure")) {
+        	failureFile = argv[++i];
+        	ss << "--failure " << argv[i] << "\n";
+		}
+	//Number of quadrature points        
+        else if (!strcmp(argv[i], "--quad_points")) {
+        	quad_points = argv[++i];
+                ss << "--quad_points " << argv[i] << "\n";
+          	}
+
+	else if (!strcmp(argv[i], "--interleave-phenotypes")) {
             interleave = true;
             ss << "--interleave-phenotypes " << "\n";
         }
@@ -151,7 +166,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
 #ifdef USE_MPI
         else if (!strcmp(argv[i], "--sync-rate")) {    //EO
             syncRate = atoi(argv[++i]);
-            if (syncRate < 1) { printf("FATAL: --sync-rate must be >= 1!\n"); exit(1); }
             ss << "--sync-rate " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--sparse-dir")) {    //EO
