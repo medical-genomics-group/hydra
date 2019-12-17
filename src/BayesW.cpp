@@ -41,59 +41,59 @@
 #define EuMasc 0.577215664901532
 
 /*
-BayesW::BayesW(Data &data, Options &opt, const long memPageSize)
-    : data(data)
-    , opt(opt)
-    , bedFile(opt.bedFile + ".bed")
-    , memPageSize(memPageSize)
-    , seed(opt.seed)
-    , max_iterations(opt.chainLength)
-    , thinning(opt.thin)
-    , burn_in(opt.burnin)
-    //, dist(opt.seed) //Was commented out
-    , usePreprocessedData(opt.analysisType == "PPBayes")
-    , showDebug(false)
-{
-    float* ptr =static_cast<float*>(&opt.S[0]);
-}
+  BayesW::BayesW(Data &data, Options &opt, const long memPageSize)
+  : data(data)
+  , opt(opt)
+  , bedFile(opt.bedFile + ".bed")
+  , memPageSize(memPageSize)
+  , seed(opt.seed)
+  , max_iterations(opt.chainLength)
+  , thinning(opt.thin)
+  , burn_in(opt.burnin)
+  //, dist(opt.seed) //Was commented out
+  , usePreprocessedData(opt.analysisType == "PPBayes")
+  , showDebug(false)
+  {
+  float* ptr =static_cast<float*>(&opt.S[0]);
+  }
 */
 BayesW::~BayesW()
 {
 }
 
 /*
-void BayesW::offset_vector_f64(double* __restrict__ vec, const double offset, const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec,   64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        vec[i] += offset;
-    }
-}
+  void BayesW::offset_vector_f64(double* __restrict__ vec, const double offset, const int N) {
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(vec,   64);
+  #endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+  for (int i=0; i<N; i++) {
+  vec[i] += offset;
+  }
+  }
 
 
-void BayesW::set_vector_f64(double* __restrict__ vec, const double val, const int N) {
+  void BayesW::set_vector_f64(double* __restrict__ vec, const double val, const int N) {
   
-    const int N8 = (N/8) * 8;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume(N8%8==0);
-#endif
-    //#pragma unroll(8)
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N8; i++) {
-        vec[i] = val;
-    }
+  const int N8 = (N/8) * 8;
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(vec, 64);
+  __assume(N8%8==0);
+  #endif
+  //#pragma unroll(8)
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+  for (int i=0; i<N8; i++) {
+  vec[i] = val;
+  }
 
-    for (int i=N8; i<N; ++i) {
-        vec[i] = val;
-    }
-}
+  for (int i=N8; i<N; ++i) {
+  vec[i] = val;
+  }
+  }
 */
 
 /*
@@ -117,73 +117,73 @@ void BayesW::set_vector_f64(double* __restrict__ vec, const double val, const in
 */
 
 /*
-void BayesW::copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(dest,   64);
-    __assume_aligned(source, 64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        dest[i] = source[i];
-    }
-}
+  void BayesW::copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(dest,   64);
+  __assume_aligned(source, 64);
+  #endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+  for (int i=0; i<N; i++) {
+  dest[i] = source[i];
+  }
+  }
 
 
-double BayesW::sum_vector_elements_f64_base(const double* __restrict__ vec, const int N) {
+  double BayesW::sum_vector_elements_f64_base(const double* __restrict__ vec, const int N) {
 
-    const int N8 = (N/8) * 8;
-    double sum = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume(N8%8==0);
-#endif
-#pragma unroll(8)
-    for (int i=0; i<N8; i++) {
-        sum += vec[i];
-    }
+  const int N8 = (N/8) * 8;
+  double sum = 0.0;
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(vec, 64);
+  __assume(N8%8==0);
+  #endif
+  #pragma unroll(8)
+  for (int i=0; i<N8; i++) {
+  sum += vec[i];
+  }
 
-    for (int i=N8; i<N; ++i) {
-        sum += vec[i];
-    }
+  for (int i=N8; i<N; ++i) {
+  sum += vec[i];
+  }
 
-    return sum;
-}
-
-
-double BayesW::sum_vector_elements_f64(const double* __restrict__ vec, const int N) {
-
-    double sum = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-#endif
-    //#pragma unroll
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+: sum)
-#endif
-    for (int i=0; i<N; i++) {
-        sum += vec[i];
-    }
-
-    return sum;
-}
+  return sum;
+  }
 
 
-void BayesW::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
-                               const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(in2, 64);
-    __assume_aligned(out, 64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        out[i] = in1[i] + in2[i];
-    }
-}
+  double BayesW::sum_vector_elements_f64(const double* __restrict__ vec, const int N) {
+
+  double sum = 0.0;
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(vec, 64);
+  #endif
+  //#pragma unroll
+  #ifdef _OPENMP
+  #pragma omp parallel for reduction(+: sum)
+  #endif
+  for (int i=0; i<N; i++) {
+  sum += vec[i];
+  }
+
+  return sum;
+  }
+
+
+  void BayesW::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
+  const int N) {
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(in1, 64);
+  __assume_aligned(in2, 64);
+  __assume_aligned(out, 64);
+  #endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+  for (int i=0; i<N; i++) {
+  out[i] = in1[i] + in2[i];
+  }
+  }
 */
 
 /*
@@ -210,664 +210,664 @@ void BayesW::sum_vectors_f64(double* __restrict__ out, const double* __restrict_
 */
 
 /*
-void BayesW::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N) {
+  void BayesW::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N) {
     
-    const int N8 = (N/8) * 8;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(out, 64);
-    __assume(N8%8==0);
-#endif
-    //#pragma unroll(8)
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N8; i++) {
-        out[i] += in1[i];
-    }
+  const int N8 = (N/8) * 8;
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(in1, 64);
+  __assume_aligned(out, 64);
+  __assume(N8%8==0);
+  #endif
+  //#pragma unroll(8)
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+  for (int i=0; i<N8; i++) {
+  out[i] += in1[i];
+  }
 
-    for (int i=N8; i<N; ++i) {
-        out[i] += in1[i];
-    }
-}
-
-
-inline void sum_vectors_f64_ref(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
-                                const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(in2, 64);
-    __assume_aligned(out, 64);
-#endif
-    for (int i=0; i<N; ++i) {
-        out[i] = in1[i] + in2[i];
-    }
-}
+  for (int i=N8; i<N; ++i) {
+  out[i] += in1[i];
+  }
+  }
 
 
-inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, const double* __restrict__ vin2, const double dMULT, const int N) {
-
-    if   (dMULT == 0.0) { 
-        for (int i=0; i<N; i++) { 
-            vout[i] = vin1[i]; 
-        } 
-    } else { 
-        for (int i=0; i<N; i++) { 
-            vout[i] = vin1[i] + dMULT * vin2[i];
-        }
-    }
-}
-
-
-inline void sparse_set(double*       __restrict__ vec,
-                       const double               val,
-                       const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (size_t i=NXS; i<NXS+NXL; ++i) {
-        vec[ IX[i] ] = val;
-        //if (i==NXS)
-        //    cout << ">??> " << i << ", " << IX[i] << ", " << vec[ IX[i] ] << endl;
-    }
-}
+  inline void sum_vectors_f64_ref(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
+  const int N) {
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(in1, 64);
+  __assume_aligned(in2, 64);
+  __assume_aligned(out, 64);
+  #endif
+  for (int i=0; i<N; ++i) {
+  out[i] = in1[i] + in2[i];
+  }
+  }
 
 
-inline void sparse_add(double*       __restrict__ vec,
-                       const double               val,
-                       const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (size_t i=NXS; i<NXS+NXL; ++i) {
-        vec[ IX[i] ] += val;
-        //if (i == NXS)
-        //    cout << ">>>> " << i << ", " << IX[i] << ", " << vec[ IX[i] ] << endl;
-    }
-}
+  inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, const double* __restrict__ vin2, const double dMULT, const int N) {
+
+  if   (dMULT == 0.0) { 
+  for (int i=0; i<N; i++) { 
+  vout[i] = vin1[i]; 
+  } 
+  } else { 
+  for (int i=0; i<N; i++) { 
+  vout[i] = vin1[i] + dMULT * vin2[i];
+  }
+  }
+  }
 
 
-void BayesW::sparse_scaadd(double*     __restrict__ vout,
-                             const double  dMULT,
-                             const uint* __restrict__ I1, const size_t N1S, const size_t N1L,
-                             const uint* __restrict__ I2, const size_t N2S, const size_t N2L,
-                             const uint* __restrict__ IM, const size_t NMS, const size_t NML,
-                             const double  mu,
-                             const double  sig_inv,
-                             const int     N) {
+  inline void sparse_set(double*       __restrict__ vec,
+  const double               val,
+  const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(vec, 64);
+  __assume_aligned(IX,  64);
+  #endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+  for (size_t i=NXS; i<NXS+NXL; ++i) {
+  vec[ IX[i] ] = val;
+  //if (i==NXS)
+  //    cout << ">??> " << i << ", " << IX[i] << ", " << vec[ IX[i] ] << endl;
+  }
+  }
+
+
+  inline void sparse_add(double*       __restrict__ vec,
+  const double               val,
+  const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(vec, 64);
+  __assume_aligned(IX,  64);
+  #endif
+  #ifdef _OPENMP
+  #pragma omp parallel for
+  #endif
+  for (size_t i=NXS; i<NXS+NXL; ++i) {
+  vec[ IX[i] ] += val;
+  //if (i == NXS)
+  //    cout << ">>>> " << i << ", " << IX[i] << ", " << vec[ IX[i] ] << endl;
+  }
+  }
+
+
+  void BayesW::sparse_scaadd(double*     __restrict__ vout,
+  const double  dMULT,
+  const uint* __restrict__ I1, const size_t N1S, const size_t N1L,
+  const uint* __restrict__ I2, const size_t N2S, const size_t N2L,
+  const uint* __restrict__ IM, const size_t NMS, const size_t NML,
+  const double  mu,
+  const double  sig_inv,
+  const int     N) {
     
-    if (dMULT == 0.0) {
-        set_vector_f64(vout, 0.0, N);
+  if (dMULT == 0.0) {
+  set_vector_f64(vout, 0.0, N);
 
-    } else {
-        double aux = mu * sig_inv * dMULT;
-        //printf("sparse_scaadd aux = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", aux, mu, sig_inv * dMULT);
-        set_vector_f64(vout, -aux, N);
+  } else {
+  double aux = mu * sig_inv * dMULT;
+  //printf("sparse_scaadd aux = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", aux, mu, sig_inv * dMULT);
+  set_vector_f64(vout, -aux, N);
 
-        //cout << "sparse set on M: " << NMS << ", " << NML << endl;
-        sparse_set(vout, 0.0, IM, NMS, NML);
+  //cout << "sparse set on M: " << NMS << ", " << NML << endl;
+  sparse_set(vout, 0.0, IM, NMS, NML);
 
-        //cout << "sparse set on 1: " << N1S << ", " << N1L << endl;
-        aux = dMULT * (1.0 - mu) * sig_inv;
-        //printf("1: aux = %15.10f\n", aux);
-        sparse_set(vout, aux, I1, N1S, N1L);
+  //cout << "sparse set on 1: " << N1S << ", " << N1L << endl;
+  aux = dMULT * (1.0 - mu) * sig_inv;
+  //printf("1: aux = %15.10f\n", aux);
+  sparse_set(vout, aux, I1, N1S, N1L);
 
-        //cout << "sparse set on 2: " << N2S << ", " << N2L << endl;
-        aux = dMULT * (2.0 - mu) * sig_inv;
-        sparse_set(vout, aux, I2, N2S, N2L);
-    }
-}
-
-
-inline double partial_sparse_dotprod(const double* __restrict__ vec,
-                                     const uint*   __restrict__ IX,
-                                     const size_t               NXS,
-                                     const size_t               NXL,
-                                     const double               fac) {
-
-    //double t1 = -mysecond();
-    //for (int ii=0; ii<1024; ii++) {
-    //}
-    //t1 += mysecond();
-    //printf("kerold 1 BW = %g\n", double(N1L)*sizeof(double) / 1024. / 1024. / t1);
-
-    double dp = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+: dp)
-#endif
-    for (size_t i=NXS; i<NXS+NXL; i++) {
-        dp += vec[ IX[i] ] * fac;
-    }
-
-    return dp;
-}
+  //cout << "sparse set on 2: " << N2S << ", " << N2L << endl;
+  aux = dMULT * (2.0 - mu) * sig_inv;
+  sparse_set(vout, aux, I2, N2S, N2L);
+  }
+  }
 
 
-double BayesW::sparse_dotprod(const double* __restrict__ vin1,
-                                const uint*   __restrict__ I1,      const size_t N1S,  const size_t N1L,
-                                const uint*   __restrict__ I2,      const size_t N2S,  const size_t N2L,
-                                const uint*   __restrict__ IM,      const size_t NMS,  const size_t NML,
-                                const double               mu, 
-                                const double               sig_inv,
-                                const int                  N,
-                                const int                  marker) {
+  inline double partial_sparse_dotprod(const double* __restrict__ vec,
+  const uint*   __restrict__ IX,
+  const size_t               NXS,
+  const size_t               NXL,
+  const double               fac) {
+
+  //double t1 = -mysecond();
+  //for (int ii=0; ii<1024; ii++) {
+  //}
+  //t1 += mysecond();
+  //printf("kerold 1 BW = %g\n", double(N1L)*sizeof(double) / 1024. / 1024. / t1);
+
+  double dp = 0.0;
+  #ifdef __INTEL_COMPILER
+  __assume_aligned(vec, 64);
+  __assume_aligned(IX,  64);
+  #endif
+  #ifdef _OPENMP
+  #pragma omp parallel for reduction(+: dp)
+  #endif
+  for (size_t i=NXS; i<NXS+NXL; i++) {
+  dp += vec[ IX[i] ] * fac;
+  }
+
+  return dp;
+  }
+
+
+  double BayesW::sparse_dotprod(const double* __restrict__ vin1,
+  const uint*   __restrict__ I1,      const size_t N1S,  const size_t N1L,
+  const uint*   __restrict__ I2,      const size_t N2S,  const size_t N2L,
+  const uint*   __restrict__ IM,      const size_t NMS,  const size_t NML,
+  const double               mu, 
+  const double               sig_inv,
+  const int                  N,
+  const int                  marker) {
     
-    double dp  = 0.0;
-    double syt = 0.0;
+  double dp  = 0.0;
+  double syt = 0.0;
 
-    dp += partial_sparse_dotprod(vin1, I1, N1S, N1L, 1.0);
+  dp += partial_sparse_dotprod(vin1, I1, N1S, N1L, 1.0);
 
-    dp += partial_sparse_dotprod(vin1, I2, N2S, N2L, 2.0);
+  dp += partial_sparse_dotprod(vin1, I2, N2S, N2L, 2.0);
 
-    dp *= sig_inv;
+  dp *= sig_inv;
 
-    syt += sum_vector_elements_f64(vin1, N);
+  syt += sum_vector_elements_f64(vin1, N);
     
-    syt += partial_sparse_dotprod(vin1, IM, NMS, NML, -1.0);
+  syt += partial_sparse_dotprod(vin1, IM, NMS, NML, -1.0);
 
-    dp -= mu * sig_inv * syt;
+  dp -= mu * sig_inv * syt;
 
-    return dp;
-}
-
-
-inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin, const double dMULT, const int N) {
-
-    if (dMULT == 0.0) {
-        for (int i=0; i<N; i++) {
-            vout[i] = 0.0;
-        }
-    } else {
-        for (int i=0; i<N; i++) {
-            vout[i] = dMULT * vin[i];
-        }
-    }
-}
+  return dp;
+  }
 
 
-inline double dotprod(const double* __restrict__ vec1, const double* __restrict__ vec2, const int N) {
+  inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin, const double dMULT, const int N) {
 
-    double dp = 0.0d;
-
-    for (int i=0; i<N; i++) {
-        dp += vec1[i] * vec2[i]; 
-    }
-
-    return dp;
-}
-
-
-inline void center_and_scale(double* __restrict__ vec, const int N) {
-
-    // Compute mean
-    double mean = 0.0;
-    for (int i=0; i<N; ++i)  mean += vec[i];
-    mean /= N;
-
-    // Center
-    for (int i=0; i<N; ++i)  vec[i] -= mean;
-
-    // Compute scale
-    double sqn = 0.0;
-    for (int i=0; i<N; ++i)  sqn += vec[i] * vec[i];
-    sqn = sqrt(double(N-1) / sqn);
-
-    // Scale
-    for (int i=0; i<N; ++i)  vec[i] *= sqn;
-}
-
-#ifdef USE_MPI
+  if (dMULT == 0.0) {
+  for (int i=0; i<N; i++) {
+  vout[i] = 0.0;
+  }
+  } else {
+  for (int i=0; i<N; i++) {
+  vout[i] = dMULT * vin[i];
+  }
+  }
+  }
 
 
-// Define blocks of markers to be processed by each task
-// By default processes all markers
-// -----------------------------------------------------
-void BayesW::mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks) {
+  inline double dotprod(const double* __restrict__ vec1, const double* __restrict__ vec2, const int N) {
 
-    const uint modu   = Mtot % nblocks;
-    const uint Mrank  = int(Mtot / nblocks);
-    uint checkM = 0;
-    uint start  = 0;
+  double dp = 0.0d;
 
-    for (int i=0; i<nblocks; ++i) {
-        MrankL[i] = int(Mtot / nblocks);
-        if (modu != 0 && i < modu)
-            MrankL[i] += 1;
-        MrankS[i] = start;
-        //printf("start %d, len %d\n", MrankS[i], MrankL[i]);
-        start += MrankL[i];
-        checkM += MrankL[i];
-    }
-    assert(checkM == Mtot);
-}
+  for (int i=0; i<N; i++) {
+  dp += vec1[i] * vec2[i]; 
+  }
+
+  return dp;
+  }
 
 
+  inline void center_and_scale(double* __restrict__ vec, const int N) {
+
+  // Compute mean
+  double mean = 0.0;
+  for (int i=0; i<N; ++i)  mean += vec[i];
+  mean /= N;
+
+  // Center
+  for (int i=0; i<N; ++i)  vec[i] -= mean;
+
+  // Compute scale
+  double sqn = 0.0;
+  for (int i=0; i<N; ++i)  sqn += vec[i] * vec[i];
+  sqn = sqrt(double(N-1) / sqn);
+
+  // Scale
+  for (int i=0; i<N; ++i)  vec[i] *= sqn;
+  }
+
+  #ifdef USE_MPI
 
 
-// Sanity check: make sure all elements were set (requires init at UINT_MAX)
-// -------------------------------------------------------------------------
-void BayesW::check_whole_array_was_set(const uint* array, const size_t size, const int linenumber, const char* filename) {
+  // Define blocks of markers to be processed by each task
+  // By default processes all markers
+  // -----------------------------------------------------
+  void BayesW::mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks) {
 
-    for (size_t i=0; i<size; i++) { 
-        if (array[i] == UINT_MAX) {
-            printf("FATAL  : array[%lu] = %d not set at %d of %s!\n", i, array[i], linenumber, filename); 
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
-    }
-}
+  const uint modu   = Mtot % nblocks;
+  const uint Mrank  = int(Mtot / nblocks);
+  uint checkM = 0;
+  uint start  = 0;
+
+  for (int i=0; i<nblocks; ++i) {
+  MrankL[i] = int(Mtot / nblocks);
+  if (modu != 0 && i < modu)
+  MrankL[i] += 1;
+  MrankS[i] = start;
+  //printf("start %d, len %d\n", MrankS[i], MrankL[i]);
+  start += MrankL[i];
+  checkM += MrankL[i];
+  }
+  assert(checkM == Mtot);
+  }
 
 
 
-//EO: This method writes sparse data files out of a BED file
-//    Note: will always convert the whole file
-//    A two-step process due to RAM limitation for very large BED files:
-//      1) Compute the number of ones and twos to be written by each task to compute
-//         rank-wise offsets for writing the si1 and si2 files
-//      2) Write files with global indexing
-// ---------------------------------------------------------------------------------
-void BayesW::write_sparse_data_files(const uint bpr) {
 
-    int rank, nranks, result;
+  // Sanity check: make sure all elements were set (requires init at UINT_MAX)
+  // -------------------------------------------------------------------------
+  void BayesW::check_whole_array_was_set(const uint* array, const size_t size, const int linenumber, const char* filename) {
 
-    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_File   bedfh, dimfh, si1fh, sl1fh, ss1fh, si2fh, sl2fh, ss2fh, simfh, slmfh, ssmfh;
-    MPI_Offset offset;
-    MPI_Status status;
+  for (size_t i=0; i<size; i++) { 
+  if (array[i] == UINT_MAX) {
+  printf("FATAL  : array[%lu] = %d not set at %d of %s!\n", i, array[i], linenumber, filename); 
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  }
+  }
+  }
 
-    MPI_Barrier(MPI_COMM_WORLD);
-    const auto st2 = std::chrono::high_resolution_clock::now();
 
-    if (rank == 0) printf("INFO   : will generate sparse data files out of %d ranks and %d blocks per rank.\n", nranks, bpr);
 
-    // Get dimensions of the dataset and define blocks
-    // -----------------------------------------------
-    const unsigned int N    = data.numInds;
-    unsigned int Mtot = data.numSnps;
-    if (opt.numberMarkers) Mtot = opt.numberMarkers;
+  //EO: This method writes sparse data files out of a BED file
+  //    Note: will always convert the whole file
+  //    A two-step process due to RAM limitation for very large BED files:
+  //      1) Compute the number of ones and twos to be written by each task to compute
+  //         rank-wise offsets for writing the si1 and si2 files
+  //      2) Write files with global indexing
+  // ---------------------------------------------------------------------------------
+  void BayesW::write_sparse_data_files(const uint bpr) {
 
-    if (rank == 0) printf("INFO   : full dataset includes %d markers and %d individuals.\n", Mtot, N);
+  int rank, nranks, result;
 
-    // Fail if more blocks requested than available markers
-    if (nranks * bpr > Mtot) {
-        if (rank == 0)
-            printf("Fatal: empty tasks defined. Useless and not allowed.\n      Requested %d tasks for %d markers to process.\n", nranks * bpr, Mtot);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
+  MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_File   bedfh, dimfh, si1fh, sl1fh, ss1fh, si2fh, sl2fh, ss2fh, simfh, slmfh, ssmfh;
+  MPI_Offset offset;
+  MPI_Status status;
 
-    // Define global marker indexing
-    // -----------------------------
-    const uint nblocks = nranks * bpr;
-    int MrankS[nblocks], MrankL[nblocks];
-    mpi_define_blocks_of_markers(Mtot, MrankS, MrankL, nblocks);
+  MPI_Barrier(MPI_COMM_WORLD);
+  const auto st2 = std::chrono::high_resolution_clock::now();
 
-    // Length of a column in bytes
-    const size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
-    if (rank == 0) printf("INFO   : snpLenByt = %zu bytes.\n", snpLenByt);
+  if (rank == 0) printf("INFO   : will generate sparse data files out of %d ranks and %d blocks per rank.\n", nranks, bpr);
 
-    // Get bed file directory and basename
-    std::string sparseOut = mpi_get_sparse_output_filebase(rank);
-    if (rank == 0) printf("INFO   : will write sparse output files as: %s.{ss1, sl1, si1, ss2, sl2, si2}\n", sparseOut.c_str());
+  // Get dimensions of the dataset and define blocks
+  // -----------------------------------------------
+  const unsigned int N    = data.numInds;
+  unsigned int Mtot = data.numSnps;
+  if (opt.numberMarkers) Mtot = opt.numberMarkers;
 
-    // Open bed file for reading
-    std::string bedfp = opt.bedFile;
-    bedfp += ".bed";
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh), __LINE__, __FILE__);
+  if (rank == 0) printf("INFO   : full dataset includes %d markers and %d individuals.\n", Mtot, N);
 
-    // Create sparse output files
-    // --------------------------
-    const std::string dim = sparseOut + ".dim";
-    const std::string si1 = sparseOut + ".si1";
-    const std::string sl1 = sparseOut + ".sl1";
-    const std::string ss1 = sparseOut + ".ss1";
-    const std::string si2 = sparseOut + ".si2";
-    const std::string sl2 = sparseOut + ".sl2";
-    const std::string ss2 = sparseOut + ".ss2";
-    const std::string sim = sparseOut + ".sim";
-    const std::string slm = sparseOut + ".slm";
-    const std::string ssm = sparseOut + ".ssm";
+  // Fail if more blocks requested than available markers
+  if (nranks * bpr > Mtot) {
+  if (rank == 0)
+  printf("Fatal: empty tasks defined. Useless and not allowed.\n      Requested %d tasks for %d markers to process.\n", nranks * bpr, Mtot);
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-    if (rank == 0) { 
-        MPI_File_delete(dim.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(si1.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(sl1.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(ss1.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(si2.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(sl2.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(ss2.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(sim.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(slm.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(ssm.c_str(), MPI_INFO_NULL);
-    }
+  // Define global marker indexing
+  // -----------------------------
+  const uint nblocks = nranks * bpr;
+  int MrankS[nblocks], MrankL[nblocks];
+  mpi_define_blocks_of_markers(Mtot, MrankS, MrankL, nblocks);
 
-    MPI_Barrier(MPI_COMM_WORLD);
+  // Length of a column in bytes
+  const size_t snpLenByt = (data.numInds % 4) ? data.numInds / 4 + 1 : data.numInds / 4;
+  if (rank == 0) printf("INFO   : snpLenByt = %zu bytes.\n", snpLenByt);
+
+  // Get bed file directory and basename
+  std::string sparseOut = mpi_get_sparse_output_filebase(rank);
+  if (rank == 0) printf("INFO   : will write sparse output files as: %s.{ss1, sl1, si1, ss2, sl2, si2}\n", sparseOut.c_str());
+
+  // Open bed file for reading
+  std::string bedfp = opt.bedFile;
+  bedfp += ".bed";
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh), __LINE__, __FILE__);
+
+  // Create sparse output files
+  // --------------------------
+  const std::string dim = sparseOut + ".dim";
+  const std::string si1 = sparseOut + ".si1";
+  const std::string sl1 = sparseOut + ".sl1";
+  const std::string ss1 = sparseOut + ".ss1";
+  const std::string si2 = sparseOut + ".si2";
+  const std::string sl2 = sparseOut + ".sl2";
+  const std::string ss2 = sparseOut + ".ss2";
+  const std::string sim = sparseOut + ".sim";
+  const std::string slm = sparseOut + ".slm";
+  const std::string ssm = sparseOut + ".ssm";
+
+  if (rank == 0) { 
+  MPI_File_delete(dim.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(si1.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(sl1.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(ss1.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(si2.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(sl2.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(ss2.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(sim.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(slm.c_str(), MPI_INFO_NULL);
+  MPI_File_delete(ssm.c_str(), MPI_INFO_NULL);
+  }
+
+  MPI_Barrier(MPI_COMM_WORLD);
     
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, dim.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &dimfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, si1.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &si1fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, sl1.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &sl1fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, ss1.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &ss1fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, si2.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &si2fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, sl2.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &sl2fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, ss2.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &ss2fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, sim.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &simfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, slm.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &slmfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, ssm.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &ssmfh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, dim.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &dimfh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, si1.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &si1fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, sl1.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &sl1fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, ss1.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &ss1fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, si2.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &si2fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, sl2.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &sl2fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, ss2.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &ss2fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, sim.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &simfh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, slm.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &slmfh), __LINE__, __FILE__);
+  check_mpi(MPI_File_open(MPI_COMM_WORLD, ssm.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &ssmfh), __LINE__, __FILE__);
 
-    // Write to dim file (as text)
-    char buff[LENBUF];
+  // Write to dim file (as text)
+  char buff[LENBUF];
 
-    if (rank == 0) {
-        int  left = snprintf(buff, LENBUF, "%d %d\n", N, Mtot);
-        check_mpi(MPI_File_write_at(dimfh, 0, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
-    }
-    MPI_Barrier(MPI_COMM_WORLD);
+  if (rank == 0) {
+  int  left = snprintf(buff, LENBUF, "%d %d\n", N, Mtot);
+  check_mpi(MPI_File_write_at(dimfh, 0, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+  }
+  MPI_Barrier(MPI_COMM_WORLD);
 
 
-    // STEP 1: compute rank-wise N1 and N2 (rN1 and rN2)
-    // -------------------------------------------------
-    size_t rN1 = 0, rN2 = 0, rNM = 0;
-    size_t N1  = 0, N2  = 0, NM  = 0;
+  // STEP 1: compute rank-wise N1 and N2 (rN1 and rN2)
+  // -------------------------------------------------
+  size_t rN1 = 0, rN2 = 0, rNM = 0;
+  size_t N1  = 0, N2  = 0, NM  = 0;
 
-    for (int i=0; i<bpr; ++i) {
+  for (int i=0; i<bpr; ++i) {
 
-        if (rank == 0) printf("INFO   : reading (1/2) starting block %3d out of %3d\n", i+1, bpr);
+  if (rank == 0) printf("INFO   : reading (1/2) starting block %3d out of %3d\n", i+1, bpr);
 
-        uint globi = rank*bpr + i;
-        int  MLi   = MrankL[globi];
-        int  MSi   = MrankS[globi];
-        //printf("DEBUG  : 1| bpr %i  MLi = %d, MSi = %d\n", i, MLi, MSi);
+  uint globi = rank*bpr + i;
+  int  MLi   = MrankL[globi];
+  int  MSi   = MrankS[globi];
+  //printf("DEBUG  : 1| bpr %i  MLi = %d, MSi = %d\n", i, MLi, MSi);
 
-        // Alloc memory for raw BED data
-        const size_t rawdata_n = size_t(MLi) * size_t(snpLenByt) * sizeof(char);
-        char* rawdata = (char*) _mm_malloc(rawdata_n, 64);  check_malloc(rawdata, __LINE__, __FILE__);
+  // Alloc memory for raw BED data
+  const size_t rawdata_n = size_t(MLi) * size_t(snpLenByt) * sizeof(char);
+  char* rawdata = (char*) _mm_malloc(rawdata_n, 64);  check_malloc(rawdata, __LINE__, __FILE__);
 
-        // Gather sizes to determine common number of reads
-        size_t rawdata_n_max = 0;
-        check_mpi(MPI_Allreduce(&rawdata_n, &rawdata_n_max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+  // Gather sizes to determine common number of reads
+  size_t rawdata_n_max = 0;
+  check_mpi(MPI_Allreduce(&rawdata_n, &rawdata_n_max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
         
-        int NREADS = check_int_overflow(size_t(ceil(double(rawdata_n_max)/double(INT_MAX/2))), __LINE__, __FILE__);
-        if (NREADS <= 0) {
-            if (rank == 0) printf("FATAL  : NREADS must be >= 1.");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
+  int NREADS = check_int_overflow(size_t(ceil(double(rawdata_n_max)/double(INT_MAX/2))), __LINE__, __FILE__);
+  if (NREADS <= 0) {
+  if (rank == 0) printf("FATAL  : NREADS must be >= 1.");
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-        // Compute the offset of the section to read from the BED file
-        offset = size_t(3) + size_t(MSi) * size_t(snpLenByt) * sizeof(char);
+  // Compute the offset of the section to read from the BED file
+  offset = size_t(3) + size_t(MSi) * size_t(snpLenByt) * sizeof(char);
         
-        // Read the bed data
-        size_t bytes = 0;
-        data.mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
+  // Read the bed data
+  size_t bytes = 0;
+  data.mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
-        // Get number of ones, twos, and missing
-        data.sparse_data_get_sizes_from_raw(rawdata, MLi, snpLenByt, N1, N2, NM);
-        //printf("DEBUG  : off rank %d: N1 = %15lu, N2 = %15lu, NM = %15lu\n", rank, N1, N2, NM);
+  // Get number of ones, twos, and missing
+  data.sparse_data_get_sizes_from_raw(rawdata, MLi, snpLenByt, N1, N2, NM);
+  //printf("DEBUG  : off rank %d: N1 = %15lu, N2 = %15lu, NM = %15lu\n", rank, N1, N2, NM);
 
-        rN1 += N1;
-        rN2 += N2;
-        rNM += NM;
+  rN1 += N1;
+  rN2 += N2;
+  rNM += NM;
 
-        _mm_free(rawdata);
+  _mm_free(rawdata);
 
-        MPI_Barrier(MPI_COMM_WORLD);
-    }
+  MPI_Barrier(MPI_COMM_WORLD);
+  }
 
 
-    // Gather offsets
-    // --------------
-    size_t *AllN1 = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllN1, __LINE__, __FILE__);
-    size_t *AllN2 = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllN2, __LINE__, __FILE__);
-    size_t *AllNM = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllNM, __LINE__, __FILE__);
+  // Gather offsets
+  // --------------
+  size_t *AllN1 = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllN1, __LINE__, __FILE__);
+  size_t *AllN2 = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllN2, __LINE__, __FILE__);
+  size_t *AllNM = (size_t*)_mm_malloc(nranks * sizeof(size_t), 64);  check_malloc(AllNM, __LINE__, __FILE__);
 
-    check_mpi(MPI_Allgather(&rN1, 1, MPI_UNSIGNED_LONG_LONG, AllN1, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
-    check_mpi(MPI_Allgather(&rN2, 1, MPI_UNSIGNED_LONG_LONG, AllN2, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
-    check_mpi(MPI_Allgather(&rNM, 1, MPI_UNSIGNED_LONG_LONG, AllNM, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
-    //printf("DEBUG  : rN1 = %lu and AllN1[0] = %lu\n", rN1, AllN1[0]);
+  check_mpi(MPI_Allgather(&rN1, 1, MPI_UNSIGNED_LONG_LONG, AllN1, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
+  check_mpi(MPI_Allgather(&rN2, 1, MPI_UNSIGNED_LONG_LONG, AllN2, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
+  check_mpi(MPI_Allgather(&rNM, 1, MPI_UNSIGNED_LONG_LONG, AllNM, 1, MPI_UNSIGNED_LONG_LONG, MPI_COMM_WORLD), __LINE__, __FILE__);
+  //printf("DEBUG  : rN1 = %lu and AllN1[0] = %lu\n", rN1, AllN1[0]);
 
-    size_t N1tot = 0, N2tot = 0, NMtot = 0;
-    for (int i=0; i<nranks; i++) {
-        N1tot += AllN1[i];
-        N2tot += AllN2[i];
-        NMtot += AllNM[i];
-    }
-    if (rank ==0 ) printf("INFO   : N1tot = %lu, N2tot = %lu, NMtot = %lu.\n", N1tot, N2tot, NMtot);
+  size_t N1tot = 0, N2tot = 0, NMtot = 0;
+  for (int i=0; i<nranks; i++) {
+  N1tot += AllN1[i];
+  N2tot += AllN2[i];
+  NMtot += AllNM[i];
+  }
+  if (rank ==0 ) printf("INFO   : N1tot = %lu, N2tot = %lu, NMtot = %lu.\n", N1tot, N2tot, NMtot);
 
-    // STEP 2: write sparse structure files
-    // ------------------------------------
-    if (rank ==0 ) printf("\nINFO   : begining of step 2, writing of the sparse files.\n");
-    size_t tN1 = 0, tN2 = 0, tNM = 0;
+  // STEP 2: write sparse structure files
+  // ------------------------------------
+  if (rank ==0 ) printf("\nINFO   : begining of step 2, writing of the sparse files.\n");
+  size_t tN1 = 0, tN2 = 0, tNM = 0;
 
-    for (int i=0; i<bpr; ++i) {
+  for (int i=0; i<bpr; ++i) {
 
-        if (rank == 0) printf("INFO   : reading (2/2) starting block %3d out of %3d\n", i+1, bpr);
+  if (rank == 0) printf("INFO   : reading (2/2) starting block %3d out of %3d\n", i+1, bpr);
 
-        uint globi = rank*bpr + i;
-        int  MLi   = MrankL[globi];
-        int  MSi   = MrankS[globi];
-        //printf("DEBUG  : 2| bpr %i  MLi = %d, MSi = %d\n", i, MLi, MSi);
+  uint globi = rank*bpr + i;
+  int  MLi   = MrankL[globi];
+  int  MSi   = MrankS[globi];
+  //printf("DEBUG  : 2| bpr %i  MLi = %d, MSi = %d\n", i, MLi, MSi);
 
-        // Alloc memory for raw BED data
-        const size_t rawdata_n = size_t(MLi) * size_t(snpLenByt) * sizeof(char);
-        char* rawdata = (char*) _mm_malloc(rawdata_n, 64);  check_malloc(rawdata, __LINE__, __FILE__);
+  // Alloc memory for raw BED data
+  const size_t rawdata_n = size_t(MLi) * size_t(snpLenByt) * sizeof(char);
+  char* rawdata = (char*) _mm_malloc(rawdata_n, 64);  check_malloc(rawdata, __LINE__, __FILE__);
 
-        // Gather sizes to determine common number of reads
-        size_t rawdata_n_max = 0;
-        check_mpi(MPI_Allreduce(&rawdata_n, &rawdata_n_max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+  // Gather sizes to determine common number of reads
+  size_t rawdata_n_max = 0;
+  check_mpi(MPI_Allreduce(&rawdata_n, &rawdata_n_max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-        int NREADS = check_int_overflow(size_t(ceil(double(rawdata_n_max)/double(INT_MAX/2))), __LINE__, __FILE__);
-        if (NREADS <= 0) {
-            if (rank == 0) printf("FATAL  : NREADS must be >= 1.");
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
+  int NREADS = check_int_overflow(size_t(ceil(double(rawdata_n_max)/double(INT_MAX/2))), __LINE__, __FILE__);
+  if (NREADS <= 0) {
+  if (rank == 0) printf("FATAL  : NREADS must be >= 1.");
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-        // Compute the offset of the section to read from the BED file
-        offset = size_t(3) + size_t(MSi) * size_t(snpLenByt) * sizeof(char);
+  // Compute the offset of the section to read from the BED file
+  offset = size_t(3) + size_t(MSi) * size_t(snpLenByt) * sizeof(char);
 
-        size_t bytes = 0;
-        data.mpi_file_read_at_all<char*>(rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
+  size_t bytes = 0;
+  data.mpi_file_read_at_all<char*>(rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
-        // Alloc memory for sparse representation
-        size_t *N1S, *N1L, *N2S, *N2L, *NMS, *NML;
-        N1S = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
-        N1L = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
-        N2S = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
-        N2L = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
-        NMS = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
-        NML = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
+  // Alloc memory for sparse representation
+  size_t *N1S, *N1L, *N2S, *N2L, *NMS, *NML;
+  N1S = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
+  N1L = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
+  N2S = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
+  N2L = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
+  NMS = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
+  NML = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
 
-        size_t N1 = 0, N2 = 0, NM = 0;
-        data.sparse_data_get_sizes_from_raw(rawdata, uint(MLi), snpLenByt, N1, N2, NM);
-        //printf("DEBUG  : N1 = %15lu, N2 = %15lu, NM = %15lu\n", N1, N2, NM);
+  size_t N1 = 0, N2 = 0, NM = 0;
+  data.sparse_data_get_sizes_from_raw(rawdata, uint(MLi), snpLenByt, N1, N2, NM);
+  //printf("DEBUG  : N1 = %15lu, N2 = %15lu, NM = %15lu\n", N1, N2, NM);
 
-        // Alloc and build sparse structure
-        uint *I1, *I2, *IM;
-        I1 = (uint*) _mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
-        I2 = (uint*) _mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
-        IM = (uint*) _mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
+  // Alloc and build sparse structure
+  uint *I1, *I2, *IM;
+  I1 = (uint*) _mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
+  I2 = (uint*) _mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
+  IM = (uint*) _mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
 
-        // To check that each element is properly set
-        //for (int i=0; i<N1; i++) I1[i] = UINT_MAX;
-        //for (int i=0; i<N2; i++) I2[i] = UINT_MAX;
-        //for (int i=0; i<NM; i++) IM[i] = UINT_MAX;
+  // To check that each element is properly set
+  //for (int i=0; i<N1; i++) I1[i] = UINT_MAX;
+  //for (int i=0; i<N2; i++) I2[i] = UINT_MAX;
+  //for (int i=0; i<NM; i++) IM[i] = UINT_MAX;
         
-        data.sparse_data_fill_indices(rawdata, MLi, snpLenByt, N1S, N1L, I1,  N2S, N2L, I2,  NMS, NML, IM);
+  data.sparse_data_fill_indices(rawdata, MLi, snpLenByt, N1S, N1L, I1,  N2S, N2L, I2,  NMS, NML, IM);
    
-        //check_whole_array_was_set(I1, N1, __LINE__, __FILE__);
-        //check_whole_array_was_set(I2, N2, __LINE__, __FILE__);
-        //check_whole_array_was_set(IM, NM, __LINE__, __FILE__);
+  //check_whole_array_was_set(I1, N1, __LINE__, __FILE__);
+  //check_whole_array_was_set(I2, N2, __LINE__, __FILE__);
+  //check_whole_array_was_set(IM, NM, __LINE__, __FILE__);
 
-        // Compute the rank offset
-        size_t N1Off = 0, N2Off = 0, NMOff = 0;
-        for (int ii=0; ii<rank; ++ii) {
-            N1Off += AllN1[ii];
-            N2Off += AllN2[ii];
-            NMOff += AllNM[ii];
-        }
+  // Compute the rank offset
+  size_t N1Off = 0, N2Off = 0, NMOff = 0;
+  for (int ii=0; ii<rank; ++ii) {
+  N1Off += AllN1[ii];
+  N2Off += AllN2[ii];
+  NMOff += AllNM[ii];
+  }
 
-        N1Off += tN1;
-        N2Off += tN2;
-        NMOff += tNM;
+  N1Off += tN1;
+  N2Off += tN2;
+  NMOff += tNM;
 
-        // ss1,2,m files must contain absolute start indices!
-        for (int ii=0; ii<MLi; ++ii) {
-            N1S[ii] += N1Off;
-            N2S[ii] += N2Off;
-            NMS[ii] += NMOff;
-        }
+  // ss1,2,m files must contain absolute start indices!
+  for (int ii=0; ii<MLi; ++ii) {
+  N1S[ii] += N1Off;
+  N2S[ii] += N2Off;
+  NMS[ii] += NMOff;
+  }
 
-        size_t N1max = 0, N2max = 0, NMmax = 0;
-        check_mpi(MPI_Allreduce(&N1, &N1max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
-        check_mpi(MPI_Allreduce(&N2, &N2max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
-        check_mpi(MPI_Allreduce(&NM, &NMmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
-        int    MLimax = 0;
-        check_mpi(MPI_Allreduce(&MLi, &MLimax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
-        if (rank == 0) printf("INFO   : N1max = %lu, N2max = %lu, NMmax = %lu, MLimax = %d\n", N1max, N2max, NMmax, MLimax);
+  size_t N1max = 0, N2max = 0, NMmax = 0;
+  check_mpi(MPI_Allreduce(&N1, &N1max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+  check_mpi(MPI_Allreduce(&N2, &N2max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+  check_mpi(MPI_Allreduce(&NM, &NMmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+  int    MLimax = 0;
+  check_mpi(MPI_Allreduce(&MLi, &MLimax, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
+  if (rank == 0) printf("INFO   : N1max = %lu, N2max = %lu, NMmax = %lu, MLimax = %d\n", N1max, N2max, NMmax, MLimax);
         
-        int NREADS1   = check_int_overflow(size_t(ceil(double(N1max)/double(INT_MAX/2))),  __LINE__, __FILE__);
-        int NREADS2   = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))),  __LINE__, __FILE__);
-        int NREADSM   = check_int_overflow(size_t(ceil(double(NMmax)/double(INT_MAX/2))),  __LINE__, __FILE__);
-        int NREADSMLi = check_int_overflow(size_t(ceil(double(MLimax)/double(INT_MAX/2))), __LINE__, __FILE__);
-        if (rank == 0) printf("INFO   : NREADS1 = %d, NREADS2 = %d, NREADSM = %d, NREADSMLi = %d\n", NREADS1, NREADS2, NREADSM, NREADSMLi);
+  int NREADS1   = check_int_overflow(size_t(ceil(double(N1max)/double(INT_MAX/2))),  __LINE__, __FILE__);
+  int NREADS2   = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))),  __LINE__, __FILE__);
+  int NREADSM   = check_int_overflow(size_t(ceil(double(NMmax)/double(INT_MAX/2))),  __LINE__, __FILE__);
+  int NREADSMLi = check_int_overflow(size_t(ceil(double(MLimax)/double(INT_MAX/2))), __LINE__, __FILE__);
+  if (rank == 0) printf("INFO   : NREADS1 = %d, NREADS2 = %d, NREADSM = %d, NREADSMLi = %d\n", NREADS1, NREADS2, NREADSM, NREADSMLi);
 
-        // Sparse Ones files
-        offset = N1Off * sizeof(uint);
-        data.mpi_file_write_at_all <uint*>   (N1,  offset, si1fh, MPI_UNSIGNED,           NREADS1,   I1);
-        offset = size_t(MSi) * sizeof(size_t);
-        data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, sl1fh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, N1L);
-        data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, ss1fh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, N1S);
+  // Sparse Ones files
+  offset = N1Off * sizeof(uint);
+  data.mpi_file_write_at_all <uint*>   (N1,  offset, si1fh, MPI_UNSIGNED,           NREADS1,   I1);
+  offset = size_t(MSi) * sizeof(size_t);
+  data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, sl1fh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, N1L);
+  data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, ss1fh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, N1S);
 
-        // Sparse Twos files
-        offset = N2Off * sizeof(uint) ;
-        data.mpi_file_write_at_all <uint*>   (N2,  offset, si2fh, MPI_UNSIGNED,           NREADS2,   I2);
-        offset = size_t(MSi) * sizeof(size_t);
-        data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, sl2fh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, N2L);
-        data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, ss2fh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, N2S);
+  // Sparse Twos files
+  offset = N2Off * sizeof(uint) ;
+  data.mpi_file_write_at_all <uint*>   (N2,  offset, si2fh, MPI_UNSIGNED,           NREADS2,   I2);
+  offset = size_t(MSi) * sizeof(size_t);
+  data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, sl2fh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, N2L);
+  data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, ss2fh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, N2S);
 
-        // Sparse Missing files
-        offset = NMOff * sizeof(uint) ;
-        data.mpi_file_write_at_all <uint*>   (NM,  offset, simfh, MPI_UNSIGNED,           NREADSM,   IM);
-        offset = size_t(MSi) * sizeof(size_t);
-        data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, slmfh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, NML);
-        data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, ssmfh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, NMS);
+  // Sparse Missing files
+  offset = NMOff * sizeof(uint) ;
+  data.mpi_file_write_at_all <uint*>   (NM,  offset, simfh, MPI_UNSIGNED,           NREADSM,   IM);
+  offset = size_t(MSi) * sizeof(size_t);
+  data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, slmfh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, NML);
+  data.mpi_file_write_at_all <size_t*> (size_t(MLi), offset, ssmfh, MPI_UNSIGNED_LONG_LONG, NREADSMLi, NMS);
 
-        // Free allocated memory
-        _mm_free(rawdata);
-        _mm_free(N1S); _mm_free(N1L); _mm_free(I1);
-        _mm_free(N2S); _mm_free(N2L); _mm_free(I2);
-        _mm_free(NMS); _mm_free(NML); _mm_free(IM);
+  // Free allocated memory
+  _mm_free(rawdata);
+  _mm_free(N1S); _mm_free(N1L); _mm_free(I1);
+  _mm_free(N2S); _mm_free(N2L); _mm_free(I2);
+  _mm_free(NMS); _mm_free(NML); _mm_free(IM);
 
-        tN1 += N1;
-        tN2 += N2;
-        tNM += NM;
-    }
+  tN1 += N1;
+  tN2 += N2;
+  tNM += NM;
+  }
 
-    _mm_free(AllN1);
-    _mm_free(AllN2);
-    _mm_free(AllNM);
+  _mm_free(AllN1);
+  _mm_free(AllN2);
+  _mm_free(AllNM);
 
-    // Sync
-    MPI_Barrier(MPI_COMM_WORLD);    
+  // Sync
+  MPI_Barrier(MPI_COMM_WORLD);    
 
-    // check size of the written files!
-    check_file_size(si1fh, N1tot, sizeof(uint),   __LINE__, __FILE__);
-    check_file_size(si2fh, N2tot, sizeof(uint),   __LINE__, __FILE__);
-    check_file_size(simfh, NMtot, sizeof(uint),   __LINE__, __FILE__);
-    check_file_size(ss1fh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
-    check_file_size(ss2fh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
-    check_file_size(ssmfh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
-    check_file_size(sl1fh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
-    check_file_size(sl2fh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
-    check_file_size(slmfh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
+  // check size of the written files!
+  check_file_size(si1fh, N1tot, sizeof(uint),   __LINE__, __FILE__);
+  check_file_size(si2fh, N2tot, sizeof(uint),   __LINE__, __FILE__);
+  check_file_size(simfh, NMtot, sizeof(uint),   __LINE__, __FILE__);
+  check_file_size(ss1fh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
+  check_file_size(ss2fh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
+  check_file_size(ssmfh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
+  check_file_size(sl1fh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
+  check_file_size(sl2fh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
+  check_file_size(slmfh, Mtot,  sizeof(size_t), __LINE__, __FILE__);
 
 
-    // Close files
-    check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&dimfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&si1fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&sl1fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&ss1fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&si2fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&sl2fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&ss2fh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&simfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&slmfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&ssmfh), __LINE__, __FILE__);
+  // Close files
+  check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&dimfh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&si1fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&sl1fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&ss1fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&si2fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&sl2fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&ss2fh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&simfh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&slmfh), __LINE__, __FILE__);
+  check_mpi(MPI_File_close(&ssmfh), __LINE__, __FILE__);
 
-    // Print approximate time for the conversion
-    MPI_Barrier(MPI_COMM_WORLD);
-    const auto et2 = std::chrono::high_resolution_clock::now();
-    const auto dt2 = et2 - st2;
-    const auto du2 = std::chrono::duration_cast<std::chrono::milliseconds>(dt2).count();
-    if (rank == 0)   std::cout << "INFO   : time to convert the data: " << du2 / double(1000.0) << " seconds." << std::endl;
-}
+  // Print approximate time for the conversion
+  MPI_Barrier(MPI_COMM_WORLD);
+  const auto et2 = std::chrono::high_resolution_clock::now();
+  const auto dt2 = et2 - st2;
+  const auto du2 = std::chrono::duration_cast<std::chrono::milliseconds>(dt2).count();
+  if (rank == 0)   std::cout << "INFO   : time to convert the data: " << du2 / double(1000.0) << " seconds." << std::endl;
+  }
 */
 
 //Already defined in BayesRRm.cpp
 /*
-size_t get_file_size(const std::string& filename) {
-    struct stat st;
-    if(stat(filename.c_str(), &st) != 0) { return 0; }
-    return st.st_size;   
-}
+  size_t get_file_size(const std::string& filename) {
+  struct stat st;
+  if(stat(filename.c_str(), &st) != 0) { return 0; }
+  return st.st_size;   
+  }
 */
 
 /*
-void BayesW::mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax) {
-    if (numBlocks > 0) {
-        if (nranks != numBlocks) {
-            if (rank == 0) {
-                printf("FATAL  : block definition does not match number of tasks (%d versus %d).\n", numBlocks, nranks);
-                printf("        => Provide each task with a block definition\n");
-            }
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
+  void BayesW::mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax) {
+  if (numBlocks > 0) {
+  if (nranks != numBlocks) {
+  if (rank == 0) {
+  printf("FATAL  : block definition does not match number of tasks (%d versus %d).\n", numBlocks, nranks);
+  printf("        => Provide each task with a block definition\n");
+  }
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-        // First and last markers (continuity is garanteed from reading)
-        if (blocksStarts[0] != 1) {
-            if (rank == 0) {
-                printf("FATAL  : first marker in block definition file should be 1 but is %d\n", blocksStarts[0]);
-                printf("        => Adjust block definition file\n");
-            }
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
+  // First and last markers (continuity is garanteed from reading)
+  if (blocksStarts[0] != 1) {
+  if (rank == 0) {
+  printf("FATAL  : first marker in block definition file should be 1 but is %d\n", blocksStarts[0]);
+  printf("        => Adjust block definition file\n");
+  }
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-        if (blocksEnds[numBlocks-1] != Mtot) {
-            if (rank == 0) {
-                printf("FATAL  : last marker in block definition file should be Mtot = %d whereas is %d\n", Mtot, blocksEnds[numBlocks-1]+1);
-                printf("        => Adjust block definition file\n");
-            }
-            MPI_Abort(MPI_COMM_WORLD, 1);
-        }
+  if (blocksEnds[numBlocks-1] != Mtot) {
+  if (rank == 0) {
+  printf("FATAL  : last marker in block definition file should be Mtot = %d whereas is %d\n", Mtot, blocksEnds[numBlocks-1]+1);
+  printf("        => Adjust block definition file\n");
+  }
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-        // Assign to MrankS and MrankL to catch up on logic
-        for (int i=0; i<numBlocks; ++i) {
-            MrankS[i] = blocksStarts[i] - 1;                  // starts from 0, not 1
-            MrankL[i] = blocksEnds[i] - blocksStarts[i] + 1;  // compute length
-        }
+  // Assign to MrankS and MrankL to catch up on logic
+  for (int i=0; i<numBlocks; ++i) {
+  MrankS[i] = blocksStarts[i] - 1;                  // starts from 0, not 1
+  MrankL[i] = blocksEnds[i] - blocksStarts[i] + 1;  // compute length
+  }
 
-    } else {
-        //if (rank == 0)
-        //    printf("INFO   : no marker block definition file used. Will go for even distribution over tasks.\n");
-        mpi_define_blocks_of_markers(Mtot, MrankS, MrankL, nranks);
-    }
+  } else {
+  //if (rank == 0)
+  //    printf("INFO   : no marker block definition file used. Will go for even distribution over tasks.\n");
+  mpi_define_blocks_of_markers(Mtot, MrankS, MrankL, nranks);
+  }
 
-    lmax = 0, lmin = 1E9;
-    for (int i=0; i<nranks; ++i) {
-        if (MrankL[i]>lmax) lmax = MrankL[i];
-        if (MrankL[i]<lmin) lmin = MrankL[i];
-    }
-}
+  lmax = 0, lmin = 1E9;
+  for (int i=0; i<nranks; ++i) {
+  if (MrankL[i]>lmax) lmax = MrankL[i];
+  if (MrankL[i]<lmin) lmin = MrankL[i];
+  }
+  }
 */
 
 /* Function to check if ARS resulted with error*/
@@ -915,7 +915,7 @@ inline double alpha_dens(double x, void *norm_data)
 	/* In C++ we need to do a static cast for the void data */
 	pars_alpha p = *(static_cast<pars_alpha *>(norm_data));
 	y = (p.alpha_0 + p.d - 1) * log(x) + x * ((p.epsilon.array() * p.failure_vector.array()).sum() - p.kappa_0) -
-			((p.epsilon * x).array() - EuMasc).exp().sum() ;
+        ((p.epsilon * x).array() - EuMasc).exp().sum() ;
 	return y;
 };
 
@@ -928,8 +928,8 @@ inline double beta_dens(double x, void *norm_data)
 	pars_beta_sparse p = *(static_cast<pars_beta_sparse *>(norm_data));
 
 	y = -p.alpha * x * p.sum_failure -
-			exp(p.alpha*x*p.mean_sd_ratio)* (p.vi_0 + p.vi_1 * exp(-p.alpha*x/p.sd) + p.vi_2 * exp(-2*p.alpha*x/p.sd))
-			-x * x / (2 * p.mixture_classes(p.used_mixture) * p.sigma_b) ;
+        exp(p.alpha*x*p.mean_sd_ratio)* (p.vi_0 + p.vi_1 * exp(-p.alpha*x/p.sd) + p.vi_2 * exp(-2*p.alpha*x/p.sd))
+        -x * x / (2 * p.mixture_classes(p.used_mixture) * p.sigma_b) ;
 	return y;
 };
 
@@ -938,12 +938,12 @@ inline double beta_dens(double x, void *norm_data)
 
 //The function for integration
 inline double gh_integrand_adaptive(double s,double alpha, double dj, double sqrt_2Ck_sigmab,
-		double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio){
+                                    double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio){
 	//vi is a vector of exp(vi)
 	double temp = -alpha *s*dj*sqrt_2Ck_sigmab +
-			vi_sum - exp(alpha*mean_sd_ratio*s*sqrt_2Ck_sigmab) *
-			(vi_0 + vi_1 * exp(-alpha * s*sqrt_2Ck_sigmab/sd) + vi_2* exp(-2 * alpha * s*sqrt_2Ck_sigmab/sd))
-			-pow(s,2);
+        vi_sum - exp(alpha*mean_sd_ratio*s*sqrt_2Ck_sigmab) *
+        (vi_0 + vi_1 * exp(-alpha * s*sqrt_2Ck_sigmab/sd) + vi_2* exp(-2 * alpha * s*sqrt_2Ck_sigmab/sd))
+        -pow(s,2);
 	return exp(temp);
 }
 
@@ -951,7 +951,7 @@ inline double gh_integrand_adaptive(double s,double alpha, double dj, double sqr
 //Calculate the value of the integral using Adaptive Gauss-Hermite quadrature
 //Let's assume that mu is always 0 for speed
 double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0,
-		double mean, double sd, double mean_sd_ratio){
+                                               double mean, double sd, double mean_sd_ratio){
 
 	double temp = 0;
 	double sqrt_2ck_sigma = sqrt(2*used_data.mixture_classes(k)*used_data_beta.sigma_b);
@@ -972,10 +972,10 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 		x2 = sigma*x2;
 
 		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-				vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-						w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-								vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-								w3;
+                                           vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3;
 	}
 	// n=5
 	else if(n == "5"){
@@ -1002,14 +1002,14 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 		//x5 = sigma*x5;
 
 		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-				vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-						w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-								vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-								w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-										vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-										w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-												vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-												w5 ;//* gh_integrand_adaptive(x5,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j); // This part is just 1
+                                           vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w5 ;//* gh_integrand_adaptive(x5,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j); // This part is just 1
 	}else if(n == "7"){
 		double x1,x2,x3,x4,x5,x6;
 		double w1,w2,w3,w4,w5,w6,w7; //These are adjusted weights
@@ -1039,18 +1039,18 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 		x6 = sigma*x6;
 
 		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-				vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-						w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-								vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-								w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-										vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-										w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-												vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-												w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-														vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-														w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-																vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-																w7;
+                                           vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
+                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w7;
 	}else if(n == "9"){
 		double x1,x2,x3,x4,x5,x6,x7,x8,x9;//,x11;
 		double w1,w2,w3,w4,w5,w6,w7,w8,w9; //These are adjusted weights
@@ -1075,7 +1075,7 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 		w7 = 0.73030245274509;
 		w8 = w7;
 
-	//	x9 = 0;
+        //	x9 = 0;
 		w9 = 0.72023521560605;
 
 		x1 = sigma*x1;
@@ -1088,14 +1088,14 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 		x8 = sigma*x8;
 
 		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w9 ;//* gh_integrand_adaptive(x9,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w9 ;//* gh_integrand_adaptive(x9,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 	}else if(n == "11"){
 		double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10;//,x11;
 		double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11; //These are adjusted weights
@@ -1141,16 +1141,16 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 		//	x11 = sigma*x11;
 
 		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w11 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w11 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 	}else if(n == "13"){
 		double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12;
 		double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13; //These are adjusted weights
@@ -1203,18 +1203,18 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 
 
 		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w13 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w13 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 	}else if(n == "15"){
 		double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14;//,x11;
 		double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15; //These are adjusted weights
@@ -1273,20 +1273,20 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 		x14 = sigma*x14;
 
 		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-				w15 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w15 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 	}else{
 		cout << "Possible number of quad_points = 3,5,7,9,11,13,15" << endl;
 		exit(1);
@@ -1298,14 +1298,14 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 
 //Pass the vector post_marginals of marginal likelihoods by reference
 void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n,
-		double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio){
+                                          double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio){
 	double exp_sum = (vi_1 * (1 - 2 * mean) + 4 * (1-mean) * vi_2 + vi_sum * mean * mean) /(sd*sd) ;
 
 	for(int i=0; i < used_data_beta.mixture_classes.size(); i++){
 		//Calculate the sigma for the adaptive G-H
 		double sigma = 1.0/sqrt(1 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigma_b * used_data_beta.mixture_classes(i) * exp_sum);
 		post_marginals(i+1) = prior_prob(i+1) * gauss_hermite_adaptive_integral(i, sigma, n, vi_sum,  vi_2,  vi_1,  vi_0,
-				mean, sd, mean_sd_ratio);
+                                                                                mean, sd, mean_sd_ratio);
 	}
 }
 
@@ -1332,7 +1332,7 @@ void BayesW::sampleTheta(int fix_i){
 
 	// Sample using ARS
 	err = arms(xinit,ninit,&xl,&xr,theta_dens,&used_data,&convex,
-			npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+               npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
 	errorCheck(err);
 
 	theta(fix_i) = xsamp[0];  // Save the new result
@@ -1435,19 +1435,19 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 
 	// Reading the Xj*failure sum in sparse format:
 	/*for(int marker=0; marker < markerCount; marker++){
-		std::vector<int> oneIndices = data.Zones[marker]; //Take the vector of indices
-		std::vector<int> twoIndices = data.Ztwos[marker]; //Take the vector of indices
+      std::vector<int> oneIndices = data.Zones[marker]; //Take the vector of indices
+      std::vector<int> twoIndices = data.Ztwos[marker]; //Take the vector of indices
 
-		int temp_sum = 0;
-		for(int i=0; i < oneIndices.size(); i++){
-			temp_sum += used_data_alpha.failure_vector(oneIndices[i]);
-		}
-		for(int i=0; i < twoIndices.size(); i++){
-			temp_sum += 2*used_data_alpha.failure_vector(twoIndices[i]);
-		}
+      int temp_sum = 0;
+      for(int i=0; i < oneIndices.size(); i++){
+      temp_sum += used_data_alpha.failure_vector(oneIndices[i]);
+      }
+      for(int i=0; i < twoIndices.size(); i++){
+      temp_sum += 2*used_data_alpha.failure_vector(twoIndices[i]);
+      }
 
-		sum_failure(marker) = (temp_sum - data.means(marker) * used_data_alpha.failure_vector.array().sum()) / data.sds(marker);
-	}*/
+      sum_failure(marker) = (temp_sum - data.means(marker) * used_data_alpha.failure_vector.array().sum()) / data.sds(marker);
+      }*/
 
 	//If there are fixed effects, find the same values for them
 	if(fixedCount > 0){
@@ -1559,7 +1559,7 @@ int BayesW::runMpiGibbs_bW() {
     std::vector<unsigned int> xI(data.X.cols());
     std::iota(xI.begin(), xI.end(), 0);
 
-//Deleted the restart part
+    //Deleted the restart part
         
     //    dist.reset_rng((uint)(opt.seed + rank*1000));
 
@@ -1678,37 +1678,37 @@ int BayesW::runMpiGibbs_bW() {
 
     double tmp0, tmp1, tmp2;
     for (int i=0; i<M; ++i) {
-	// For now use the old way to compute means
+        // For now use the old way to compute means
         mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
-//Old method for calculating mean
-//        mave[i] = data.means(i);
+        //Old method for calculating mean
+        //        mave[i] = data.means(i);
 
-	tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
+        tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
         tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
         tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
         //TODO At some point we need to turn sd to 1/sd for speed
-	//mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
+        //mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
         mstd[i] = sqrt( (tmp0+tmp1+tmp2)/double(Ntot - 1));
 
-	// Old sd
-	//mstd[i] = data.sds(i);
+        // Old sd
+        //mstd[i] = data.sds(i);
         //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
 
-        // Reading the Xj*failure sum in sparse format:
-        for(int marker=0; marker < Mtot; marker++){
-                int temp_sum = 0;
+    // Reading the Xj*failure sum in sparse format:
+    for(int marker=0; marker < Mtot; marker++){
+        int temp_sum = 0;
 		for(int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
-                //for(int i=0; i < oneIndices.size(); i++){
-                        temp_sum += used_data_alpha.failure_vector(I1[i]);
-                }
-                for(int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
-	        //for(int i=0; i < twoIndices.size(); i++){
-                        temp_sum += 2*used_data_alpha.failure_vector(I2[i]);
-                }
-
-                sum_failure(marker) = (temp_sum - mave[marker] * used_data_alpha.failure_vector.array().sum()) / mstd[marker];
+            //for(int i=0; i < oneIndices.size(); i++){
+            temp_sum += used_data_alpha.failure_vector(I1[i]);
         }
+        for(int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+	        //for(int i=0; i < twoIndices.size(); i++){
+            temp_sum += 2*used_data_alpha.failure_vector(I2[i]);
+        }
+
+        sum_failure(marker) = (temp_sum - mave[marker] * used_data_alpha.failure_vector.array().sum()) / mstd[marker];
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
     const auto et2 = std::chrono::high_resolution_clock::now();
@@ -1780,17 +1780,18 @@ int BayesW::runMpiGibbs_bW() {
         stats_dis  = (int*)    _mm_malloc(size_t(nranks)     * sizeof(int),    64);  check_malloc(stats_dis,  __LINE__, __FILE__);
     }
 
-   //Set iteration_start=0
+    //Set iteration_start=0
     for (uint iteration=0; iteration<opt.chainLength; iteration++) {
+
         double start_it = MPI_Wtime();
         double it_sync_ar1  = 0.0;
         double it_sync_ar2  = 0.0;
         int    it_nsync_ar1 = 0;
         int    it_nsync_ar2 = 0;
 
-	/* 1. Intercept (mu) */
- 	//Removed sampleMu function on its own 
-	int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
+        /* 1. Intercept (mu) */
+        //Removed sampleMu function on its own 
+        int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
         int neval;
         double xsamp[0], xcent[10], qcent[10] = {5., 30., 70., 95.};
         double convex = 1.0;
@@ -1803,33 +1804,34 @@ int BayesW::runMpiGibbs_bW() {
         double xr = 5;   //xl and xr and the maximum and minimum values between which we sample
 	
 
-	//Update before sampling
-	for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
-		(used_data.epsilon)[mu_ind] = epsilon[mu_ind] + mu;// we add to epsilon =Y+mu-X*beta
-	}
+        //Update before sampling
+        for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
+            (used_data.epsilon)[mu_ind] = epsilon[mu_ind] + mu;// we add to epsilon =Y+mu-X*beta
+        }
+
         // Use ARS to sample mu (with density mu_dens, using parameters from used_data)
         err = arms(xinit,ninit,&xl,&xr,mu_dens,&used_data,&convex,
-                        npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+                   npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
 
         errorCheck(err); // If there is error, stop the program
         mu = xsamp[0];   // Save the sampled value
         //Update after sampling
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
-                epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
+            epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
 
-////////// End sampling mu
+        ////////// End sampling mu
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
         //------------------------------------------------------------------------
         
-	// Calculate the vector of exponent of the adjusted residuals
-	for(int i=0; i<Ntot; ++i){
-		vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
-	}
-	if (opt.shuffleMarkers) {
+        // Calculate the vector of exponent of the adjusted residuals
+        for(int i=0; i<Ntot; ++i){
+            vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
+        }
+        if (opt.shuffleMarkers) {
             std::shuffle(markerI.begin(), markerI.end(), dist.rng);
-	}
+        }
         m0 = 0.0;
         v.setOnes();
 
@@ -1838,149 +1840,155 @@ int BayesW::runMpiGibbs_bW() {
         double cumSumDeltaBetas = 0.0;
         double task_sum_abs_deltabeta = 0.0;
         int    sinceLastSync    = 0;
+     	
+        // First element for the marginal likelihoods is always is pi_0 *sqrt(pi) for
+        marginal_likelihoods(0) = pi_L(0) * sqrtPI;  
 
         // Loop over (shuffled) markers
         // ----------------------------
-     	
-	// First element for the marginal likelihoods is always is pi_0 *sqrt(pi) for
-	marginal_likelihoods(0) = pi_L(0) * sqrtPI;  
-	for (int j = 0; j < lmax; j++) {
-	    sinceLastSync += 1; 
+        for (int j = 0; j < lmax; j++) {
+
+            sinceLastSync += 1; 
+
             if (j < M) {
+            
                 marker  = markerI[j];
                 beta =  Beta(marker);
 
-/////////////////////////////////////////////////////////
-	//Replace the sampleBeta function with the inside of the function        
-        double vi_sum = 0.0;
-        double vi_1 = 0.0;
-        double vi_2 = 0.0;
+                /////////////////////////////////////////////////////////
+                //Replace the sampleBeta function with the inside of the function        
+                double vi_sum = 0.0;
+                double vi_1 = 0.0;
+                double vi_2 = 0.0;
 
-        //Change the residual vector only if the previous beta was non-zero
-        if(Beta(marker) != 0){
+                //Change the residual vector only if the previous beta was non-zero
+                if(Beta(marker) != 0){
 
-                /*for(int i=0; i<Ntot; ++i){
-                        tmpEps_vi[i] = epsilon[i] - data.mean_sd_ratio(marker) * Beta(marker);
-                 }
-		//And adjust even further for specific 1 and 2 allele values
-                for(int i=0; i < data.Zones[marker].size(); i++){
-                	tmpEps_vi[data.Zones[marker][i]] += Beta(marker)/mstd[marker];
-                }
-                for(int i=0; i < data.Ztwos[marker].size(); i++){
-                        tmpEps_vi[data.Ztwos[marker][i]] += 2*Beta(marker)/mstd[marker];
-                } */
+                    /*for(int i=0; i<Ntot; ++i){
+                      tmpEps_vi[i] = epsilon[i] - data.mean_sd_ratio(marker) * Beta(marker);
+                      }
+                      //And adjust even further for specific 1 and 2 allele values
+                      for(int i=0; i < data.Zones[marker].size(); i++){
+                      tmpEps_vi[data.Zones[marker][i]] += Beta(marker)/mstd[marker];
+                      }
+                      for(int i=0; i < data.Ztwos[marker].size(); i++){
+                      tmpEps_vi[data.Ztwos[marker][i]] += 2*Beta(marker)/mstd[marker];
+                      } */
 
-		//Calculate the change in epsilon if we remove the previous marker effect (-Beta(marker))
+                    //Calculate the change in epsilon if we remove the previous marker effect (-Beta(marker))
 		
-		set_vector_f64(tmp_deltaEps, 0.0, Ntot);
-		sparse_scaadd(tmp_deltaEps, Beta(marker),
-                                      I1, N1S[marker], N1L[marker],
-                                      I2, N2S[marker], N2L[marker],
-                                      IM, NMS[marker], NML[marker],
-                                      mave[marker], 1/mstd[marker] , Ntot);
-        	//Create the temporary vector to store the vector without the last Beta(marker)
-                sum_vectors_f64(tmpEps_vi, epsilon, tmp_deltaEps,  Ntot);
+                    set_vector_f64(tmp_deltaEps, 0.0, Ntot);
+                    sparse_scaadd(tmp_deltaEps, Beta(marker),
+                                  I1, N1S[marker], N1L[marker],
+                                  I2, N2S[marker], N2L[marker],
+                                  IM, NMS[marker], NML[marker],
+                                  mave[marker], 1/mstd[marker] , Ntot);
+                    //Create the temporary vector to store the vector without the last Beta(marker)
+                    sum_vectors_f64(tmpEps_vi, epsilon, tmp_deltaEps,  Ntot);
 
-	        //Also find the transformed residuals
-		for(int i=0; i<Ntot; ++i){
+                    //Also find the transformed residuals
+                    for(int i=0; i<Ntot; ++i){
                         tmp_vi[i] = exp(used_data.alpha * tmpEps_vi[i] - EuMasc);
                         vi_sum += tmp_vi[i];
-		}
+                    }
 
-	        for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
-//                for (int i=0; i < data.Zones[marker].size(); i++){
-			vi_2 += tmp_vi[I2[i]];
-          	      //vi_2 += tmp_vi[data.Ztwos[marker][i]];
-        	}
-//        	for (int i=0; i < data.Zones[marker].size(); i++){
-                for (int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
+                    for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+                        //                for (int i=0; i < data.Zones[marker].size(); i++){
+                        vi_2 += tmp_vi[I2[i]];
+                        //vi_2 += tmp_vi[data.Ztwos[marker][i]];
+                    }
+                    //        	for (int i=0; i < data.Zones[marker].size(); i++){
+                    for (int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
                         vi_1 += tmp_vi[I1[i]];
-                	//vi_1 += tmp_vi[data.Zones[marker][i]];
-        	}
-        }else{
-		// Calculate the sums of vi elements
-        	for (int i=0; i < Ntot; i++){
-                	vi_sum += vi[i];
-        	}
-//        	for (int i=0; i < data.Ztwos[marker].size(); i++){
-                for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
-//		       	vi_2 += vi[data.Ztwos[marker][i]];
+                        //vi_1 += tmp_vi[data.Zones[marker][i]];
+                    }
+                }else{
+                    // Calculate the sums of vi elements
+                    for (int i=0; i < Ntot; i++){
+                        vi_sum += vi[i];
+                    }
+                    //        	for (int i=0; i < data.Ztwos[marker].size(); i++){
+                    for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+                        //		       	vi_2 += vi[data.Ztwos[marker][i]];
                         vi_2 += vi[I2[i]];
-        	}
-//        	for (int i=0; i < data.Zones[marker].size(); i++){
-                for (int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
-//                        vi_1 += vi[data.Zones[marker][i]];
+                    }
+                    //        	for (int i=0; i < data.Zones[marker].size(); i++){
+                    for (int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
+                        //                        vi_1 += vi[data.Zones[marker][i]];
                         vi_1 += vi[I1[i]];
-        	}
+                    }
 
-	}
+                }
 
-        double vi_0 = vi_sum - vi_1 - vi_2;
+                double vi_0 = vi_sum - vi_1 - vi_2;
 
-        /* Calculate the mixture probability */
-        double p = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)    
+                /* Calculate the mixture probability */
+                double p = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)    
   
-	// Calculate the (ratios of) marginal likelihoods
-        marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0, mave[marker],mstd[marker], mave[marker]/mstd[marker]);
-        // Calculate the probability that marker is 0
-        double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
-        //Loop through the possible mixture classes
-        for (int k = 0; k < K; k++) {
-                if (p <= acum) {
+                // Calculate the (ratios of) marginal likelihoods
+                marginal_likelihood_vec_calc(pi_L, marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
+                                             mave[marker],mstd[marker], mave[marker]/mstd[marker]);
+
+                // Calculate the probability that marker is 0
+                double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
+
+                //Loop through the possible mixture classes
+                for (int k = 0; k < K; k++) {
+                    if (p <= acum) {
                         //if zeroth component
                         if (k == 0) {
-                                Beta(marker) = 0;
-                                v[k] += 1.0;
-                                components[marker] = k;
+                            Beta(marker) = 0;
+                            v[k] += 1.0;
+                            components[marker] = k;
                         }
                         // If is not 0th component then sample using ARS
                         else {
-		 		used_data_beta.sum_failure = sum_failure(marker);
-				used_data_beta.mean = mave[marker];
-        			used_data_beta.sd = mstd[marker];
-        			used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
-                                used_data_beta.used_mixture = k-1;
+                            used_data_beta.sum_failure = sum_failure(marker);
+                            used_data_beta.mean = mave[marker];
+                            used_data_beta.sd = mstd[marker];
+                            used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
+                            used_data_beta.used_mixture = k-1;
 
-                                used_data_beta.vi_0 = vi_0;
-                                used_data_beta.vi_1 = vi_1;
-                                used_data_beta.vi_2 = vi_2;
+                            used_data_beta.vi_0 = vi_0;
+                            used_data_beta.vi_1 = vi_1;
+                            used_data_beta.vi_2 = vi_2;
 
-                                double safe_limit = 2 * sqrt(used_data_beta.sigma_b * used_data_beta.mixture_classes(k-1));
+                            double safe_limit = 2 * sqrt(used_data_beta.sigma_b * used_data_beta.mixture_classes(k-1));
 
-                                // ARS parameters
-       				 neval = 0;
-			         xsamp[0] = 0;
-			         convex = 1.0;
-        			 dometrop = 0;
-			         xprev = 0.0;
-			         xinit[0] = Beta(marker) - safe_limit/10;     // Initial abscissae
-			         xinit[1] = Beta(marker);
-			         xinit[2] = Beta(marker) + safe_limit/20;
-        			 xinit[3] = Beta(marker) + safe_limit/10;
+                            // ARS parameters
+                            neval = 0;
+                            xsamp[0] = 0;
+                            convex = 1.0;
+                            dometrop = 0;
+                            xprev = 0.0;
+                            xinit[0] = Beta(marker) - safe_limit/10;     // Initial abscissae
+                            xinit[1] = Beta(marker);
+                            xinit[2] = Beta(marker) + safe_limit/20;
+                            xinit[3] = Beta(marker) + safe_limit/10;
    			        
-				// Initial left and right (pseudo) extremes
+                            // Initial left and right (pseudo) extremes
 
-                                xl = Beta(marker) - safe_limit  ; //Construct the hull around previous beta value
-                                xr = Beta(marker) + safe_limit;
-                                // Sample using ARS
-                                err = arms(xinit,ninit,&xl,&xr,beta_dens,&used_data_beta,&convex,
-                                                npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+                            xl = Beta(marker) - safe_limit  ; //Construct the hull around previous beta value
+                            xr = Beta(marker) + safe_limit;
+                            // Sample using ARS
+                            err = arms(xinit,ninit,&xl,&xr,beta_dens,&used_data_beta,&convex,
+                                       npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
 	                        errorCheck(err);
 
-                                Beta(marker) = xsamp[0];  // Save the new result
+                            Beta(marker) = xsamp[0];  // Save the new result
  
-                                v[k] += 1.0;
-                                components[marker] = k;
+                            v[k] += 1.0;
+                            components[marker] = k;
                         }
                         break;
-                } else {
+                    } else {
                         if((k+1) == (K-1)){
-                                acum = 1; // In the end probability will be 1
+                            acum = 1; // In the end probability will be 1
                         }else{
-                                acum += marginal_likelihoods(k+1)/marginal_likelihoods.sum();
+                            acum += marginal_likelihoods(k+1)/marginal_likelihoods.sum();
                         }
+                    }
                 }
-        }
 
                 betaOld   = beta;
                 beta      = Beta(marker);
@@ -2007,7 +2015,7 @@ int BayesW::runMpiGibbs_bW() {
                         sum_vectors_f64(dEpsSum, deltaEps, Ntot);
                     }
                 }	
-}
+            }
 
                         
 
@@ -2040,7 +2048,7 @@ int BayesW::runMpiGibbs_bW() {
             }
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
 
- //         if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
+            //         if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
             if ( cumSumDeltaBetas != 0.0 && (sinceLastSync >= opt.syncRate || j == lmax-1)) {
 
                 // Update local copy of epsilon
@@ -2194,35 +2202,35 @@ int BayesW::runMpiGibbs_bW() {
                     it_nsync_ar2  += 1;    
 
                 } else { // case nranks == 1    
-                     if(opt.deltaUpdate == true){
-			sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
- 		     }else{	
-			for(int i=0; i < Ntot; i++){
-		                        epsilon[i] = epsilon[i] -  betaOld * mave[marker]/mstd[marker];
-                                        epsilon[i] = epsilon[i] + beta * mave[marker]/mstd[marker];
-                                }
-                                //And adjust even further for specific 1 and 2 allele values
-                              //  for(int i=0; i < data.Zones[marker].size(); i++){
+                    if(opt.deltaUpdate == true){
+                        sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
+                    }else{	
+                        for(int i=0; i < Ntot; i++){
+                            epsilon[i] = epsilon[i] -  betaOld * mave[marker]/mstd[marker];
+                            epsilon[i] = epsilon[i] + beta * mave[marker]/mstd[marker];
+                        }
+                        //And adjust even further for specific 1 and 2 allele values
+                        //  for(int i=0; i < data.Zones[marker].size(); i++){
 		                for (int i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
-                                        //epsilon[data.Zones[marker][i]] += betaOld/mstd[marker];
-                                        //epsilon[data.Zones[marker][i]] -= beta/mstd[marker];
-                                        epsilon[I1[i]] += betaOld/mstd[marker];
-					epsilon[I1[i]] += betaOld/mstd[marker];
-                                }
-                            //    for(int i=0; i < data.Ztwos[marker].size(); i++){
-                                for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
-                                        //epsilon[data.Ztwos[marker][i]] += 2*betaOld/mstd[marker];
-					//epsilon[data.Ztwos[marker][i]] -= 2*beta/mstd[marker];
-					epsilon[I2[i]] += 2*betaOld/mstd[marker];
-                                        epsilon[I2[i]] -= 2*beta/mstd[marker];
-                                }
-			}
-		}
+                            //epsilon[data.Zones[marker][i]] += betaOld/mstd[marker];
+                            //epsilon[data.Zones[marker][i]] -= beta/mstd[marker];
+                            epsilon[I1[i]] += betaOld/mstd[marker];
+                            epsilon[I1[i]] += betaOld/mstd[marker];
+                        }
+                        //    for(int i=0; i < data.Ztwos[marker].size(); i++){
+                        for (int i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+                            //epsilon[data.Ztwos[marker][i]] += 2*betaOld/mstd[marker];
+                            //epsilon[data.Ztwos[marker][i]] -= 2*beta/mstd[marker];
+                            epsilon[I2[i]] += 2*betaOld/mstd[marker];
+                            epsilon[I2[i]] -= 2*beta/mstd[marker];
+                        }
+                    }
+                }
    
-		// Do a update currently locally for vi vector
-		for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
-			vi[vi_ind] = exp(used_data.alpha * epsilon[vi_ind] - EuMasc);
-		}
+                // Do a update currently locally for vi vector
+                for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
+                    vi[vi_ind] = exp(used_data.alpha * epsilon[vi_ind] - EuMasc);
+                }
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
                 
@@ -2240,7 +2248,7 @@ int BayesW::runMpiGibbs_bW() {
                 
             }// else {
              //   sinceLastSync += 1;
-                //task_sum_abs_deltabeta += fabs(deltaBeta);
+            //task_sum_abs_deltabeta += fabs(deltaBeta);
             //}
 
         } // END PROCESSING OF ALL MARKERS
@@ -2266,9 +2274,9 @@ int BayesW::runMpiGibbs_bW() {
         // ------------------------
         m0      = double(Mtot) - v[0];
 
-	// ARS parameters
+        // ARS parameters
         neval = 0;
-	xsamp[0] = 0;
+        xsamp[0] = 0;
         convex = 1.0;
         dometrop = 0;
         xprev = 0.0;
@@ -2276,7 +2284,7 @@ int BayesW::runMpiGibbs_bW() {
         xinit[1] =  used_data.alpha;
         xinit[2] = (used_data.alpha)*1.15;
         xinit[3] = (used_data.alpha)*1.5; 
-	// double *p_xinit = xinit;
+        // double *p_xinit = xinit;
 
         // Initial left and right (pseudo) extremes
         xl = 0.0;
@@ -2285,51 +2293,51 @@ int BayesW::runMpiGibbs_bW() {
         //Give the residual to alpha structure
         //used_data_alpha.epsilon = epsilon;
         for(int alpha_ind=0; alpha_ind < Ntot; alpha_ind++){
-                (used_data_alpha.epsilon)[alpha_ind] = epsilon[alpha_ind];
+            (used_data_alpha.epsilon)[alpha_ind] = epsilon[alpha_ind];
         }
 
         //Sample using ARS
         err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
-                        npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+                   npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
         errorCheck(err);
 
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-	used_data.alpha = xsamp[0];
+        used_data.alpha = xsamp[0];
         used_data_beta.alpha = xsamp[0];
  
         MPI_Barrier(MPI_COMM_WORLD);
 
-	// 4. Sample sigma_b
-	used_data_beta.sigma_b = dist.inv_gamma_rng((double) (used_data.alpha_sigma + 0.5 * (M - v[0]+1)),
-	(double)(used_data.beta_sigma + 0.5 * (M - v[0]+1) * Beta.squaredNorm()));
+        // 4. Sample sigma_b
+        used_data_beta.sigma_b = dist.inv_gamma_rng((double) (used_data.alpha_sigma + 0.5 * (M - v[0]+1)),
+                                                    (double)(used_data.beta_sigma + 0.5 * (M - v[0]+1) * Beta.squaredNorm()));
         check_mpi(MPI_Bcast(&(used_data_beta.sigma_b), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
 
-	//Update the sqrt(2sigmab) variable
-	used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
-	//Print results
+        //Update the sqrt(2sigmab) variable
+        used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
+        //Print results
         cout << iteration << ". " << Mtot - v[0] +1 <<"; " <<"; "<< setprecision(17) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigma_b << endl;
 	
-	// 5. Sample prior mixture component probability from Dirichlet distribution
-	pi_L = dist.dirichilet_rng(v.array());
-	check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        // 5. Sample prior mixture component probability from Dirichlet distribution
+        pi_L = dist.dirichilet_rng(v.array());
+        check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
-  /*      if (rank%10==0) {
-            printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f (%9.3f + %9.3f), n_sync = %8d (%8d + %8d) (%7.3f / %7.3f), sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n",
-                   iteration, rank, end_it-start_it,
-                   it_sync_ar1  + it_sync_ar2,  it_sync_ar1,  it_sync_ar2,
-                   it_nsync_ar1 + it_nsync_ar2, it_nsync_ar1, it_nsync_ar2,
-                   (it_sync_ar1) / double(it_nsync_ar1) * 1000.0,
-                   (it_sync_ar2) / double(it_nsync_ar2) * 1000.0,
-                   sigmaG, sigmaE, beta_squaredNorm, int(m0));
-            fflush(stdout);
-        }*/
+        /*      if (rank%10==0) {
+                printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f (%9.3f + %9.3f), n_sync = %8d (%8d + %8d) (%7.3f / %7.3f), sigmaG = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %10d\n",
+                iteration, rank, end_it-start_it,
+                it_sync_ar1  + it_sync_ar2,  it_sync_ar1,  it_sync_ar2,
+                it_nsync_ar1 + it_nsync_ar2, it_nsync_ar1, it_nsync_ar2,
+                (it_sync_ar1) / double(it_nsync_ar1) * 1000.0,
+                (it_sync_ar2) / double(it_nsync_ar2) * 1000.0,
+                sigmaG, sigmaE, beta_squaredNorm, int(m0));
+                fflush(stdout);
+                }*/
  
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
         //printf("inv scaled parameters %20.15f __ %20.15f\n", v0G+m0, (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
@@ -2351,7 +2359,7 @@ int BayesW::runMpiGibbs_bW() {
             assert(left > 0);
 
             offset = (size_t(n_thinned_saved) * size_t(nranks) + size_t(rank)) * strlen(buff);
-	    check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
 
             // Write iteration number
             if (rank == 0) {
@@ -2366,7 +2374,7 @@ int BayesW::runMpiGibbs_bW() {
                 + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double))
                 + size_t(MrankS[rank]) * sizeof(double);
             check_mpi(MPI_File_write_at_all(betfh, betoff, Beta.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
-    //        check_mpi(MPI_File_write_at_all(acufh, betoff, Acum.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
+            //        check_mpi(MPI_File_write_at_all(acufh, betoff, Acum.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
 
             cpnoff = sizeof(uint) + sizeof(uint)
                 + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int))
@@ -2405,7 +2413,7 @@ int BayesW::runMpiGibbs_bW() {
             check_mpi(MPI_File_write_at(mrkfh, epsoff, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             epsoff += sizeof(uint);
  
-           check_mpi(MPI_File_write_at(epsfh, epsoff, &Ntot,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(epsfh, epsoff, &Ntot,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             check_mpi(MPI_File_write_at(mrkfh, epsoff, &M,            1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             epsoff = sizeof(uint) + sizeof(uint);
             check_mpi(MPI_File_write_at(epsfh, epsoff, epsilon,        Ntot,           MPI_DOUBLE, &status), __LINE__, __FILE__);
@@ -2512,98 +2520,98 @@ int BayesW::runMpiGibbs_bW() {
 // Get directory and basename of bed file (passed with no extension via command line)
 // ----------------------------------------------------------------------------------
 /*
-string BayesW::mpi_get_sparse_output_filebase(const int rank) {
+  string BayesW::mpi_get_sparse_output_filebase(const int rank) {
 
-    std::string dir, bsn;
+  std::string dir, bsn;
 
-    if (opt.sparseDir.length() > 0) {
-        // Make sure the requested output directory exists
-        struct stat stats;
-        stat(opt.sparseDir.c_str(), &stats);
-        if (!S_ISDIR(stats.st_mode)) { 
-            if (rank == 0)
-                printf("Fatal: requested directory for sparse output (%s) not found. Must be an existing directory (line %d in %s).\n", opt.sparseDir.c_str(), __LINE__, __FILE__);
-            MPI_Abort(MPI_COMM_WORLD, 1); }
-        dir = string(opt.sparseDir);
-    } else {
-        char *cstr = new char[opt.bedFile.length() + 1];
-        strcpy(cstr, opt.bedFile.c_str());
-        dir = string(dirname(cstr));
-    }
+  if (opt.sparseDir.length() > 0) {
+  // Make sure the requested output directory exists
+  struct stat stats;
+  stat(opt.sparseDir.c_str(), &stats);
+  if (!S_ISDIR(stats.st_mode)) { 
+  if (rank == 0)
+  printf("Fatal: requested directory for sparse output (%s) not found. Must be an existing directory (line %d in %s).\n", opt.sparseDir.c_str(), __LINE__, __FILE__);
+  MPI_Abort(MPI_COMM_WORLD, 1); }
+  dir = string(opt.sparseDir);
+  } else {
+  char *cstr = new char[opt.bedFile.length() + 1];
+  strcpy(cstr, opt.bedFile.c_str());
+  dir = string(dirname(cstr));
+  }
 
-    if (opt.sparseBsn.length() > 0) {
-        bsn = opt.sparseBsn.c_str();
-    } else {
-        char *cstr = new char[opt.bedFile.length() + 1];
-        strcpy(cstr, opt.bedFile.c_str());
-        bsn = string(basename(cstr));
-    }
+  if (opt.sparseBsn.length() > 0) {
+  bsn = opt.sparseBsn.c_str();
+  } else {
+  char *cstr = new char[opt.bedFile.length() + 1];
+  strcpy(cstr, opt.bedFile.c_str());
+  bsn = string(basename(cstr));
+  }
     
-    return string(dir) + string("/") + string(bsn);
-}
+  return string(dir) + string("/") + string(bsn);
+  }
 
 
 
-uint BayesW::set_Ntot(const int rank) {
+  uint BayesW::set_Ntot(const int rank) {
 
-    uint Ntot = opt.numberIndividuals; //data.numInds;
+  uint Ntot = opt.numberIndividuals; //data.numInds;
 
-    if (Ntot == 0) {
-        printf("FATAL  : opt.numberIndividuals is zero! Set it via --number-individuals in call.");
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
+  if (Ntot == 0) {
+  printf("FATAL  : opt.numberIndividuals is zero! Set it via --number-individuals in call.");
+  MPI_Abort(MPI_COMM_WORLD, 1);
+  }
 
-    if (Ntot != data.numInds - data.numNAs) {
-        if (rank == 0) 
-            printf("WARNING: opt.numberIndividuals set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot, data.numInds, data.numNAs, data.numInds-data.numNAs);
-    }
+  if (Ntot != data.numInds - data.numNAs) {
+  if (rank == 0) 
+  printf("WARNING: opt.numberIndividuals set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot, data.numInds, data.numNAs, data.numInds-data.numNAs);
+  }
 
-    return Ntot;
-}
+  return Ntot;
+  }
 
-uint BayesW::set_Mtot(const int rank) {
+  uint BayesW::set_Mtot(const int rank) {
 
-    uint Mtot = opt.numberMarkers;     //data.numSnps;
+  uint Mtot = opt.numberMarkers;     //data.numSnps;
 
-    if (Mtot == 0) throw("FATAL  : opt.numberMarkers is zero! Set it via --number-markers in call.");
+  if (Mtot == 0) throw("FATAL  : opt.numberMarkers is zero! Set it via --number-markers in call.");
     
-    // Block marker definition has precedence over requested number of markers
-    if (opt.markerBlocksFile != "" && opt.numberMarkers > 0) {
-        opt.numberMarkers = 0;
-        if (rank == 0) 
-            printf("WARNING: --number-markers option ignored, a marker block definition file was passed!\n");
-    } 
+  // Block marker definition has precedence over requested number of markers
+  if (opt.markerBlocksFile != "" && opt.numberMarkers > 0) {
+  opt.numberMarkers = 0;
+  if (rank == 0) 
+  printf("WARNING: --number-markers option ignored, a marker block definition file was passed!\n");
+  } 
     
-    if (opt.numberMarkers > 0 && opt.numberMarkers < Mtot) {
-        Mtot = opt.numberMarkers;
-        if (rank == 0) 
-            printf("INFO   : Option passed to process only %d markers!\n", Mtot);
-    }
+  if (opt.numberMarkers > 0 && opt.numberMarkers < Mtot) {
+  Mtot = opt.numberMarkers;
+  if (rank == 0) 
+  printf("INFO   : Option passed to process only %d markers!\n", Mtot);
+  }
 
-    return Mtot;
-}
+  return Mtot;
+  }
 
 
-#endif
+  #endif
 */
 
 //  ORIGINAL (SEQUENTIAL) VERSION
 /*
-VectorXd BayesW::getSnpData(unsigned int marker) const
-{
-    if (!usePreprocessedData) {
-        //read column from RAM loaded genotype matrix.
-        return data.Z.col(marker);//.cast<double>();
-    } else {
-        //read column from preprocessed and memory mapped genotype matrix file.
-        return data.mappedZ.col(marker).cast<double>();
-    }
-}
+  VectorXd BayesW::getSnpData(unsigned int marker) const
+  {
+  if (!usePreprocessedData) {
+  //read column from RAM loaded genotype matrix.
+  return data.Z.col(marker);//.cast<double>();
+  } else {
+  //read column from preprocessed and memory mapped genotype matrix file.
+  return data.mappedZ.col(marker).cast<double>();
+  }
+  }
 
-void BayesW::printDebugInfo() const
-{
-    //const unsigned int N(data.numInds);
-    // cout << "x mean " << Cx.mean() << "\n";
-    //   cout << "x sd " << sqrt(Cx.squaredNorm() / (double(N - 1))) << "\n";
-}
+  void BayesW::printDebugInfo() const
+  {
+  //const unsigned int N(data.numInds);
+  // cout << "x mean " << Cx.mean() << "\n";
+  //   cout << "x sd " << sqrt(Cx.squaredNorm() / (double(N - 1))) << "\n";
+  }
 */
