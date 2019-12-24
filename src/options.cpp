@@ -26,7 +26,19 @@ void Options::inputOptions(const int argc, const char* argv[]){
             sparseSync = true;
             ss << "--sparse-sync " << "\n";
         }
-        else if (!strcmp(argv[i], "--mpibayes")) {
+        else if (!strcmp(argv[i], "--mpiBayesGroups")) {
+            mpiBayesGroups = true;
+            ss << "--mpiBayesGroups " << "\n";
+        }
+        else if (!strcmp(argv[i], "--groupIndexFile")) {
+            groupIndexFile = argv[++i];
+            ss << "--groupIndexFile " << argv[i] << "\n";
+        }
+         else if (!strcmp(argv[i], "--groupMixtureFile")) {
+            groupMixtureFile = argv[++i];
+            ss << "--groupMixtureFile " << argv[i] << "\n";
+        }
+         else if (!strcmp(argv[i], "--mpibayes")) {
             analysisType = "RAM";
             bayesType = argv[++i];
             ss << "--mpibayes " << argv[i] << "\n";
@@ -149,9 +161,9 @@ void Options::inputOptions(const int argc, const char* argv[]){
             ss << "--marker-blocks-file " << argv[i] << "\n";
         }
 #ifdef USE_MPI
-        else if (!strcmp(argv[i], "--mpi-sync-rate")) {    //EO
-            MPISyncRate = atoi(argv[++i]);
-            ss << "--mpi-sync-rate " << argv[i] << "\n";
+        else if (!strcmp(argv[i], "--sync-rate")) {    //EO
+            syncRate = atoi(argv[++i]);
+            ss << "--sync-rate " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--sparse-dir")) {    //EO
             sparseDir = argv[++i];
@@ -237,7 +249,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
     }
 
     options_s = ss.str();
-    //cout << ss.str() << endl;
+    cout << ss.str() << endl;
 
 
     //EO: check output directory exists or can be created
@@ -292,8 +304,8 @@ void Options::readFile(const string &file){  // input options from file
         } else if (key == "shuffleMarkers") {
             shuffleMarkers = stoi(value);
 #ifdef USE_MPI
-        } else if (key == "MPISyncRate") {
-            MPISyncRate = stoi(value);
+        } else if (key == "syncRate") {
+            syncRate = stoi(value);
         } else if (key == "blocksPerRank") {
             blocksPerRank = stoi(value);
         }

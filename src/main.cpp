@@ -43,15 +43,6 @@ int main(int argc, const char * argv[]) {
 
 #ifdef USE_MPI
 
-        // marion : originally I had something like this to read the annotation and mS file
-        /*
-         * if (opt.bayesType == "bayesG") {
-        	data.readGroupFile(opt.groupFile);
-        	data.readmSFile(opt.mSfile);
-        }
-         */// but maybe we can have something like : if we use --group option then read these files
-
-
         if (opt.bedToSparse || opt.checkRam) {
 
             data.readFamFile(opt.bedFile + ".fam");
@@ -64,7 +55,8 @@ int main(int argc, const char * argv[]) {
             } else if (opt.checkRam) {
                 analysis.checkRamUsage();
             }
-        } else if (opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") {
+
+        } else if ((opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") || opt.mpiBayesGroups) {
             
             if (opt.readFromBedFile) {
                 //printf("INFO   : reading from BED file\n");
@@ -99,6 +91,15 @@ int main(int argc, const char * argv[]) {
             if (opt.markerBlocksFile != "") {
                 data.readMarkerBlocksFile(opt.markerBlocksFile);
             }
+
+            if (opt.mpiBayesGroups) {
+                printf("MPI BAYES GROUPS\n");
+                if (opt.groupIndexFile == "") throw("with --mpiBayesGroups activated you must use the --groupIndexFile!");
+                data.readGroupFile(opt.groupIndexFile);
+                if (opt.groupMixtureFile == "") throw("with --mpiBayesGroups activated you must use the --groupMixtureFile!");
+                data.readmSFile(opt.groupMixtureFile);
+            }
+
             if (opt.multi_phen) {
                 //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 //analysis.runMpiGibbsMultiTraits();

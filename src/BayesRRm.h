@@ -34,22 +34,22 @@ class BayesRRm
     const double       s02F    = 1.0;
     const size_t       LENBUF  = 300;
 
-    VectorXd    cva;
+    //VectorXd  cva;     //EO: move v
+    MatrixXd  cVa;       // component-specific variance
+    MatrixXd  cVaI;      // inverse of the component variances
 
     Distributions_boost dist;
     Distributions_boost dist8[8];
     bool usePreprocessedData;
     bool showDebug;
-    VectorXd betasqn;
 
     MatrixXd X;         // "fixed effects" matrix.
     VectorXd gamma;     // fixed effects coefficients
 
     // Component variables
     MatrixXd priorPi;   // prior probabilities for each component
-    MatrixXd pi;        // mixture probabilities
-    MatrixXd pi8;
-    MatrixXd cVa;       // component-specific variance
+    MatrixXd estPi;        // mixture probabilities
+    //MatrixXd pi8;
     VectorXd logL;      // log likelihood of component
     VectorXd muk;       // mean of k-th component marker effect size
     VectorXd denom;     // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
@@ -57,11 +57,10 @@ class BayesRRm
     //VectorXd v;         // variable storing the component assignment
     VectorXd cass;      // variable storing the component assignment //EO RENAMING
     MatrixXd cass8;
-    VectorXd cVaI;      // inverse of the component variances
 
     // Mean and residual variables
     double mu;          // mean or intercept
-    VectorXd sigmaG;      // genetic variance
+    VectorXd sigmaG;    // genetic variance
     double sigmaE;      // residuals variance
     double sigmaF;      // covariates variance if using ridge;
 

@@ -314,6 +314,10 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
 void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
                                      VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
     
+    cout << "EO: FIX ME" << endl;
+    exit(1);
+    
+    /*
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -376,6 +380,8 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     sigmaE            = sige_;
     for (int i=0; i<K; i++) 
         pi[i] = pipi[i];
+
+    */
 }
 
 
@@ -1767,9 +1773,9 @@ void Data::readPhenotypeFile(const string &phenFile) {
 
 //TODO Finish function to read the group file
 void Data::readGroupFile(const string &groupFile) {
-    // NA: missing phenotype
+
     ifstream in(groupFile.c_str());
-    if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read.");
+    if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read. Use the --groupIndexFile option!");
 
     cout << "Reading groups from [" + groupFile + "]." << endl;
 
@@ -1777,8 +1783,7 @@ void Data::readGroupFile(const string &groupFile) {
     std::vector<int> numbers(start, end);
     int* ptr =(int*)&numbers[0];
     G=(Eigen::Map<Eigen::VectorXi>(ptr,numbers.size()));
-
-    cout << "Groups read from file" << endl;
+    cout << "Groups read from file: G.size = " << G.size() << endl;
 }
 
 template<typename M>
@@ -1851,14 +1856,16 @@ void Data::readmSFile(const string& mSfile){
 
 		Gadget::Tokenizer strvec;
 		Gadget::Tokenizer strT;
+
 		strvec.getTokens(whole_text, ";");
 		strT.getTokens(strvec[0],",");
+        
 		mS=Eigen::MatrixXd(strvec.size(),strT.size());
 		numGroups=strvec.size();
-
+        //cout << "numGroups = " << numGroups << endl;
 		for (unsigned j=0; j<strvec.size(); ++j) {
 			strT.getTokens(strvec[j],",");
-			for(unsigned k=0;k<strT.size();++k)
+			for(unsigned k=0; k<strT.size(); ++k)
 				mS(j,k) = stod(strT[k]);
 		}
 	}

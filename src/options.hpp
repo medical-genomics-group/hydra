@@ -22,9 +22,12 @@ public:
 
     unsigned shuffleMarkers    = 1;
 #ifdef USE_MPI
+    bool     mpiBayesGroups    = false;
+    string   groupIndexFile    = "";
+    string   groupMixtureFile  = "";
     bool     restart           = false;
     bool     sparseSync        = false;
-    unsigned MPISyncRate       = 1;
+    unsigned syncRate          = 1;
     bool     bedToSparse       = false;
     bool     readFromBedFile   = false; //EO: by default read from sparse representation files
     unsigned blocksPerRank     = 1;     //EO: for bed -> sparse conversion, to split blocks if too large
