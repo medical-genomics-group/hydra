@@ -42,8 +42,8 @@ BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
     , usePreprocessedData(opt.analysisType == "PPBayes")
     , showDebug(false)
 {
-    float* ptr =static_cast<float*>(&opt.S[0]);
-    cva = (Eigen::Map<Eigen::VectorXf>(ptr, static_cast<long>(opt.S.size()))).cast<double>();
+    double* ptr = &opt.S[0];
+    cva = (Eigen::Map<Eigen::VectorXd>(ptr, static_cast<long>(opt.S.size()))).cast<double>();
 }
 
 BayesRRm::~BayesRRm()
@@ -1332,7 +1332,8 @@ int BayesRRm::runMpiGibbs() {
         //EO: broadcast sigmaE from rank 0 to all the others
         //check_mpi(MPI_Bcast(&sigmaE, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
     }
-    //printf("sigmaE = %15.13f\n", sigmaE);
+    //printf("sigmaE = %20.15f\n", sigmaE);
+    //printf("mu = %20.15f\n", mu);
 
 
     adaV.setOnes();
@@ -1416,7 +1417,7 @@ int BayesRRm::runMpiGibbs() {
 
         // update mu
         mu = dist.norm_rng(epssum / dN, sigmaE / dN);
-        //printf("it %d, rank %d: mu = %15.10f with dN = %10.1f\n", iteration, rank, mu, dN);
+        //printf("it %d, rank %d: mu = %20.15f with dN = %10.1f\n", iteration, rank, mu, dN);
 
         // We substract again now epsilon =Y-mu-X*beta
         for (int i=0; i<Ntot; ++i) epsilon[i] -= mu;
@@ -1440,9 +1441,9 @@ int BayesRRm::runMpiGibbs() {
 
         for (int i=0; i<Ntot; ++i) tmpEps[i] = epsilon[i];
 
-        double cumSumDeltaBetas = 0.0;
+        double cumSumDeltaBetas       = 0.0;
         double task_sum_abs_deltabeta = 0.0;
-        int    sinceLastSync    = 0;
+        int    sinceLastSync          = 0;
 
 
         // Loop over (shuffled) markers
@@ -1455,17 +1456,14 @@ int BayesRRm::runMpiGibbs() {
 
                 marker  = markerI[j];
                 beta =  Beta(marker);
-                
-                //daniel, we check if we are in a restarted chain and if the markers is to be sampled
-                //if(adaV[j] || !opt.restart) {
-                // EO
+
                 if (adaV[j]) {
 
                     //we compute the denominator in the variance expression to save computations
                     //denom = dNm1 + sigE_G * cVaI.segment(1, km1).array();
                     for (int i=1; i<=km1; ++i) {
                         denom(i-1) = dNm1 + sigE_G * cVaI(i);
-                        //printf("it %d, rank %d, m %d: denom[%d] = %20.15f\n", iteration, rank, marker, i-1, denom(i-1));
+                        //printf("it %d, rank %d, m %d: denom[%d] = %20.15f, cvai = %20.15f\n", iteration, rank, marker, i-1, denom(i-1), cVaI(i));
                     }
                     //cout << "denom = " << endl << denom << endl;
                     
@@ -1486,21 +1484,29 @@ int BayesRRm::runMpiGibbs() {
                     muk.segment(1, km1) = num / denom.array();           
                     //cout << "muk = " << endl << muk << endl; 
                     
-                    //first component probabilities remain unchanged
-                    logL = pi.array().log();
+                    //first component probabilities remain unchanged                    
+                    //logL = pi.array().log();
+                    for (int i=0; i<K; i++)
+                        logL[i] = log(pi[i]);
+
                     //cout << "logL = " << endl << logL << endl;
 
                     // Update the log likelihood for each component
-                    logL.segment(1,km1) = logL.segment(1, km1).array()
-                        - 0.5d * (sigG_E * dNm1 * cVa.segment(1,km1).array() + 1.0d).array().log() 
-                        + muk.segment(1,km1).array() * num * i_2sigE;
+                    //logL.segment(1,km1) = logL.segment(1, km1).array()
+                    //    - 0.5d * (sigG_E * dNm1 * cVa.segment(1,km1).array() + 1.0d).array().log() 
+                    //    + muk.segment(1,km1).array() * num * i_2sigE;
+                    for (int i=1; i<1+km1; i++) {
+                        logL[i] = logL[i]
+                            - 0.5 * log(sigG_E * dNm1 * cVa[i] + 1.0)
+                            +  muk[i] * num * i_2sigE;
+                    }
                     //cout << "logL = " << endl << logL << endl;
 
                     p = dist.unif_rng();
                     //printf("%d/%d/%d  p = %15.10f\n", iteration, rank, j, p);
                     
                     acum = 0.0;
-                    if(((logL.segment(1,km1).array()-logL[0]).abs().array() > 700 ).any() ){
+                    if(((logL.segment(1,km1).array()-logL[0]).abs().array() > 700.0).any() ){
                         acum = 0.0;
                     } else{
                         acum = 1.0 / ((logL.array()-logL[0]).exp().sum());
@@ -1527,7 +1533,7 @@ int BayesRRm::runMpiGibbs() {
                                 printf("FATAL  : iteration %d, marker = %d, p = %15.10f, acum = %15.10f logL overflow with %d => %d\n", iteration, marker, p, acum, k+1, K);
                                 MPI_Abort(MPI_COMM_WORLD, 1);
                             }
-                            if (((logL.segment(k+1,K-(k+1)).array()-logL[k+1]).abs().array() > 700.0d ).any()) {
+                            if (((logL.segment(k+1,K-(k+1)).array()-logL[k+1]).abs().array() > 700.0).any()) {
                                 acum += 0.0d; // we compare next mixture to the others, if to big diff we skip
                             } else{
                                 acum += 1.0d / ((logL.array()-logL[k+1]).exp().sum()); //if not , sample
@@ -1807,7 +1813,8 @@ int BayesRRm::runMpiGibbs() {
         // ------------------------
         m0      = double(Mtot) - v[0];
         sigmaG  = dist.inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0));
-        //printf("rank %d own sigmaG = %15.10f with Mtot = %d and m0 = %d\n", rank, sigmaG, Mtot, int(m0));
+        pi      = dist.dirichilet_rng(v.array() + 1.0);
+        //printf("rank %d own sigmaG = %20.15f with Mtot = %d and m0 = %d\n", rank, sigmaG, Mtot, int(m0));
 
         // Broadcast sigmaG of rank 0
         check_mpi(MPI_Bcast(&sigmaG, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -1888,12 +1895,12 @@ int BayesRRm::runMpiGibbs() {
 
         e_sqn = 0.0d;
         for (int i=0; i<Ntot; ++i) e_sqn += epsilon[i] * epsilon[i];
-        //printf("e_sqn = %15.10f\n", e_sqn);
+        //printf("e_sqn = %20.15f, v0E = %20.15f, s02E = %20.15f\n", e_sqn, v0E, s02E);
 
         //EO: sample sigmaE and broadcast the one from rank 0 to all the others
         sigmaE  = dist.inv_scaled_chisq_rng(v0E+dN, (e_sqn + v0E*s02E)/(v0E+dN));
         check_mpi(MPI_Bcast(&sigmaE, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
-        //printf("sigmaE = %15.10f\n", sigmaE);
+        //printf("sigmaE = %20.15f\n", sigmaE);
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
@@ -1918,7 +1925,7 @@ int BayesRRm::runMpiGibbs() {
         //printf("it %6d, rank %3d: epsilon[0] = %15.10f, y[0] = %15.10f, m0=%10.1f,  sigE=%15.10f,  sigG=%15.10f [%6d / %6d]\n", iteration, rank, epsilon[0], y[0], m0, sigmaE, sigmaG, markerI[0], markerI[M-1]);
 
         //BCAST
-        pi = dist.dirichilet_rng(v.array() + 1.0);
+        //pi = dist.dirichilet_rng(v.array() + 1.0);
         check_mpi(MPI_Bcast(pi.data(), pi.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //for (int i=0; i<pi.size(); i++) {
         //    printf("rank %3d: pi[%d] = %15.10f after glob sync\n", rank, i, pi[i]);
@@ -2559,7 +2566,7 @@ int BayesRRm::runGibbs()
 
             double p(dist.unif_rng());
 
-            if (((logL.segment(1, km1).array() - logL[0]).abs().array() > 700).any()) { // this quantity will be exponentiated and go to huge values and we set to infinity, thus the reciprocal is set to zero
+            if (((logL.segment(1, km1).array() - logL[0]).abs().array() > 700.0).any()) { // this quantity will be exponentiated and go to huge values and we set to infinity, thus the reciprocal is set to zero
                 acum = 0;
             } else {
                 acum = 1.0 / ((logL.array() - logL[0]).exp().sum());
@@ -2582,7 +2589,7 @@ int BayesRRm::runGibbs()
                         printf("FATAL  : iteration %d, marker = %d, p = %15.10f, acum = %15.10f logL overflow with %d => %d\n", iteration, marker, p, acum, k+1, K);
                         exit(1);
                     }
-                    if (((logL.segment(k+1,K-(k+1)).array()-logL[k+1]).abs().array() > 700.0d ).any() ){
+                    if (((logL.segment(k+1,K-(k+1)).array()-logL[k+1]).abs().array() > 700.0).any() ){
                         acum += 0.0d;// we compare next mixture to the others, if to big diff we skip
                     } else{
                         acum += 1.0d / ((logL.array()-logL[k+1]).exp().sum()); //if not , sample
@@ -2620,6 +2627,8 @@ int BayesRRm::runGibbs()
         //sample sigmaG from inverse gamma
         sigmaG = dist.inv_scaled_chisq_rng(v0G + double(m0), (betasqn * double(m0) + v0G * s02G) / (v0G + double(m0)));
 
+        pi = dist.dirichilet_rng(cass.array() + 1.0);
+
         const double epsilonSqNorm = epsilon.squaredNorm();
 
         //sample residual variance sigmaE from inverse gamma
@@ -2628,7 +2637,7 @@ int BayesRRm::runGibbs()
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, epsilonSqNorm, v0E, s02E, N, sigmaE);
 
         //sample hyperparameter pi from dirichlet
-        pi = dist.dirichilet_rng(cass.array() + 1.0);
+        //pi = dist.dirichilet_rng(cass.array() + 1.0);
         //cout << pi << endl;
 
         if (showDebug)

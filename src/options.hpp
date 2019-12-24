@@ -38,10 +38,10 @@ public:
     unsigned burnin;
     unsigned seed;
     unsigned numThread;
-    int numThreadSpawned       = 0;      // Default to 0, let TBB do its thing
+    int numThreadSpawned       = 0;    // Default to 0, let TBB do its thing
     unsigned thin;                     // save every this th sampled value in MCMC
     unsigned save;                     // sampling rate of the epsilon vector
-    vector<float> S;                   // variance components
+    vector<double> S;                  // variance components
 
     //marion : include annotation variables
     unsigned int numGroups;

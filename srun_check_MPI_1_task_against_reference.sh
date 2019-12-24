@@ -8,7 +8,7 @@ source ./compile_code.sh $1
 
 S="1.0,0.1"
 
-DS=2
+DS=4
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -45,6 +45,16 @@ elif [ $DS == 3 ]; then
     NUMSNPS=8430446
     NUMSNPS=500
     S="0.00001,0.0001,0.001,0.01"
+elif [ $DS == 4 ]; then
+    datadir=/scratch/orliac/TESTdataset_groups_mpi
+    dataset=sim1_M100K_N10K
+    phen=sim1_M100K_N10K_h2_0.5_Mc_1000
+    grp=sim1_M100K_N10K_h2_0.5_Mc_1000.groups
+    mix=sim1_M100K_N10K_h2_0.5_Mc_1000.S
+    NUMINDS=10000
+    NUMSNPS=100000
+    NUMSNPS=1000
+    S="0.0001,0.001,0.01"
 fi
 
 outdir=/home/orliac/DCSR/CTGG/BayesRRcmd/output_tests/
@@ -60,14 +70,17 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=3
+CL=10
 SEED=1222
 SR=0
-SM=0
+SM=1
 
 # If you change those, do not expect compatibility
 N=1
 TPN=1
+
+#echo EXE = $EXE
+#EXE=/home/orliac/DCSR/CTGG/BayesRRcmd/src/mpi_gibbs_20191217
 
 echo 
 echo
@@ -86,19 +99,20 @@ echo
 echo "@@@ MPI 1-task solution reading from  BED file @@@"
 echo
 sol=mpi1tbed
-cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS"
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS"
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------
 $cmd || exit 1
 
+exit 1;
 
 echo
 echo
 echo "@@@ MPI 1-task solution reading from SPARSE files @@@"
 echo
 sol=mpi1tsparse
-cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------
@@ -110,7 +124,7 @@ echo
 echo "@@@ MPI 1-task solution reading from SPARSE files and sparse sync @@@"
 echo
 sol=mpi1tsparse_sparseSync
-cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --sparse-sync --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --mpi-sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --sparse-sync --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------
@@ -118,3 +132,15 @@ $cmd || exit 1
 #--marker-blocks-file $datadir/${dataset}.blk_1 
 #--covariates $datadir/scaled_covariates.csv
 
+echo
+echo
+echo "@@@ MPI 1-task solution reading from SPARSE files and sparse sync and alternate binary !!!@@@"
+echo
+sol=mpi1tsparse_sparseSync_alt
+EXE=./src/mpi_gibbs_20191217
+#SR=$(($SR - 2))
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --sparse-sync --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
+echo ----------------------------------------------------------------------------------
+echo $cmd
+echo ----------------------------------------------------------------------------------
+$cmd || exit 1
