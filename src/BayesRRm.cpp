@@ -42,7 +42,7 @@ BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
     , usePreprocessedData(opt.analysisType == "PPBayes")
     , showDebug(false)
 {
-    float* ptr =static_cast<float*>(&opt.S[0]);
+    //float* ptr =static_cast<float*>(&opt.S[0]);
     //cva = data.mS; // vector -> Matrix if grouping!!
 }
 
@@ -961,32 +961,25 @@ int BayesRRm::runMpiGibbs() {
     int IrankS[nranks], IrankL[nranks];
     mpi_define_blocks_of_markers(Ntot - data.numNAs, IrankS, IrankL, nranks);
 
-
-    // Grouping
     const unsigned int  K   = int(data.mS.cols()) + 1;
     const unsigned int  km1 = K - 1;
     const int numGroups = data.numGroups;
-    cVa.resize(numGroups, K);          // component-specific variance
-    cVaI.resize(numGroups, K);         // inverse of the component variances
     VectorXi G          = data.G;
-
+    cVa.resize(numGroups, K);                   // component-specific variance
+    cVaI.resize(numGroups, K);                  // inverse of the component variances
     std::vector<int>    markerI;
-    VectorXd            muk(K);          // mean of k-th component marker effect size
-    VectorXd            denom(K-1);      // temporal variable for computing the inflation of the effect variance for a given non-zero component
-    double              num;             // storing dot product
-    //int                 m0;              // total number of markers in model
-    VectorXd            m0(numGroups);     //non-zero elements per group
-    MatrixXd            v(numGroups,K);            // variable storing the component assignment per group
-    MatrixXd            sum_v(numGroups,K);        // To store the sum of v elements over all ranks per group
+    VectorXd            muk(K);                 // mean of k-th component marker effect size
+    VectorXd            denom(K-1);             // temporal variable for computing the inflation of the effect variance for a given non-zero component
+    double              num;                    // storing dot product
+    VectorXi            m0(numGroups);          // non-zero elements per group
+    MatrixXi            cass(numGroups,K);      // variable storing the component assignment per group; EO RENAMING was v
+    MatrixXi            sum_cass(numGroups,K);  // To store the sum of v elements over all ranks per group;         was sum_v
     VectorXd            Acum(M);
     VectorXd            Gamma(data.numFixedEffects);
-    //daniel The following variables are related to the restarting
     typedef Matrix<bool, Dynamic, 1> VectorXb;
     VectorXb            adaV(M);   //daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0
-
-    std::vector<int>     mark2sync;
-    std::vector<double>  dbet2sync;
-
+    std::vector<int>    mark2sync;
+    std::vector<double> dbet2sync;
 
     dalloc +=     M * sizeof(int)    / 1E9; // for components
     dalloc += 2 * M * sizeof(double) / 1E9; // for Beta and Acum
@@ -1072,6 +1065,14 @@ int BayesRRm::runMpiGibbs() {
     sigmaG.resize(numGroups);
     
     sigmaE = 0.0;
+
+    // Build global repartition of markers over the groups
+    VectorXi MtotGrp(numGroups);
+    MtotGrp.setZero();
+    for (int i=0; i<Mtot; i++) {
+        MtotGrp[G[i]] += 1;
+    }
+    cout << "MtotGrp = " << MtotGrp << endl;
 
 
     // In case of a restart, we first read the latest dumps
@@ -1277,8 +1278,7 @@ int BayesRRm::runMpiGibbs() {
     // ---------------
     const auto st3 = std::chrono::high_resolution_clock::now();
 
-    //double *y, *epsilon, *tmpEps, *previt_eps, *deltaEps, *dEpsSum, *deltaSum;
-    double *y, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum;
+    double   *y, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum; //, *previt_eps;
     const size_t NDB = size_t(Ntot) * sizeof(double);
     y          = (double*)_mm_malloc(NDB, 64);  check_malloc(y,          __LINE__, __FILE__);
     epsilon    = (double*)_mm_malloc(NDB, 64);  check_malloc(epsilon,    __LINE__, __FILE__);
@@ -1348,7 +1348,7 @@ int BayesRRm::runMpiGibbs() {
     double   beta, betaOld, deltaBeta, p, acum, e_sqn;
     VectorXd beta_squaredNorm(numGroups);
     size_t   markoff;
-    int      marker, left;
+    int      marker, cx;
 
     logL.resize(K);
 
@@ -1433,7 +1433,7 @@ int BayesRRm::runMpiGibbs() {
         }
 
         m0.setZero();
-        v.setZero();
+        cass.setZero();
 
         //printf("it %d rank %d: sigE_G = %15.10f, %15.10f, %15.10f\n", iteration, rank, sigE_G, sigG_E, i_2sigE);
 
@@ -1526,8 +1526,8 @@ int BayesRRm::runMpiGibbs() {
                                 Beta(marker) = dist.norm_rng(muk[k], sigmaE/denom[k-1]);
                                 //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with p=%15.10f <= acum = %15.10f, denom = %15.10f, sigmaE = %15.10f: beta = %15.10f\n", iteration, rank, marker, k, muk[k], p, acum, denom[k-1], sigmaE, Beta(marker));
                             }
-                            v(G[marker],k) += 1.0d;
-                            components[marker] = k;
+                            cass(G[marker], k) += 1;
+                            components[marker]  = k;
                             break;
                         } else {
                             //if too big or too small
@@ -1808,18 +1808,19 @@ int BayesRRm::runMpiGibbs() {
         // ------------------------
         if (nranks > 1) {
             MPI_Barrier(MPI_COMM_WORLD);
-            check_mpi(MPI_Allreduce(beta_squaredNorm.data(), sum_beta_squaredNorm.data(), beta_squaredNorm.size(),        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            check_mpi(MPI_Allreduce(v.data(),                sum_v.data(),                v.size(),                       MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            v                = sum_v;
+            check_mpi(MPI_Allreduce(beta_squaredNorm.data(), sum_beta_squaredNorm.data(), beta_squaredNorm.size(), MPI_DOUBLE,  MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(cass.data(),             sum_cass.data(),             cass.size(),             MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            cass             = sum_cass;
             beta_squaredNorm = sum_beta_squaredNorm;
         }
 
         // Update global parameters
         // ------------------------
         for(int i=0; i<numGroups; i++){
-            m0[i]        = double(Mtot) - v(i,0);
-            sigmaG[i]    = dist.inv_scaled_chisq_rng(v0G + m0[i], (beta_squaredNorm[i] * m0[i] + v0G*s02G) / (v0G + m0[i]));
-            estPi.row(i) = dist.dirichilet_rng(v.row(i).array() + 1.0); //we moved the pi update here to use the same loop
+            m0[i]        = MtotGrp[i] - cass(i, 0);
+            sigmaG[i]    = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
+            //we moved the pi update here to use the same loop
+            estPi.row(i) = dist.dirichilet_rng(cass.row(i).array().cast<double>() + 1.0);
         }
         //printf("rank %d own sigmaG[0] = %20.15f with Mtot = %d and m0[0] = %d\n", rank, sigmaG[0], Mtot, int(m0[0]));
 
@@ -1921,7 +1922,7 @@ int BayesRRm::runMpiGibbs() {
                    it_nsync_ar1 + it_nsync_ar2, it_nsync_ar1, it_nsync_ar2,
                    (it_sync_ar1) / double(it_nsync_ar1) * 1000.0,
                    (it_sync_ar2) / double(it_nsync_ar2) * 1000.0,
-                   sigmaG.sum(), sigmaE, beta_squaredNorm.sum(), int(m0.sum()));
+                   sigmaG.sum(), sigmaE, beta_squaredNorm.sum(), m0.sum());
             fflush(stdout);
         }
 
@@ -1931,60 +1932,42 @@ int BayesRRm::runMpiGibbs() {
         //printf("sigmaG = %20.15f, sigmaE = %20.15f, e_sqn = %20.15f\n", sigmaG, sigmaE, e_sqn);
         //printf("it %6d, rank %3d: epsilon[0] = %15.10f, y[0] = %15.10f, m0=%10.1f,  sigE=%15.10f,  sigG=%15.10f [%6d / %6d]\n", iteration, rank, epsilon[0], y[0], m0, sigmaE, sigmaG, markerI[0], markerI[M-1]);
         
-        //BCAST
-
-        //I leave it here in order to not disturb the rest of the logic, but I imagine it can be moved up
-
+        // Broadcast estPi from rank 0 (update moved up)
         check_mpi(MPI_Bcast(estPi.data(), estPi.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
-        //for (int i=0; i<pi.size(); i++) {
-        //    printf("rank %3d: estPi[%d] = %15.10f after glob sync\n", rank, i, estPi[i]);
-        //}
         
+
         // Write output files
         // ------------------
         if (iteration%opt.thin == 0) {
-            cout << "EO: FIX ME" << endl;
 
             //TODO adjust for multiple sigmaG and matrix PI
             //EO: now only global parameters to out
             if (rank == 0) {
 
-                left = snprintf(buff, LENBUF, "%5d", iteration);
-                assert(left > 0);
+                cx = snprintf(buff, LENBUF, "%5d, %4d", iteration, (int) sigmaG.size());
+                assert(cx >= 0 && cx < LENBUF);
+
                 for(int jj = 0; jj < sigmaG.size(); ++jj){
-                    left = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %20.15f", sigmaG(jj));
-                    assert(left > 0);
+                    cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %20.15f", sigmaG(jj));
+                    assert(cx >= 0 && cx < LENBUF - strlen(buff));
                 }
                 
-                left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), ", %20.15f, %20.15f, %7d, %2d",  sigmaE, sigmaG.sum()/(sigmaE+sigmaG.sum()), int(m0.sum()), int(estPi.size()));
+                cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %20.15f, %20.15f, %7d, %4d, %2d",  sigmaE, sigmaG.sum()/(sigmaE+sigmaG.sum()), m0.sum(), int(estPi.rows()), int(estPi.cols()));
+                assert(cx >= 0 && cx < LENBUF - strlen(buff));
 
                 for (int ii=0; ii<estPi.rows(); ++ii) {
                     for(int kk = 0; kk < estPi.cols(); ++kk) {
-                        left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), ", %20.15f", estPi(ii,kk));
-                        assert(left > 0);
+                        cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %20.15f", estPi(ii,kk));
+                        assert(cx >= 0 && cx < LENBUF - strlen(buff));
                     }
                 }
-                left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), "\n");
-                assert(left > 0);
+
+                cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), "\n");
+                assert(cx >= 0 && cx < LENBUF - strlen(buff));
 
                 offset = size_t(n_thinned_saved) * strlen(buff);
                 check_mpi(MPI_File_write_at(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
             }
-
-            /*
-              left = snprintf(buff, LENBUF, "%5d, %4d, %20.15f, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, rank, mu, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), int(m0), int(estPi.size()));
-              assert(left > 0);
-
-              for (int ii=0; ii<estPi.size(); ++ii) {
-              left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), ", %20.15f", estPi(ii));
-              assert(left > 0);
-              }
-              left = snprintf(&buff[strlen(buff)], LENBUF-strlen(buff), "\n");
-              assert(left > 0);
-
-              offset = (size_t(n_thinned_saved) * size_t(nranks) + size_t(rank)) * strlen(buff);
-              check_mpi(MPI_File_write_at_all(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
-            */
 
             // Write iteration number
             if (rank == 0) {

@@ -1771,21 +1771,6 @@ void Data::readPhenotypeFile(const string &phenFile) {
 }
 
 
-//TODO Finish function to read the group file
-void Data::readGroupFile(const string &groupFile) {
-
-    ifstream in(groupFile.c_str());
-    if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read. Use the --groupIndexFile option!");
-
-    cout << "Reading groups from [" + groupFile + "]." << endl;
-
-    std::istream_iterator<double> start(in), end;
-    std::vector<int> numbers(start, end);
-    int* ptr =(int*)&numbers[0];
-    G=(Eigen::Map<Eigen::VectorXi>(ptr,numbers.size()));
-    cout << "Groups read from file: G.size = " << G.size() << endl;
-}
-
 template<typename M>
 M Data::readCSVFile (const string &path) {
     std::ifstream indata;
@@ -1813,6 +1798,22 @@ void Data::readCovariateFile(const string &covariateFile ) {
 }
 
 
+
+//TODO Finish function to read the group file
+void Data::readGroupFile(const string &groupFile) {
+
+    ifstream in(groupFile.c_str());
+    if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read. Use the --groupIndexFile option!");
+
+    cout << "Reading groups from [" + groupFile + "]." << endl;
+
+    std::istream_iterator<double> start(in), end;
+    std::vector<int> numbers(start, end);
+    int* ptr =(int*)&numbers[0];
+    G=(Eigen::Map<Eigen::VectorXi>(ptr,numbers.size()));
+    cout << "Groups read from file: G.size = " << G.size() << endl;
+}
+
 //marion : read annotation file
 //group index starts from 0
 void Data::readGroupFile_new(const string& groupFile){
@@ -1834,7 +1835,7 @@ void Data::readGroupFile_new(const string& groupFile){
 	}
 
 	G=Eigen::VectorXi::Map(tmp.data(), tmp.size());
-
+    
 	cout << "Groups read from file" << endl;
 }
 

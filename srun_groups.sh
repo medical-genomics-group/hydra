@@ -49,8 +49,8 @@ elif [ $DS == 4 ]; then
     datadir=/scratch/orliac/TESTdataset_groups_mpi
     dataset=sim1_M100K_N10K
     phen=sim1_M100K_N10K_h2_0.5_Mc_1000
-    grp=sim1_M100K_N10K_h2_0.5_Mc_1000.groups.1
-    mix=sim1_M100K_N10K_h2_0.5_Mc_1000.S.1
+    grp=sim1_M100K_N10K_h2_0.5_Mc_1000.groups #.1
+    mix=sim1_M100K_N10K_h2_0.5_Mc_1000.S #.1
     NUMINDS=10000
     NUMSNPS=100000
     NUMSNPS=100000

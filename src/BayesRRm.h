@@ -32,7 +32,7 @@ class BayesRRm
     const double       v0G     = 0.0001;
     const double       s02G    = 0.0001;
     const double       s02F    = 1.0;
-    const size_t       LENBUF  = 300;
+    const size_t       LENBUF  = 50000;
 
     //VectorXd  cva;     //EO: move v
     MatrixXd  cVa;       // component-specific variance
@@ -54,8 +54,7 @@ class BayesRRm
     VectorXd muk;       // mean of k-th component marker effect size
     VectorXd denom;     // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
     int      m0;        // total number of markers in model
-    //VectorXd v;         // variable storing the component assignment
-    VectorXd cass;      // variable storing the component assignment //EO RENAMING
+    VectorXd cass;      // variable storing the component assignment //EO RENAMING: was v
     MatrixXd cass8;
 
     // Mean and residual variables
