@@ -70,14 +70,14 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=10
+CL=22
 SEED=1222
 SR=0
 SM=1
 
 # If you change those, do not expect compatibility
 N=1
-TPN=1
+TPN=17
 
 echo 
 echo
@@ -93,8 +93,23 @@ echo
 echo
 echo "@@@ MPI 1-task solution reading from  BED file @@@"
 echo
-sol=mpi1tbed
+sol=ref; CL=14;
 cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpiBayesGroups --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS --groupIndexFile $datadir/$grp --groupMixtureFile $datadir/$mix"
+echo ----------------------------------------------------------------------------------
+echo $cmd
+echo ----------------------------------------------------------------------------------
+$cmd || exit 1
+#
+sol=fail; CL=7;
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpiBayesGroups --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS --groupIndexFile $datadir/$grp --groupMixtureFile $datadir/$mix --save 5"
+echo ----------------------------------------------------------------------------------
+echo $cmd
+echo ----------------------------------------------------------------------------------
+$cmd || exit 1
+#
+# RESTART previous failed chain
+sol=fail; CL=14;
+cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpiBayesGroups --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --read-from-bed-file --number-markers $NUMSNPS --number-individuals $NUMINDS --groupIndexFile $datadir/$grp --groupMixtureFile $datadir/$mix --save 5 --restart"
 echo ----------------------------------------------------------------------------------
 echo $cmd
 echo ----------------------------------------------------------------------------------

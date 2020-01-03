@@ -310,53 +310,77 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
 
 
 //EO: consider moving the csv output file from ASCII to BIN
-//TODO improve reading from file for multi group, now sigmaG is a vector and pi is a numgroups*components vector, read in rowise manner
 void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
                                      VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
     
-    cout << "EO: FIX ME" << endl;
-    exit(1);
-    
-    /*
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    string csv = mcmcOut + ".csv";
+    string        csv = mcmcOut + ".csv";
     std::ifstream file(csv);
-    int it_ = 1E9, rank_ = -1, m0_ = -1, pisize_ = -1, nchar = 0;
-    double mu_, sige_, rat_;
-    VectorXd sigg_(numGroups);
-    MatrixXd pipi(numGroups,K);
-    int lastSavedIt = 0;
+    int           it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0, ngrp_ = -1;
+    int           lastSavedIt = 0;
+    double        mu_, rat_, tmp;
+    VectorXd      sigg_(numGroups);
+    MatrixXd      pipi(numGroups,K);
     
     if (file.is_open()) {
+
         std::string str;
+
         while (std::getline(file, str)) {
+
             if (str.length() > 0) {
-                int nread = sscanf(str.c_str(), "%5d", &it_);
-                if (it_%optSave == 0) {
+
+                int nread = sscanf(str.c_str(), "%5d, %4d", &it_, &ngrp_);
+                //printf("%5d | %4d with optSave = %d\n", it_, ngrp_, optSave);
+
+                if (it_ % optSave == 0) {
+
                     lastSavedIt = it_;
+
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
-		    //we read iteration number
-                    nread = sscanf(cstr, "%5d", &it_);
-		    //here we have to loop over the number of sigmaG elements
-		    for(int jj=0; jj < num; ++jj)
+                    nread = sscanf(cstr, "%5d, %4d, %n", &it_, &ngrp_, &nchar);
+                    string remain_s = str.substr(nchar, str.length() - nchar);
+                    char   remain_c[remain_s.length() + 1];
+                    strcpy(remain_c, remain_s.c_str());
 
-		    ", %lf, %lf, %lf, %7d, %2d, %n",
-                                  
-				   &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
-                    string pis = str.substr(nchar, str.length()-nchar);
-                    char   pic[pis.length()+1];
-                    strcpy(pic, pis.c_str());
-                    for (int i=0; i<pis.length(); ++i) {
-                        if (pic[i] == ',') pic[i] = ' ';
+                    // remove commas
+                    for (int i=0; i<remain_s.length(); ++i) {
+                        if (remain_c[i] == ',') remain_c[i] = ' ';
                     }
-                    //cout << "pic = " << pic << endl;
-                    char* ppic = pic;
-                    for (int i=0; i<K; i++) {
-                        pipi[i] = strtod(ppic, &ppic);
+
+                    char* prc = remain_c;
+                    for (int i=0; i<numGroups; i++) {
+                        sigmaG[i] = strtod(prc, &prc);
+                        //printf("sigmaG[%d] = %20.15f\n", i, sigmaG[i]); 
+                    }
+
+                    sigmaE = strtod(prc, &prc);
+                    //printf("sigmaE = %20.15f\n", sigmaE);
+
+                    rat_ = strtod(prc, &prc);
+                    //printf("rat_ = %20.15f\n", rat_);
+                    
+                    m0_ = std::strtol(prc, &prc, 10);
+                    //printf("m0_ = %d\n", m0_);
+
+                    pirows_ = std::strtol(prc, &prc, 10);
+                    //printf("pirows_ = %d\n", pirows_);
+                    assert(pirows_ == ngrp_);
+                    assert(pi.rows() == pirows_);
+
+                    picols_ = std::strtol(prc, &prc, 10);
+                    //printf("picols_ = %d\n", picols_);
+                    assert(pi.cols() == picols_);
+
+
+                    for (int i=0; i<pirows_; i++) {
+                        for (int j=0; j<picols_; j++) {
+                            pi(i, j) = strtod(prc, &prc);
+                        }
                     }
                 }
             }
@@ -366,22 +390,12 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     
-    //printf("INFO   : read csv last it on rank %3d: %5d %15.10f %15.10f %15.10f %7d %2d ",
-    //       rank, lastSavedIt, mu_, sigg_, sige_, m0_, pisize_);
-    //for (int i=0; i<K; i++)  printf("%15.10f ", pipi[i]);
-    //printf("\n");
-    
-    // Sanity checks and assign
+    // Sanity checks
     assert(lastSavedIt % optSave == 0);
     assert(lastSavedIt >= 0);
     assert(lastSavedIt <= UINT_MAX);
-    iteration_restart = lastSavedIt;
-    sigmaG            = sigg_;
-    sigmaE            = sige_;
-    for (int i=0; i<K; i++) 
-        pi[i] = pipi[i];
 
-    */
+    iteration_restart = lastSavedIt;
 }
 
 
@@ -1802,16 +1816,20 @@ void Data::readCovariateFile(const string &covariateFile ) {
 //TODO Finish function to read the group file
 void Data::readGroupFile(const string &groupFile) {
 
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+
     ifstream in(groupFile.c_str());
     if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read. Use the --groupIndexFile option!");
 
-    cout << "Reading groups from [" + groupFile + "]." << endl;
+    if (rank == 0)
+        cout << "Reading groups from [" + groupFile + "]." << endl;
 
     std::istream_iterator<double> start(in), end;
     std::vector<int> numbers(start, end);
     int* ptr =(int*)&numbers[0];
-    G=(Eigen::Map<Eigen::VectorXi>(ptr,numbers.size()));
-    cout << "Groups read from file: G.size = " << G.size() << endl;
+    G=(Eigen::Map<Eigen::VectorXi>(ptr, numbers.size()));
 }
 
 //marion : read annotation file
@@ -1844,6 +1862,9 @@ void Data::readGroupFile_new(const string& groupFile){
 //save as Eigen Matrix
 void Data::readmSFile(const string& mSfile){
 
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
 	ifstream in(mSfile);
 
 	if(!in.is_open()){
@@ -1871,6 +1892,7 @@ void Data::readmSFile(const string& mSfile){
 		}
 	}
 
-	cout << "Mixtures read from file" << endl;
+    if (rank == 0)
+        cout << "Mixtures read from file" << endl;
 }
 

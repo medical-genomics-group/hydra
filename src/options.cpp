@@ -249,8 +249,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
     }
 
     options_s = ss.str();
-    cout << ss.str() << endl;
-
+    //cout << ss.str() << endl;
 
     //EO: check output directory exists or can be created
     int ldir = mcmcOutDir.length();
@@ -342,7 +341,7 @@ void Options::readFile(const string &file){  // input options from file
         ss << boost::format("%20s %-1s %-20s\n") %key %":" %value;
     }
     in.close();
-    cout << ss.str() << endl;
+    //cout << ss.str() << endl;
 }
 
 

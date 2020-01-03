@@ -93,7 +93,7 @@ int main(int argc, const char * argv[]) {
             }
 
             if (opt.mpiBayesGroups) {
-                printf("MPI BAYES GROUPS\n");
+                //printf("MPI BAYES GROUPS\n");
                 if (opt.groupIndexFile == "") throw("with --mpiBayesGroups activated you must use the --groupIndexFile!");
                 data.readGroupFile(opt.groupIndexFile);
                 if (opt.groupMixtureFile == "") throw("with --mpiBayesGroups activated you must use the --groupMixtureFile!");
