@@ -861,9 +861,6 @@ int BayesW::runMpiGibbs_bW() {
                 sum_failure(marker) = (temp_sum - mave[marker] * used_data_alpha.failure_vector.array().sum()) / mstd[marker];
         }
 
-        sum_failure(marker) = (temp_sum - mave[marker] * used_data_alpha.failure_vector.array().sum()) / mstd[marker];
-    }
-
     MPI_Barrier(MPI_COMM_WORLD);
     const auto et2 = std::chrono::high_resolution_clock::now();
     const auto dt2 = et2 - st2;
