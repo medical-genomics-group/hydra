@@ -214,12 +214,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             strvec.getTokens(argv[++i], " ,");
             S.resize(strvec.size());
             for (unsigned j=0; j<strvec.size(); ++j) {
-                S[j] = stof(strvec[j]);
+                S[j] = stod(strvec[j]);
             }
             ss << "--S " << argv[i] << "\n";
         }
-
-
         //marion : include mS for annotations
         else if (!strcmp(argv[i], "--mS")) {
         	mSfile = argv[++i];

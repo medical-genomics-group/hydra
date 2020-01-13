@@ -8,8 +8,11 @@ module list
 #echo LD_LIBRARY_PATH = $LD_LIBRARY_PATH
 
 NAM=mpi_gibbs
+
 cd ./src
+
 make EXE=$NAM $1 -f Makefile || exit 1;
+
 cd ..
 
 if [ ! -f $EXE ]; then

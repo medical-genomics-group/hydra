@@ -29,13 +29,13 @@ INCLUDE += -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
 INCLUDE += -I$(MVAPICH2_ROOT)/include
 
-LIBS     = -lz
+LIBS      = -lz
 #LIBS    += -lomp
 #LIBS    += -lstdc++fs
 #LIBS    += -lboost_system 
 #LIBS    += -lboost_filesystem
 
-SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
+SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 

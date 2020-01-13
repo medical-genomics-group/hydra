@@ -9,8 +9,6 @@ module list
 
 NAM=mpi_gibbs_G
 
-EXE=./src/$NAM
-
 cd ./src
 
 make EXE=$NAM $1 -f Makefile_G || exit 1;
@@ -22,3 +20,5 @@ if [ ! -f $EXE ]; then
     exit
 fi
 
+PWD=`pwd`
+export EXE=$PWD/src/$NAM
