@@ -8,7 +8,7 @@ EXE       = mpi_gibbs
 
 CXX       = mpic++
 
-CXXFLAGS  = -O2
+CXXFLAGS  = -O3
 CXXFLAGS += -ffast-math
 CXXFLAGS += -funroll-loops
 
