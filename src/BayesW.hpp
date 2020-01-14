@@ -142,7 +142,7 @@ class BayesW : public BayesRRm
 //    MatrixXi components8;
 
     //VectorXd y;
-    VectorXd sum_failure;
+ //   VectorXd sum_failure;
     VectorXd sum_failure_fix;
     
     //Sampled variables that are not kept in structure
