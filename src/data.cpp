@@ -1749,14 +1749,10 @@ void Data::readPhenCovFiles(const string &phenFile, const string covFile, const 
     Gadget::Tokenizer colDataP,  colDataC;
     string            inputStrP, inputStrC;
     std::vector<double> values;
-
     while (getline(inp, inputStrP)) {
-
         getline(inc, inputStrC);
-
         colDataP.getTokens(inputStrP, sep);
         colDataC.getTokens(inputStrC, sep);
-
         bool naC = false;
         for (int i=2; i<colDataC.size(); i++) {
             if (colDataC[i] == "NA") {
@@ -1777,12 +1773,14 @@ void Data::readPhenCovFiles(const string &phenFile, const string covFile, const 
             NAsInds.push_back(line);
             nas += 1;
         }
+
         line += 1;
     }
     inp.close();
     inc.close();
-    
+
     assert(nonas + nas == numInds);
+
     assert(line == numInds);
 
     numFixedEffects = values.size() / (line - nas);
@@ -1900,12 +1898,18 @@ template<typename M>
 M Data::readCSVFile (const string &path) {
     std::ifstream indata;
     indata.open(path);
+
     std::string line;
+
     std::vector<double> values;
+    cout << path << endl;
+
     uint rows = 0;
     while (std::getline(indata, line)) {
         std::stringstream lineStream(line);
         std::string cell;
+	        cout << cell  << endl;
+
         while (std::getline(lineStream, cell, ',')) {
             values.push_back(std::stod(cell));
         }

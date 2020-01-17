@@ -44,6 +44,25 @@ BayesW::~BayesW()
 {
 }
 
+/* Function that finds the sum across the sum across individuals who have marker with specified value */
+double BayesW::partial_sum(const double* __restrict__ vec,
+                                     const uint*   __restrict__ IX,
+                                     const size_t               NXS,
+                                     const size_t               NXL) {
+    double sum = 0.0;
+#ifdef __INTEL_COMPILER
+    __assume_aligned(vec, 64);
+    __assume_aligned(IX,  64);
+#endif
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+: sum)
+#endif
+    for (size_t i=NXS; i < NXS + NXL; i++) {
+        sum += vec[IX[i]];
+    }
+    return sum;
+}
+
 /* Function to check if ARS resulted with error*/
 inline void errorCheck(int err){
 	if(err>0){
@@ -68,7 +87,7 @@ inline double mu_dens(double x, void *norm_data)
 };
 
 /* Function for the log density of some "fixed" covariate effect */
-inline double theta_dens(double x, void *norm_data)
+inline double gamma_dens(double x, void *norm_data)
 /* We are sampling beta (denoted by x here) */
 {
 	double y;
@@ -482,36 +501,6 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
 	}
 }
 
-
-// Function for sampling fixed effect (theta_i)
-void BayesW::sampleTheta(int fix_i){
-	// ARS parameters
-	int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
-	int neval;
-	double xsamp[0], xcent[10], qcent[10] = {5., 30., 70., 95.};
-	double convex = 1.0;
-	int dometrop = 0;
-	double xprev = 0.0;
-	double xinit[4] = {theta(fix_i)-0.01, theta(fix_i),  theta(fix_i)+0.005, theta(fix_i)+0.01};     // Initial abscissae
-	double *p_xinit = xinit;
-
-	double xl = -2;
-	double xr = 2;			  // Initial left and right (pseudo) extremes
-
-	used_data.X_j = data.X.col(fix_i).cast<double>();  //Take from the fixed effects matrix
-	used_data.sum_failure = sum_failure_fix(fix_i);
-
-	used_data.epsilon = epsilon.array() + (used_data.X_j * theta(fix_i)).array(); // Adjust residual
-
-	// Sample using ARS
-	err = arms(xinit,ninit,&xl,&xr,theta_dens,&used_data,&convex,
-               npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
-	errorCheck(err);
-
-	theta(fix_i) = xsamp[0];  // Save the new result
-	epsilon = used_data.epsilon - used_data.X_j * theta(fix_i); // Adjust residual
-}
-
 void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsigned int fixedCount)
 {
 	// Read the failure indicator vector
@@ -524,10 +513,7 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 
 	// Linear model variables
 	Beta = VectorXd(markerCount);           // effect sizes
-	theta = VectorXd(fixedCount);
-
-//	sum_failure = VectorXd(markerCount);	// Vector to sum SNP data vector * failure vector per SNP
-	sum_failure_fix = VectorXd(fixedCount); // Vector to sum fixed vector * failure vector per fixed effect
+	gamma = VectorXd(fixedCount);
 
 	//phenotype vector
 	y = VectorXd();
@@ -557,7 +543,7 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 	marginal_likelihoods.setOnes();   //Initialize with just ones
 
 	Beta.setZero();
-	theta.setZero();
+	gamma.setZero();
 
 	//initialize epsilon vector as the phenotype vector
 	y = data.y.cast<double>().array();
@@ -606,12 +592,6 @@ void BayesW::init(unsigned int markerCount, unsigned int individualCount, unsign
 	used_data.d = used_data_alpha.failure_vector.array().sum();
 	used_data_alpha.d = used_data.d;
 
-	//If there are fixed effects, find the same values for them
-	if(fixedCount > 0){
-		for(int fix_i=0; fix_i < fixedCount; fix_i++){
-			sum_failure_fix(fix_i) = ((data.X.col(fix_i).cast<double>()).array() * used_data_alpha.failure_vector.array()).sum();
-		}
-	}
 }
 
 //EO: MPI GIBBS
@@ -828,15 +808,19 @@ int BayesW::runMpiGibbs_bW() {
     //if (rank == 0) printf("INFO   : start computing statistics on Ntot = %d individuals\n", Ntot);
     double dN   = (double) Ntot;
     double dNm1 = (double)(Ntot - 1);
-    double *mave, *mstd, *sum_failure;
+    double *mave, *mstd, *sum_failure, *sum_failure_fix; 
 
     mave = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mave, __LINE__, __FILE__);
     mstd = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
     sum_failure = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
 
+    sum_failure_fix = (double*)_mm_malloc(size_t(numFixedEffects) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
+
+
     dalloc += 2 * size_t(M) * sizeof(double) / 1E9;
 
     double tmp0, tmp1, tmp2;
+    double temp_fail_sum = used_data_alpha.failure_vector.array().sum();
     for (int i=0; i<M; ++i) {
         // For now use the old way to compute means
         mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
@@ -855,10 +839,18 @@ int BayesW::runMpiGibbs_bW() {
         for(size_t ii = N2S[i]; ii < (N2S[i] + N2L[i]) ; ii++){
               temp_sum += 2*used_data_alpha.failure_vector(I2[ii]);
         }
-        sum_failure[i] = (temp_sum - mave[i] * used_data_alpha.failure_vector.array().sum()) / mstd[i];
+        sum_failure[i] = (temp_sum - mave[i] * temp_fail_sum) / mstd[i];
 
         //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
+//If there are fixed effects, find the same values for them
+        if(opt.covariates){
+            for(int fix_i=0; fix_i < numFixedEffects; fix_i++){
+                    sum_failure_fix[fix_i] = ((data.X.col(fix_i).cast<double>()).array() * used_data_alpha.failure_vector.array()).sum();
+            }
+        }
+
+
 
         // Reading the Xj*failure sum in sparse format:
     /*    for(int marker=0; marker < Mtot; marker++){
@@ -985,8 +977,51 @@ int BayesW::runMpiGibbs_bW() {
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
             epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
-
         ////////// End sampling mu
+
+	/* 1a. Fixed effects (gammas) */
+	if(opt.covariates){
+		double gamma_old = 0;
+		std::shuffle(xI.begin(), xI.end(), dist.rng);    
+
+		for(int fix_i = 0; fix_i < numFixedEffects; fix_i++){
+                        gamma_old = gamma(xI[fix_i]);
+
+			neval = 0;
+			xsamp[0] = 0;
+			convex = 1.0;
+			dometrop = 0;
+			xprev = 0.0;
+			xinit[0] = gamma_old - 0.001;     // Initial abscissae
+			xinit[1] = gamma_old; 	
+			xinit[2] = gamma_old + 0.0005;  
+			xinit[3] = gamma_old + 0.001;  
+
+			xl = -0.5;
+			xr = 0.5;			  // Initial left and right (pseudo) extremes
+
+			used_data.X_j = data.X.col(fix_i).cast<double>();  //Take from the fixed effects matrix
+			used_data.sum_failure = sum_failure_fix[fix_i];
+
+			for(int k = 0; k < Ntot; k++){
+            			(used_data.epsilon)[k] = epsilon[k] + used_data.X_j[k] * gamma_old;// we adjust the residual with the respect to the previous gamma value
+        		}
+
+			// Sample using ARS
+			err = arms(xinit,ninit,&xl,&xr, gamma_dens,&used_data,&convex,
+				npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+			errorCheck(err);
+			//Use only rank 0
+		        check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+		
+			gamma(xI[fix_i]) = xsamp[0];  // Save the new result
+			
+			for(int k = 0; k < Ntot; k++){
+                                 epsilon[k] = (used_data.epsilon)[k] - used_data.X_j[k] * gamma(xI[fix_i]);// we adjust the residual with the respect to the previous gamma value
+                        }
+		}
+	}
+        ////////// End sampling gamma
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
         //------------------------------------------------------------------------
@@ -1041,25 +1076,33 @@ int BayesW::runMpiGibbs_bW() {
 	        //Also find the transformed residuals
 		for(uint i=0; i<Ntot; ++i){
                         tmp_vi[i] = exp(used_data.alpha * tmpEps_vi[i] - EuMasc);
-                        vi_sum += tmp_vi[i];
+                //        vi_sum += tmp_vi[i];
 		}
-	        for (size_t i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
-			vi_2 += tmp_vi[I2[i]];
-        	}
-                for (size_t i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
-                        vi_1 += tmp_vi[I1[i]];
-        	}
+                vi_sum = sum_vector_elements_f64(tmp_vi, Ntot);
+	      //  for (size_t i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+	      //		vi_2 += tmp_vi[I2[i]];
+              //	}
+                vi_2 = partial_sum(tmp_vi, I2, N2S[marker], N2L[marker]);
+
+                //for (size_t i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
+                //        vi_1 += tmp_vi[I1[i]];
+        	//}
+                vi_1 = partial_sum(tmp_vi, I1, N1S[marker], N1L[marker]);
+
         }else{
 		// Calculate the sums of vi elements
-        	for (uint i=0; i < Ntot; i++){
-                	vi_sum += vi[i];
-        	}
-                for (size_t i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
-                        vi_2 += vi[I2[i]];
-        	}
-                for (size_t i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
-                        vi_1 += vi[I1[i]];
-                }
+        	//for (uint i=0; i < Ntot; i++){
+                //	vi_sum += vi[i];
+        	//}
+		vi_sum = sum_vector_elements_f64(vi, Ntot);
+                //for (size_t i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
+                //        vi_2 += vi[I2[i]];
+        	//}
+		vi_2 = partial_sum(vi, I2, N2S[marker], N2L[marker]);
+                //for (size_t i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
+                //        vi_1 += vi[I1[i]];
+                //}
+                vi_1 = partial_sum(vi, I1, N1S[marker], N1L[marker]);
 
                 }
 
@@ -1429,7 +1472,6 @@ int BayesW::runMpiGibbs_bW() {
         xinit[1] =  used_data.alpha;
         xinit[2] = (used_data.alpha)*1.15;
         xinit[3] = (used_data.alpha)*1.5; 
-        // double *p_xinit = xinit;
 
         // Initial left and right (pseudo) extremes
         xl = 0.0;
@@ -1460,9 +1502,9 @@ int BayesW::runMpiGibbs_bW() {
         //Update the sqrt(2sigmab) variable
         used_data.sqrt_2sigmab = sqrt(2*used_data_beta.sigma_b);
         //Print results
-        if(rank == 0){
-	        //cout << iteration << ". " << Mtot - v[0]  <<"; " <<"; "<< setprecision(17) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigma_b << endl;
-	}
+        //if(rank == 0){
+	  //      cout << iteration << ". " << Mtot - v[0]  <<"; " <<"; "<< setprecision(17) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigma_b << endl;
+	//}
 	
         // 5. Sample prior mixture component probability from Dirichlet distribution
         pi_L = dist.dirichilet_rng(v.array() + 1);
@@ -1473,7 +1515,7 @@ int BayesW::runMpiGibbs_bW() {
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
-              if (true and rank%10==0) {
+              if (rank%10==0) {
                 printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f (%9.3f + %9.3f), n_sync = %8d (%8d + %8d) (%7.3f / %7.3f), betasq = %15.10f, m0 = %10d\n",
                 iteration, rank, end_it-start_it,
                 it_sync_ar1  + it_sync_ar2,  it_sync_ar1,  it_sync_ar2,

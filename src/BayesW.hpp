@@ -135,7 +135,6 @@ class BayesW : public BayesRRm
 */
     // Linear model variables
 //    VectorXd Beta;       // effect sizes
-    VectorXd theta;
     VectorXd vi;
 //    VectorXd y_tilde;    // variable containing the adjusted residuals to exclude the effects of a given marker
 //    VectorXd epsilon;    // variable containing the residuals
@@ -143,7 +142,7 @@ class BayesW : public BayesRRm
 
     //VectorXd y;
  //   VectorXd sum_failure;
-    VectorXd sum_failure_fix;
+ //   VectorXd sum_failure_fix;
     
     //Sampled variables that are not kept in structure
 //    double mu;
@@ -209,13 +208,10 @@ class BayesW : public BayesRRm
     
 private:
         void init(unsigned int markerCount, unsigned int individualCount, unsigned int fixedCount);
-	void sampleMu();
-	void sampleTheta(int fix_i);
-	void sampleBeta(int marker);
-	void sampleAlpha();
 
 	void marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n, double vi_sum, double vi_2,double vi_1, double vi_0,double mean, double sd, double mean_sd_ratio);
 	double gauss_hermite_adaptive_integral(int k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio);
+	double partial_sum(const double* __restrict__ vec, const uint*   __restrict__ IX, const size_t  NXS, const size_t NXL);
 
 //	VectorXd getSnpData(unsigned int marker) const;
 //    void     printDebugInfo() const;
