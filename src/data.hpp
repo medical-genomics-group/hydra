@@ -186,6 +186,13 @@ public:
 
     void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
                                    double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart);
+    // Two functions tailored for bW output. Consider using same format in bR
+    void read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
+                                     double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart);
+    void read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave, const int gamma_length,
+                                     VectorXd& gamma, uint& iteration_restart);
+    void read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
+                                     std::vector<int>& markerI);
 
     void read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration_restart, const int thin,
                                    double& mu);

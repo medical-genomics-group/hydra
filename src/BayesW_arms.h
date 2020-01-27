@@ -1,6 +1,8 @@
 #ifndef SRC_BAYESW_ARMS_H_
 #define SRC_BAYESW_ARMS_H_
 
+
+
 int arms_simple (int ninit, double *xl, double *xr,
                  double (*myfunc)(double x, void *mydata), void *mydata,
                  int dometrop, double *xprev, double *xsamp);

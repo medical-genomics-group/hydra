@@ -75,10 +75,8 @@ int main(int argc, const char * argv[]) {
 
                 // Read in covariates file if passed
                 if (opt.covariates) {
-                    std::cout << "reading covariates file: "  << opt.covariatesFile << endl;
                     //data.readCovariateFile(opt.covariatesFile);
                     data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
-		    std::cout << "reading done "  << endl;
 
                 }else{
                     data.readPhenotypeFile(opt.phenotypeFile);

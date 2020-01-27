@@ -75,6 +75,46 @@ void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, con
     check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
 }
 
+//SO: remove rank specificity for bW
+void Data::read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
+                                     std::vector<int>& markerI)  {
+   
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    MPI_Status status;
+    MPI_File   fh;
+
+    const string fp = mcmcOut + "." + ext;
+    check_mpi(MPI_File_open(MPI_COMM_SELF, fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
+
+    // 1. get and validate iteration number that we are about to read
+    MPI_Offset off = size_t(0);
+    uint iteration_ = UINT_MAX;
+    check_mpi(MPI_File_read_at(fh, off, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (iteration_ != iteration_restart) {
+        printf("Mismatch between expected and read mrk iteration: %d vs %d\n", iteration_restart, iteration_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 2. get and validate M (against size of markerI)
+    uint M_ = 0;
+    off = sizeof(uint);
+    check_mpi(MPI_File_read_at(fh, off, &M_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    uint M = markerI.size();
+    if (M_ != M) {
+        printf("Mismatch between expected and read mrk M: %d vs %d\n", M, M_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    // 3. read the M_ coefficients
+    off = sizeof(uint) + sizeof(uint);
+    check_mpi(MPI_File_read_at(fh, off, markerI.data(), M_, MPI_INT, &status), __LINE__, __FILE__);
+
+
+    check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
+}
 
 //EO: .gam files only contain a dump of last saved iteration (no history)
 //  : format is: iter, length, vector
@@ -282,6 +322,7 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
     MPI_Status status;
 
     MPI_File betfh;
+cout << betfp.c_str() << endl;
     check_mpi(MPI_File_open(MPI_COMM_WORLD, betfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &betfh), __LINE__, __FILE__);
 
     // 1. first element of the .bet, .cpn and .acu files is the total number of processed markers
@@ -385,6 +426,128 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     for (int i=0; i<K; i++) 
         pi[i] = pipi[i];
 }
+
+// SO: Currently basically the copy of the previous version. Consider using adding reading mu for bR so the same function could be used
+void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
+                                     double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart) {
+
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    string csv = mcmcOut + ".csv";
+    std::ifstream file(csv);
+    int it_ = 1E9, rank_ = -1, m0_ = -1, pisize_ = -1, nchar = 0;
+    double mu_, sigg_, sige_, rat_;
+    double pipi[K];
+    int lastSavedIt = 0;
+
+    if (file.is_open()) {
+        std::string str;
+        while (std::getline(file, str)) {
+            if (str.length() > 0) {
+                int nread = sscanf(str.c_str(), "%5d", &it_);
+                if (it_%optSave == 0) {
+                    lastSavedIt = it_;
+                    char cstr[str.length()+1];
+                    strcpy(cstr, str.c_str());
+                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %lf, %7d, %2d, %n",
+                                   &it_, &mu_, &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
+                    string pis = str.substr(nchar, str.length()-nchar);
+                    char   pic[pis.length()+1];
+                    strcpy(pic, pis.c_str());
+                    for (int i=0; i<pis.length(); ++i) {
+                        if (pic[i] == ',') pic[i] = ' ';
+                    }
+                    //cout << "pic = " << pic << endl;
+                    char* ppic = pic;
+                    for (int i=0; i<K; i++) {
+                        pipi[i] = strtod(ppic, &ppic);
+                    }
+                }
+            }
+        }
+    } else {
+        printf("*FATAL*: failed to open csv file %s!\n", csv.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    //printf("INFO   : read csv last it on rank %3d: %5d %15.10f %15.10f %15.10f %7d %2d ",
+    //       rank, lastSavedIt, mu_, sigg_, sige_, m0_, pisize_);
+    //for (int i=0; i<K; i++)  printf("%15.10f ", pipi[i]);
+    //printf("\n");
+
+    // Sanity checks and assign
+    assert(lastSavedIt % optSave == 0);
+    assert(lastSavedIt >= 0);
+    assert(lastSavedIt <= UINT_MAX);
+    iteration_restart = lastSavedIt;
+    mu		      = mu_;
+    sigmaG            = sigg_;
+    sigmaE            = sige_;
+    for (int i=0; i<K; i++)
+        pi[i] = pipi[i];
+}
+
+
+// SO: Function to read fixed covariate effects from csv format file. Consider using adding reading mu for bR so the same function could be used
+void Data::read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave, const int gamma_length, 
+                                     VectorXd& gamma, uint& iteration_restart) {
+
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    string csv = mcmcOut + ".gam";
+    std::ifstream file(csv);
+    int it_ = 1E9, nchar = 0;
+    double gamma_[gamma_length];
+    int lastSavedIt = 0;
+
+    if (file.is_open()) {
+        std::string str;
+        while (std::getline(file, str)) {
+            if (str.length() > 0) {
+                int nread = sscanf(str.c_str(), "%5d", &it_);
+                if (it_%optSave == 0) {
+                    lastSavedIt = it_;
+                    char cstr[str.length()+1];
+                    strcpy(cstr, str.c_str());
+                    nread = sscanf(cstr, "%5d, %n",
+                                   &it_, &nchar);
+	    string pis = str.substr(nchar, str.length()-nchar);
+	    char   pic[pis.length()+1];
+                    strcpy(pic, pis.c_str());
+                    for (int i=0; i<pis.length(); ++i) {
+                        if (pic[i] == ',') pic[i] = ' ';
+                    }
+                    //cout << "pic = " << pic << endl;
+                    char* ppic = pic;
+                    for (int i = 0; i < gamma_length; i++) {
+                        gamma_[i] = strtod(ppic, &ppic);
+                    }
+                }
+            }
+        }
+    } else {
+        printf("*FATAL*: failed to open csv file %s!\n", csv.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    //printf("INFO   : read csv last it on rank %3d: %5d %15.10f %15.10f %15.10f %7d %2d ",
+    //       rank, lastSavedIt, mu_, sigg_, sige_, m0_, pisize_);
+    //for (int i=0; i<K; i++)  printf("%15.10f ", pipi[i]);
+    //printf("\n");
+
+    // Sanity checks and assign
+    assert(lastSavedIt % optSave == 0);
+    assert(lastSavedIt >= 0);
+    assert(lastSavedIt <= UINT_MAX);
+    iteration_restart = lastSavedIt;
+    for (int i = 0; i < gamma_length; i++)
+        gamma[i] = gamma_[i];
+}
+
 
 
 void Data::sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
@@ -1507,113 +1670,6 @@ void Data::readBedFile_noMPI(const string &bedFile) {
     cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
 #endif
 }
-
-/*
-void Data::readBedFile_noMPI_unstandardised(const string &bedFile){
-	unsigned i = 0, j = 0, k = 0;
-
-	if (numSnps == 0) throw ("Error: No SNP is retained for analysis.");
-	if (numInds == 0) throw ("Error: No individual is retained for analysis.");
-
-	Zones.resize(numSnps);
-	Ztwos.resize(numSnps);
-	means.resize(numSnps);
-	sds.resize(numSnps);
-	mean_sd_ratio.resize(numSnps);
-
-	//	Z.resize(numInds, numSnps);
-	//	ZPZdiag.resize(numSnps);
-	snp2pq.resize(numSnps);
-
-	// Read bed file
-	char ch[1];
-	bitset<8> b;
-	unsigned allele1=0, allele2=0;
-	ifstream BIT(bedFile.c_str(), ios::binary);
-	if (!BIT) throw ("Error: can not open the file [" + bedFile + "] to read.");
-	cout << "Reading PLINK BED file from [" + bedFile + "] in SNP-major format ..." << endl;
-	for (i = 0; i < 3; i++) BIT.read(ch, 1); // skip the first three bytes
-	SnpInfo *snpInfo = NULL;
-	unsigned snp = 0, ind = 0;
-	unsigned nmiss = 0;
-	double mean = 0.0;
-	double sqn = 0.0;
-
-	for (j = 0, snp = 0; j < numSnps; j++) { // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
-		snpInfo = snpInfoVec[j];
-		mean = 0.0;
-		sqn = 0.0;
-		nmiss = 0;
-		if (!snpInfo->included) {
-			for (i = 0; i < numInds; i += 4) BIT.read(ch, 1);
-			continue;
-		}
-		for (i = 0, ind = 0; i < numInds;) {
-			BIT.read(ch, 1);
-			if (!BIT) throw ("Error: problem with the BED file ... has the FAM/BIM file been changed?");
-			b = ch[0];
-			k = 0;
-			while (k < 7 && i < numInds) {
-				if (!indInfoVec[i]->kept) k += 2;
-				else {
-					allele1 = (!b[k++]);
-					allele2 = (!b[k++]);
-					//Assume no missing genotypes
-					//if (allele1 == 0 && allele2 == 1) {  // missing genotype
-					//	Z(ind++, snp) = -9;
-					//++nmiss;
-					//	} else {
-					int all_sum = allele1 + allele2;
-					if(all_sum == 1 ){
-						Zones[j].push_back(ind++); //Save the index of the individual to the vector of ones
-					}else if(all_sum == 2){
-						Ztwos[j].push_back(ind++);
-					}else{
-						ind++;
-					}
-
-					if (allele1 == 0 && allele2 == 1) {  // missing genotype
-						cout << "MISSING " << endl;
-					}
-
-					mean += all_sum;
-					sqn += all_sum*all_sum;
-					//	}
-				}
-				i++;
-			}
-		}
-		// fill missing values with the mean
-		mean /= double(numInds-nmiss);
-
-		//Assume non-missingness
-
-		//	if (nmiss) {
-		//	for (i=0; i<numInds; ++i) {
-		//		if (Z(i,snp) == -9) Z(i,snp) = mean;
-		//	}
-		//}
-		 
-		// compute allele frequency
-		snpInfo->af = 0.5f*mean;
-		snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
-
-		// standardize genotypes
-
-		sqn -= numInds * mean * mean;
-		means(j) = mean;
-		sds(j) = sqrt(sqn / double(numInds));
-
-		mean_sd_ratio(j) = means(j)/sds(j);
-
-		if (++snp == numSnps) break;
-	}
-	BIT.clear();
-	BIT.close();
-
-	cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
-}
-*/
 
 
 void Data::center_and_scale(double* __restrict__ vec, int* __restrict__ mask, const uint N, const uint nas) {
