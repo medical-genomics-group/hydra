@@ -1451,8 +1451,9 @@ int BayesRRm::runMpiGibbs() {
 
                 marker  = markerI[j];
                 beta    = Beta(marker);
-                sigE_G  = sigmaE / sigmaG[G[marker]];
-                sigG_E  = sigmaG[G[MrankS[rank] + marker]] / sigmaE;
+
+		sigE_G  = sigmaE / sigmaG[G[MrankS[rank] + marker]];
+		sigG_E  = sigmaG[G[MrankS[rank] + marker]] / sigmaE;
                 i_2sigE = 1.0 / (2.0 * sigmaE);
                 
                 if (adaV[j]) {
