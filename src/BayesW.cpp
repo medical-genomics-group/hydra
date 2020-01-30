@@ -923,7 +923,25 @@ int BayesW::runMpiGibbs_bW() {
         printf("INFO   : Total time to load the data: %lu bytes in %.3f seconds => BW = %7.3f GB/s\n", totalBytes, tl, (double)totalBytes * 1E-9 / tl);
         fflush(stdout);
     }
+    // Correct each marker for individuals with missing phenotype
+    // ----------------------------------------------------------
+    if (data.numNAs > 0) {
 
+        if (rank == 0)
+            printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", data.numNAs);
+
+        data.sparse_data_correct_for_missing_phenotype(N1S, N1L, I1, M);
+        data.sparse_data_correct_for_missing_phenotype(N2S, N2L, I2, M);
+        data.sparse_data_correct_for_missing_phenotype(NMS, NML, IM, M);
+
+        MPI_Barrier(MPI_COMM_WORLD);
+        if (rank == 0) printf("INFO   : finished applying NA corrections.\n");
+
+        // Adjust N upon number of NAs
+        Ntot -= data.numNAs;
+        if (rank == 0 && data.numNAs > 0)
+            printf("INFO   : Ntot adjusted by -%d to account for NAs in phenotype file. Now Ntot=%d\n", data.numNAs, Ntot);
+    }
 
     // Compute statistics (from sparse info)
     // -------------------------------------

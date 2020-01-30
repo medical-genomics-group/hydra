@@ -1995,7 +1995,9 @@ void Data::readFailureFile(const string &failureFile){
 	while(true){
 		input >> col ;
 		if(input.eof()) break;
-		tmp.push_back(col);
+		if(col == 0 or col == 1){
+			tmp.push_back(col); // Only read the individuals who have a valid failure indicator (others are missing data)
+		}
 	}
 	input.close();
 	fail = Eigen::VectorXd::Map(tmp.data(), tmp.size());
