@@ -1064,15 +1064,6 @@ int BayesW::runMpiGibbs_bW() {
         int    it_nsync_ar1 = 0;
         int    it_nsync_ar2 = 0;
 
-/* double temp_sum_0 = 0.0;
-
-        for(int i=0; i < Ntot; ++i){
-                temp_sum_0 += epsilon[i] * epsilon[i];
-        }
-if(rank == 0){
-cout <<rank << ". " << setprecision(16) << temp_sum_0 << endl;
-}*/
-
         /* 1. Intercept (mu) */
         //Removed sampleMu function on its own 
         int err, ninit = 4, npoint = 100, nsamp = 1, ncent = 4 ;
@@ -1100,30 +1091,17 @@ cout <<rank << ". " << setprecision(16) << temp_sum_0 << endl;
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 	mu = xsamp[0];   // Save the sampled value
         //Update after sampling
-/*
-if(rank == 0){
-cout <<rank << ". " << setprecision(16) << mu << endl;
-}
-*/
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
             epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
-/* temp_sum_0 = 0.0;
-
-        for(int i=0; i < Ntot; ++i){
-                temp_sum_0 += epsilon[i] * epsilon[i];
-        }
-if(rank == 0){
-cout <<rank << ". " << setprecision(16) << temp_sum_0 << endl;
-}*/
         ////////// End sampling mu
 	/* 1a. Fixed effects (gammas) */
 	if(opt.covariates){
 
 		double gamma_old = 0;
-		//std::shuffle(xI.begin(), xI.end(), dist.rng);    
+		std::shuffle(xI.begin(), xI.end(), dist.rng);    
     		//Use only rank 0 shuffling
-                //check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+                check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 	        MPI_Barrier(MPI_COMM_WORLD);
 
 		//TODO Maybe there is a better way of doing this
@@ -1161,14 +1139,6 @@ cout <<rank << ". " << setprecision(16) << temp_sum_0 << endl;
 			for(int k = 0; k < Ntot; k++){
                                  epsilon[k] = (used_data.epsilon)[k] - used_data.X_j[k] * gamma(xI[fix_i]);// we adjust the residual with the respect to the previous gamma value
                         }
-      /*  double temp_sum_2 = 0.0;
-
-        for(int i=0; i < Ntot; ++i){
-                temp_sum_2 += epsilon[i] * epsilon[i];
-        }
-		//cout << "(" << rank << ") " << setprecision(13) << gamma_old << ", " << gamma(xI[fix_i]) << ", " << temp_sum_2 << endl;
-		if(rank == 0){cout << "(" << rank << ") " << setprecision(13) << gamma_old << ", " << gamma(xI[fix_i]) << ", " << temp_sum_2 << endl;}
-	 */       
 		        MPI_Barrier(MPI_COMM_WORLD);
 		}
 	}
@@ -1180,15 +1150,9 @@ cout <<rank << ". " << setprecision(16) << temp_sum_0 << endl;
         //------------------------------------------------------------------------
         
         // Calculate the vector of exponent of the adjusted residuals
-        //double temp_sum_1 = 0.0;
-        //double temp_sum_2 = 0.0;
-
         for(int i=0; i<Ntot; ++i){
             vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
-		//temp_sum_1 += vi[i];
-		//temp_sum_2 += epsilon[i] * epsilon[i];
         }
-        //cout << "(" << rank << ") " << setprecision(13) <<temp_sum_1 << ", " << temp_sum_2 << endl;
 
         if (opt.shuffleMarkers) {
             std::shuffle(markerI.begin(), markerI.end(), dist.rng);
@@ -1556,17 +1520,11 @@ cout <<rank << ". " << setprecision(16) << temp_sum_0 << endl;
                             epsilon[i] = epsilon[i] + beta * mave[marker]/mstd[marker];
                         }
                         //And adjust even further for specific 1 and 2 allele values
-                        //  for(int i=0; i < data.Zones[marker].size(); i++){
 		                for (size_t i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
-                            //epsilon[data.Zones[marker][i]] += betaOld/mstd[marker];
-                            //epsilon[data.Zones[marker][i]] -= beta/mstd[marker];
                             epsilon[I1[i]] += betaOld/mstd[marker];
                             epsilon[I1[i]] += betaOld/mstd[marker];
                         }
-                        //    for(int i=0; i < data.Ztwos[marker].size(); i++){
                         for (size_t i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
-                            //epsilon[data.Ztwos[marker][i]] += 2*betaOld/mstd[marker];
-                            //epsilon[data.Ztwos[marker][i]] -= 2*beta/mstd[marker];
                             epsilon[I2[i]] += 2*betaOld/mstd[marker];
                             epsilon[I2[i]] -= 2*beta/mstd[marker];
                         }
@@ -1840,28 +1798,17 @@ cout <<rank << ". " << setprecision(16) << temp_sum_0 << endl;
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
-//cout << "A1" << endl;
     // Close output files
     check_mpi(MPI_File_close(&outfh), __LINE__, __FILE__);
-//cout << "A2" << endl;
     check_mpi(MPI_File_close(&betfh), __LINE__, __FILE__);
-//cout << "A3" << endl;
     check_mpi(MPI_File_close(&xbetfh), __LINE__, __FILE__);
-//cout << "A4" << endl;
     check_mpi(MPI_File_close(&epsfh), __LINE__, __FILE__);
-//cout << "A5" << endl;
     check_mpi(MPI_File_close(&cpnfh), __LINE__, __FILE__);
-//cout << "A6" << endl;
     check_mpi(MPI_File_close(&xcpnfh), __LINE__, __FILE__);
-//cout << "A7" << endl;
     check_mpi(MPI_File_close(&acufh), __LINE__, __FILE__);
-//cout << "A8" << endl;
     check_mpi(MPI_File_close(&mrkfh), __LINE__, __FILE__);
-//cout << "A9" << endl;
     check_mpi(MPI_File_close(&xivfh), __LINE__, __FILE__);
-//cout << "A10" << endl;
     check_mpi(MPI_File_close(&gamfh), __LINE__, __FILE__);
-//cout << "A11" << endl;
 
     // Release memory
     _mm_free(y);
