@@ -534,6 +534,11 @@ void BayesW::init(unsigned int individualCount, unsigned int fixedCount)
 {
 	// Read the failure indicator vector
 	data.readFailureFile(opt.failureFile);
+	
+	if(individualCount != (data.fail).size()){
+		cout << "Number of phenotypes "<< individualCount << " was different from the number of failures " << (data.fail).size() << endl;
+		exit(1);
+	}
 
 	// Component variables
 	pi_L = VectorXd(K);           		 // prior mixture probabilities
@@ -1105,7 +1110,6 @@ int BayesW::runMpiGibbs_bW() {
                    npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
 
         errorCheck(err); // If there is error, stop the program
-
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 	mu = xsamp[0];   // Save the sampled value
         //Update after sampling
@@ -1131,13 +1135,14 @@ int BayesW::runMpiGibbs_bW() {
 			convex = 1.0;
 			dometrop = 0;
 			xprev = 0.0;
-			xinit[0] = gamma_old - 0.001;     // Initial abscissae
-			xinit[1] = gamma_old; 	
-			xinit[2] = gamma_old + 0.0005;  
-			xinit[3] = gamma_old + 0.001;  
 
-			xl = -0.5;
-			xr = 0.5;			  // Initial left and right (pseudo) extremes
+			xinit[0] = gamma_old - 0.075/30 ;     // Initial abscissae
+			xinit[1] = gamma_old; 	
+			xinit[2] = gamma_old + 0.075/60;  
+			xinit[3] = gamma_old + 0.075/30;  
+
+			xl = gamma_old - 0.075;
+			xr = gamma_old + 0.075;			  // Initial left and right (pseudo) extremes
 
 			used_data.X_j = data.X.col(xI[fix_i]).cast<double>();  //Take from the fixed effects matrix
 			used_data.sum_failure = sum_failure_fix[xI[fix_i]];
@@ -1603,26 +1608,26 @@ int BayesW::runMpiGibbs_bW() {
         xprev = 0.0;
         xinit[0] = (used_data.alpha)*0.5;     // Initial abscissae
         xinit[1] =  used_data.alpha;
-        xinit[2] = (used_data.alpha)*1.15;
-        xinit[3] = (used_data.alpha)*1.5; 
+        xinit[2] = (used_data.alpha)*1.05;
+        xinit[3] = (used_data.alpha)*1.10; 
 
         // Initial left and right (pseudo) extremes
         xl = 0.0;
-        xr = 30.0;
+        xr = 40.0;
 
         //Give the residual to alpha structure
         //used_data_alpha.epsilon = epsilon;
         for(int alpha_ind=0; alpha_ind < Ntot; alpha_ind++){
             (used_data_alpha.epsilon)[alpha_ind] = epsilon[alpha_ind];
         }
+//cout << "sample alpha" << endl;
 
         //Sample using ARS
         err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
                    npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
         errorCheck(err);
-
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
-
+//cout << "alpha=" <<xsamp[0] << endl;
         used_data.alpha = xsamp[0];
         used_data_beta.alpha = xsamp[0];
 
@@ -1639,15 +1644,15 @@ int BayesW::runMpiGibbs_bW() {
         pi_L = dist.dirichilet_rng(v.array() + 1);
         check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
  //Print results
-         if(rank == 0){
-                cout << iteration << ". " << Mtot - v[0]  <<"; " <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigmaG << "; " << pi_L[0] << "; " << pi_L[1] << endl;
-         }
+    //     if(rank == 0){
+    //            cout << iteration << ". " << Mtot - v[0]  <<"; " <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigmaG << "; " << pi_L[0] << "; " << pi_L[1] << endl;
+    //     }
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
 
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
-              if (false and rank%10==0) {
+              if (rank == 0) {
                 printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f (%9.3f + %9.3f), n_sync = %8d (%8d + %8d) (%7.3f / %7.3f), betasq = %15.10f, m0 = %10d\n",
                 iteration, rank, end_it-start_it,
                 it_sync_ar1  + it_sync_ar2,  it_sync_ar1,  it_sync_ar2,
