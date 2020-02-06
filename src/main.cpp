@@ -76,7 +76,12 @@ int main(int argc, const char * argv[]) {
                 // Read in covariates file if passed
                 if (opt.covariates) {
                     //data.readCovariateFile(opt.covariatesFile);
-                    data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
+                    if(opt.bayesType == "bayesWMPI"){
+			data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
+			if(rank == 0){cout << data.y[0] << ", " << data.y[1] << ", " << data.fail[0] << ", " << data.fail[1]; }
+		    }else{
+                    	data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
+		    }
 
                 }else{
                     data.readPhenotypeFile(opt.phenotypeFile);

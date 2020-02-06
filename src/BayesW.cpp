@@ -287,7 +287,7 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 		w4 = w3;
 
 		x5 = 1.4685532892167;
-		x6 = -x3;
+		x6 = -x5;
 		w5 = 0.7646081250946;
 		w6 = w5;
 
@@ -508,8 +508,203 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
             w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w15 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
-	}else{
-		cout << "Possible number of quad_points = 3,5,7,9,11,13,15" << endl;
+	}else if(n == "17"){
+                double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16;//,x17;
+                double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15,w16,w17; //These are adjusted weights
+
+                x1 = 4.8713451936744;
+                x2 = -x1;
+                w1 = 0.92625413999;
+                w2 = w1;
+
+                x3 = 4.0619466758755;
+                x4 = -x3;
+                w3 = 0.728748370587;
+                w4 = w3;
+
+                x5 = 3.3789320911415;
+                x6 = -x3;
+                w5 = 0.6462917002129;
+                w6 = w5;
+
+                x7 = 2.7577629157039;
+                x8 = -x7;
+                w7 = 0.5998927326678;
+                w8 = w7;
+
+                x9 = 2.1735028266666;
+                x10 = -x9;
+                w9 = 0.5707392941245;
+                w10 = w9;
+
+                x11 = 1.6129243142212;
+                x12 = -x11;
+                w11 = 0.55177735307817;
+                w12 = w11;
+
+                x13 = 1.0676487257435;
+                x14 = -x13;
+                w13 = 0.5397631139085;
+                w14 = w13;
+
+                x15 = 0.53163300134266;
+                x16 = -x15;
+                w15 = 0.5330706545736;
+                w16 = w15;
+
+	        w17 = 0.53091793762486;
+
+                x1 = sigma*x1;
+                x2 = sigma*x2;
+                x3 = sigma*x3;
+                x4 = sigma*x4;
+                x5 = sigma*x5;
+                x6 = sigma*x6;
+                x7 = sigma*x7;
+                x8 = sigma*x8;
+                x9 = sigma*x9;
+                x10 = sigma*x10;
+                x11 = sigma*x11;
+                x12 = sigma*x12;
+                x13 = sigma*x13;
+                x14 = sigma*x14;
+                x15 = sigma*x15;
+                x16 = sigma*x16;
+
+                temp =  w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w15 * gh_integrand_adaptive(x15,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w16 * gh_integrand_adaptive(x16,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w17 ;//* gh_integrand_adaptive(0,...)= 1
+        }else if(n == "25"){
+                double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24;
+                double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15,w16,w17,w18,w19,w20,w21,w22,w23,w24,w25; //These are adjusted weights
+
+                x1 = 6.1642724340525;
+                x2 = -x1;
+                w1 = 0.862401988731;
+                w2 = w1;
+
+                x3 = 5.41363635528;
+                x4 = -x3;
+                w3 = 0.673022290222;
+                w4 = w3;
+
+                x5 = 4.7853203673522;
+                x6 = -x3;
+                w5 = 0.5920816930865;
+                w6 = w5;
+               x7 = 4.2186094443866;
+                x8 = -x7;
+                w7 = 0.5449177721944;
+                w8 = w7;
+
+                x9 = 3.690282876998;
+                x10 = -x9;
+                w9 = 0.513655789775;
+                w10 = w9;
+
+                x11 = 3.1882949244251;
+                x12 = -x11;
+                w11 = 0.4915068818876;
+                w12 = w11;
+
+                x13 = 2.705320237173;
+                x14 = -x13;
+                w13 = 0.4752497380022;
+                w14 = w13;
+
+                x15 = 2.2364201302673;
+                x16 = -x15;
+                w15 = 0.463141046575;
+                w16 = w15;
+
+                x17 = 1.7780011243372;
+                x18 = -x17;
+                w17 = 0.45415588552762;
+                w18 = w17;
+
+                x19 = 1.3272807020731;
+                x20 = -x19;
+                w19 = 0.4476612565874;
+                w20 = w19;
+
+                x21 = 0.88198275621382;
+                x22 = -x21;
+                w21 = 0.44325918925185;
+                w22 = w21;
+
+                x23 = 0.44014729864531;
+                x24 = -x23;
+                w23 = 0.44070582891206;
+                w24 = w23;
+                //x25 = 0.0;
+                w25 = 0.43986872216949;
+
+                x1 = sigma*x1;
+                x2 = sigma*x2;
+                x3 = sigma*x3;
+                x4 = sigma*x4;
+                x5 = sigma*x5;
+                x6 = sigma*x6;
+                x7 = sigma*x7;
+                x8 = sigma*x8;
+                x9 = sigma*x9;
+                x10 = sigma*x10;
+                x11 = sigma*x11;
+                x12 = sigma*x12;
+                x13 = sigma*x13;
+                x14 = sigma*x14;
+                x15 = sigma*x15;
+                x16 = sigma*x16;
+                x17 = sigma*x17;
+                x18 = sigma*x18;
+                x19 = sigma*x19;
+                x20 = sigma*x20;
+                x21 = sigma*x21;
+                x22 = sigma*x22;
+                x23 = sigma*x23;
+                x24 = sigma*x24;
+
+                temp =  w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w15 * gh_integrand_adaptive(x15,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w16 * gh_integrand_adaptive(x16,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w17 * gh_integrand_adaptive(x17,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w18 * gh_integrand_adaptive(x18,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w19 * gh_integrand_adaptive(x19,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w20 * gh_integrand_adaptive(x20,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w21 * gh_integrand_adaptive(x21,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w22 * gh_integrand_adaptive(x22,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w23 * gh_integrand_adaptive(x23,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w24 * gh_integrand_adaptive(x24,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+            w25 ;//* gh_integrand_adaptive(0,...)= 1
+        }else{
+		cout << "Possible number of quad_points = 3,5,7,9,11,13,15,17,25" << endl;
 		exit(1);
 	}
 
@@ -533,7 +728,7 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
 void BayesW::init(unsigned int individualCount, unsigned int fixedCount)
 {
 	// Read the failure indicator vector
-	data.readFailureFile(opt.failureFile);
+//	data.readFailureFile(opt.failureFile);
 	
 	if(individualCount != (data.fail).size()){
 		cout << "Number of phenotypes "<< individualCount << " was different from the number of failures " << (data.fail).size() << endl;
@@ -1150,11 +1345,13 @@ int BayesW::runMpiGibbs_bW() {
 			for(int k = 0; k < Ntot; k++){
             			(used_data.epsilon)[k] = epsilon[k] + used_data.X_j[k] * gamma_old;// we adjust the residual with the respect to the previous gamma value
         		}
-
+//if(rank == 0) cout << fix_i << ". gamma sampling" << endl;
 			// Sample using ARS
 			err = arms(xinit,ninit,&xl,&xr, gamma_dens,&used_data,&convex,
 				npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
 			errorCheck(err);
+//if(rank == 0) cout << fix_i << ". gamma = " << xsamp[0] << endl;
+
 			//Use only rank 0
 		        check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 		
@@ -1620,14 +1817,12 @@ int BayesW::runMpiGibbs_bW() {
         for(int alpha_ind=0; alpha_ind < Ntot; alpha_ind++){
             (used_data_alpha.epsilon)[alpha_ind] = epsilon[alpha_ind];
         }
-//cout << "sample alpha" << endl;
 
         //Sample using ARS
         err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
                    npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
         errorCheck(err);
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
-//cout << "alpha=" <<xsamp[0] << endl;
         used_data.alpha = xsamp[0];
         used_data_beta.alpha = xsamp[0];
 
@@ -1644,9 +1839,9 @@ int BayesW::runMpiGibbs_bW() {
         pi_L = dist.dirichilet_rng(v.array() + 1);
         check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
  //Print results
-    //     if(rank == 0){
-    //            cout << iteration << ". " << Mtot - v[0]  <<"; " <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigmaG << "; " << pi_L[0] << "; " << pi_L[1] << endl;
-    //     }
+         if(rank == 0){
+                cout << iteration << ". " << Mtot - v[0]  <<"; " <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigmaG << "; " << pi_L[0] << "; " << pi_L[1] << endl;
+         }
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
