@@ -1908,7 +1908,7 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
     }
     inp.close();
     inc.close();
-
+    inf.close();
     assert(nonas + nas == numInds);
 
     assert(line == numInds);

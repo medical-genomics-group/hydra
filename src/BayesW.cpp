@@ -725,11 +725,9 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
 	}
 }
 
-void BayesW::init(unsigned int individualCount, unsigned int fixedCount)
+void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int fixedCount)
 {
 	// Read the failure indicator vector
-//	data.readFailureFile(opt.failureFile);
-	
 	if(individualCount != (data.fail).size()){
 		cout << "Number of phenotypes "<< individualCount << " was different from the number of failures " << (data.fail).size() << endl;
 		exit(1);
@@ -760,9 +758,11 @@ void BayesW::init(unsigned int individualCount, unsigned int fixedCount)
 	const int km1 = K - 1;
 
 	//set priors for pi parameters
-	//Give all mixtures (except 0 class) equal initial probabilities
+	//Give only the first mixture some initial probability of entering
+	pi_L.setConstant(1.0/Mtot);
 	pi_L(0) = 0.99;
-	pi_L.segment(1,km1).setConstant((1-pi_L(0))/km1);
+	pi_L(1) = 1 - pi_L(0) - (km1 - 1)/Mtot;
+	//pi_L.segment(1,km1).setConstant((1-pi_L(0))/km1);
 
 	marginal_likelihoods.setOnes();   //Initialize with just ones
 
@@ -829,7 +829,7 @@ void BayesW::init(unsigned int individualCount, unsigned int fixedCount)
 void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot, const uint fixtot,
                                  const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart) {
     //Use the regular bW initialisation
-    init(Ntot,fixtot);    
+    init(Ntot,Mtot, fixtot);    
      
     data.read_mcmc_output_csv_file_bW(opt.mcmcOut, opt.save, K, mu, used_data_beta.sigmaG, used_data.alpha, pi_L, iteration_restart);
     
@@ -1005,7 +1005,7 @@ int BayesW::runMpiGibbs_bW() {
     }else{
         // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
         srand(opt.seed);
-	init(Ntot - data.numNAs, numFixedEffects);
+	init(Ntot - data.numNAs, Mtot,numFixedEffects);
     }
 
     std::vector<unsigned int> xI(data.X.cols());
@@ -1307,7 +1307,7 @@ int BayesW::runMpiGibbs_bW() {
         errorCheck(err); // If there is error, stop the program
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 	mu = xsamp[0];   // Save the sampled value
-        //Update after sampling
+	//Update after sampling
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
             epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
         }
@@ -1320,6 +1320,7 @@ int BayesW::runMpiGibbs_bW() {
     		//Use only rank 0 shuffling
                 check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 	        MPI_Barrier(MPI_COMM_WORLD);
+
 
 		//TODO Maybe there is a better way of doing this
 		for(int fix_i = 0; fix_i < numFixedEffects; fix_i++){
@@ -1342,15 +1343,14 @@ int BayesW::runMpiGibbs_bW() {
 			used_data.X_j = data.X.col(xI[fix_i]).cast<double>();  //Take from the fixed effects matrix
 			used_data.sum_failure = sum_failure_fix[xI[fix_i]];
 
+
 			for(int k = 0; k < Ntot; k++){
             			(used_data.epsilon)[k] = epsilon[k] + used_data.X_j[k] * gamma_old;// we adjust the residual with the respect to the previous gamma value
         		}
-//if(rank == 0) cout << fix_i << ". gamma sampling" << endl;
 			// Sample using ARS
 			err = arms(xinit,ninit,&xl,&xr, gamma_dens,&used_data,&convex,
 				npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
 			errorCheck(err);
-//if(rank == 0) cout << fix_i << ". gamma = " << xsamp[0] << endl;
 
 			//Use only rank 0
 		        check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -1368,7 +1368,39 @@ int BayesW::runMpiGibbs_bW() {
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
         //------------------------------------------------------------------------
+ 
+        // ARS parameters
+        neval = 0;
+        xsamp[0] = 0;
+        convex = 1.0;
+        dometrop = 0;
+        xprev = 0.0;
+        xinit[0] = (used_data.alpha)*0.5;     // Initial abscissae
+        xinit[1] =  used_data.alpha;
+        xinit[2] = (used_data.alpha)*1.05;
+        xinit[3] = (used_data.alpha)*1.10;
+
+        // Initial left and right (pseudo) extremes
+        xl = 0.0;
+        xr = 40.0;
+
+        //Give the residual to alpha structure
+        //used_data_alpha.epsilon = epsilon;
+        for(int alpha_ind=0; alpha_ind < Ntot; alpha_ind++){
+            (used_data_alpha.epsilon)[alpha_ind] = epsilon[alpha_ind];
+        }
+
+        //Sample using ARS
+        err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
+                   npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
+        errorCheck(err);
+        check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        used_data.alpha = xsamp[0];
+        used_data_beta.alpha = xsamp[0];
         
+	MPI_Barrier(MPI_COMM_WORLD);
+
+       
         // Calculate the vector of exponent of the adjusted residuals
         for(int i=0; i<Ntot; ++i){
             vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
@@ -1753,7 +1785,7 @@ int BayesW::runMpiGibbs_bW() {
    
                 // Do a update currently locally for vi vector
                 for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
-                    vi[vi_ind] = exp(used_data.alpha * epsilon[vi_ind] - EuMasc);
+                      vi[vi_ind] = exp(used_data.alpha * epsilon[vi_ind] - EuMasc);
                 }
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
@@ -1796,36 +1828,6 @@ int BayesW::runMpiGibbs_bW() {
         // Update global parameters
         // ------------------------
         m0      = double(Mtot) - v[0];
-
-        // ARS parameters
-        neval = 0;
-        xsamp[0] = 0;
-        convex = 1.0;
-        dometrop = 0;
-        xprev = 0.0;
-        xinit[0] = (used_data.alpha)*0.5;     // Initial abscissae
-        xinit[1] =  used_data.alpha;
-        xinit[2] = (used_data.alpha)*1.05;
-        xinit[3] = (used_data.alpha)*1.10; 
-
-        // Initial left and right (pseudo) extremes
-        xl = 0.0;
-        xr = 40.0;
-
-        //Give the residual to alpha structure
-        //used_data_alpha.epsilon = epsilon;
-        for(int alpha_ind=0; alpha_ind < Ntot; alpha_ind++){
-            (used_data_alpha.epsilon)[alpha_ind] = epsilon[alpha_ind];
-        }
-
-        //Sample using ARS
-        err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
-                   npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
-        errorCheck(err);
-        check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
-        used_data.alpha = xsamp[0];
-        used_data_beta.alpha = xsamp[0];
-
         MPI_Barrier(MPI_COMM_WORLD);
 
         // 4. Sample sigmaG

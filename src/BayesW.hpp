@@ -117,7 +117,7 @@ class BayesW : public BayesRRm
 #endif
     
 private:
-        void init(unsigned int individualCount, unsigned int fixedCount);
+        void init(unsigned int individualCount, unsigned int Mtot, unsigned int fixedCount);
 	void init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot, const uint fixtot,
                                  const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart);
 	void marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n, double vi_sum, double vi_2,double vi_1, double vi_0,double mean, double sd, double mean_sd_ratio);
