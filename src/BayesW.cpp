@@ -887,7 +887,7 @@ int BayesW::runMpiGibbs_bW() {
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File   outfh, betfh, epsfh, gamfh, cpnfh, acufh, mrkfh, xivfh;
+    MPI_File   outfh, betfh, epsfh, gamfh, cpnfh, mrkfh, xivfh; //acufh
     MPI_File   xbetfh, xcpnfh;
     MPI_Status status;
     MPI_Info   info;
@@ -971,7 +971,7 @@ int BayesW::runMpiGibbs_bW() {
     string xbetfp = opt.mcmcOut + ".xbet";
     string cpnfp = opt.mcmcOut + ".cpn";
     string xcpnfp = opt.mcmcOut + ".xcpn";
-    string acufp = opt.mcmcOut + ".acu";
+  //  string acufp = opt.mcmcOut + ".acu";
     string gamfp = opt.mcmcOut + ".gam";
     string xivfp = opt.mcmcOut + ".xiv";
     string rngfp = opt.mcmcOut + ".rng." + std::to_string(rank);
@@ -995,7 +995,7 @@ int BayesW::runMpiGibbs_bW() {
         xbetfp = opt.mcmcOut + ".xbet"; // Last saved iteration of bet; .bet has full history
         cpnfp  = opt.mcmcOut + ".cpn";
         xcpnfp = opt.mcmcOut + ".xcpn"; // Idem
-        acufp  = opt.mcmcOut + ".acu";
+       // acufp  = opt.mcmcOut + ".acu";
         rngfp  = opt.mcmcOut + ".rng." + std::to_string(rank);
         mrkfp  = opt.mcmcOut + ".mrk." + std::to_string(rank);
         epsfp  = opt.mcmcOut + ".eps." + std::to_string(rank);
@@ -1024,7 +1024,7 @@ int BayesW::runMpiGibbs_bW() {
     listFile << xbetfp << "\n";
     listFile << cpnfp << "\n";
     listFile << xcpnfp << "\n";
-    listFile << acufp << "\n";
+   // listFile << acufp << "\n";
     listFile << gamfp << "\n";
     listFile << xivfp << "\n";
     for (int i=0; i<nranks; i++) {
@@ -1045,7 +1045,7 @@ int BayesW::runMpiGibbs_bW() {
         MPI_File_delete(xbetfp.c_str(), MPI_INFO_NULL);
         MPI_File_delete(cpnfp.c_str(), MPI_INFO_NULL);
         MPI_File_delete(xcpnfp.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(acufp.c_str(), MPI_INFO_NULL);
+     //   MPI_File_delete(acufp.c_str(), MPI_INFO_NULL);
         MPI_File_delete(gamfp.c_str(), MPI_INFO_NULL);
 	MPI_File_delete(xivfp.c_str(), MPI_INFO_NULL);
     }
@@ -1059,7 +1059,7 @@ int BayesW::runMpiGibbs_bW() {
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xbetfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xbetfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, cpnfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &cpnfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xcpnfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xcpnfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, acufp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &acufh), __LINE__, __FILE__);
+  //  check_mpi(MPI_File_open(MPI_COMM_WORLD, acufp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &acufh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD,  gamfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &gamfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD,  xivfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xivfh), __LINE__, __FILE__);
 
@@ -1077,7 +1077,7 @@ int BayesW::runMpiGibbs_bW() {
         check_mpi(MPI_File_write_at(xbetfh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
         check_mpi(MPI_File_write_at(cpnfh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
         check_mpi(MPI_File_write_at(xcpnfh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        check_mpi(MPI_File_write_at(acufh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+       // check_mpi(MPI_File_write_at(acufh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1919,7 +1919,7 @@ int BayesW::runMpiGibbs_bW() {
             if (rank == 0) {
                 offset = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double));
                 check_mpi(MPI_File_write_at(betfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-                check_mpi(MPI_File_write_at(acufh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+               // check_mpi(MPI_File_write_at(acufh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
 
                 offset = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int));
                 check_mpi(MPI_File_write_at(cpnfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
@@ -2025,7 +2025,7 @@ int BayesW::runMpiGibbs_bW() {
     check_mpi(MPI_File_close(&epsfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&cpnfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&xcpnfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&acufh), __LINE__, __FILE__);
+   // check_mpi(MPI_File_close(&acufh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&mrkfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&xivfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&gamfh), __LINE__, __FILE__);

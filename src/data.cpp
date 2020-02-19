@@ -1923,6 +1923,56 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
     dfail.conservativeResize(numInds-nas);
 
 }
+//SEO: Function to read phenotype and failure files simultaneously (without covariates)
+void Data::readPhenFailFiles(const string &phenFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank) {
+
+    numInds = numberIndividuals;
+    dest.setZero(numInds);
+    dfail.setZero(numInds);
+
+    ifstream inp(phenFile.c_str());
+    if (!inp)
+        throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
+
+    ifstream inf(failFile.c_str());
+    if (!inf)
+        throw ("Error: can not open the failure file [" + failFile + "] to read.");
+
+    uint line = 0, nas = 0, nonas = 0;
+    string sep(" \t");
+    Gadget::Tokenizer colDataP,  colDataF;
+    string            inputStrP, inputStrF;
+    std::vector<double> values;
+    while (getline(inp, inputStrP)) {
+        getline(inf, inputStrF);
+        colDataP.getTokens(inputStrP, sep);
+        colDataF.getTokens(inputStrF, sep);
+
+        if (colDataP[1+1] != "NA" && colDataF[0] != "-9") {
+            dest[nonas] = double( atof(colDataP[1+1].c_str()) );
+            dfail[nonas] = double( atof(colDataF[0].c_str()) );
+            nonas += 1;
+        } else {
+            if (rank == 0)
+                cout << "NA(s) detected on line " << line << ", naP? " << colDataP[1+1] << ", naF? " << colDataF[0]  << endl;
+            NAsInds.push_back(line);
+            nas += 1;
+        }
+
+        line += 1;
+    }
+    inp.close();
+    inf.close();
+    assert(nonas + nas == numInds);
+
+    assert(line == numInds);
+
+    numNAs = nas;
+
+    dest.conservativeResize(numInds-nas);
+    dfail.conservativeResize(numInds-nas);
+}
+
 
 void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest) {
     numInds = numberIndividuals;
