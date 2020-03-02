@@ -974,8 +974,8 @@ int BayesRRm::runMpiGibbs() {
     double              num;             // storing dot product
     //int                 m0;              // total number of markers in model
     double              m0;
-    VectorXd            v(K);            // variable storing the component assignment
-    VectorXd            sum_v(K);        // To store the sum of v elements over all ranks
+    VectorXd            cass(K);            // variable storing the component assignment
+    VectorXd            sum_cass(K);        // To store the sum of v elements over all ranks
     VectorXd            Acum(M);
     VectorXd            Gamma(data.numFixedEffects);
     //daniel The following variables are related to the restarting
@@ -1431,7 +1431,7 @@ int BayesRRm::runMpiGibbs() {
         }
         
         m0 = 0.0;
-        v.setZero();
+        cass.setZero();
 
         sigE_G  = sigmaE / sigmaG;
         sigG_E  = sigmaG / sigmaE;
@@ -1524,7 +1524,7 @@ int BayesRRm::runMpiGibbs() {
                                 Beta(marker) = dist.norm_rng(muk[k], sigmaE/denom[k-1]);
                                 //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with p=%15.10f <= acum = %15.10f, denom = %15.10f, sigmaE = %15.10f: beta = %15.10f\n", iteration, rank, marker, k, muk[k], p, acum, denom[k-1], sigmaE, Beta(marker));
                             }
-                            v[k] += 1.0d;
+                            cass[k] += 1.0d;
                             components[marker] = k;
                             break;
                         } else {
@@ -1803,17 +1803,17 @@ int BayesRRm::runMpiGibbs() {
         // ------------------------
         if (nranks > 1) {
             MPI_Barrier(MPI_COMM_WORLD);
-            check_mpi(MPI_Allreduce(&beta_squaredNorm, &sum_beta_squaredNorm, 1,        MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            check_mpi(MPI_Allreduce(v.data(),          sum_v.data(),          v.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            v                = sum_v;
+            check_mpi(MPI_Allreduce(&beta_squaredNorm, &sum_beta_squaredNorm, 1,           MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(cass.data(),       sum_cass.data(),       cass.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            cass             = sum_cass;
             beta_squaredNorm = sum_beta_squaredNorm;
         }
 
         // Update global parameters
         // ------------------------
-        m0      = double(Mtot) - v[0];
+        m0      = double(Mtot) - cass[0];
         sigmaG  = dist.inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0));
-        pi      = dist.dirichilet_rng(v.array() + 1.0);
+        pi      = dist.dirichilet_rng(cass.array() + 1.0);
         //printf("rank %d own sigmaG = %20.15f with Mtot = %d and m0 = %d\n", rank, sigmaG, Mtot, int(m0));
 
         // Broadcast sigmaG of rank 0
@@ -1925,7 +1925,7 @@ int BayesRRm::runMpiGibbs() {
         //printf("it %6d, rank %3d: epsilon[0] = %15.10f, y[0] = %15.10f, m0=%10.1f,  sigE=%15.10f,  sigG=%15.10f [%6d / %6d]\n", iteration, rank, epsilon[0], y[0], m0, sigmaE, sigmaG, markerI[0], markerI[M-1]);
 
         //BCAST
-        //pi = dist.dirichilet_rng(v.array() + 1.0);
+        //pi = dist.dirichilet_rng(cass.array() + 1.0);
         check_mpi(MPI_Bcast(pi.data(), pi.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //for (int i=0; i<pi.size(); i++) {
         //    printf("rank %3d: pi[%d] = %15.10f after glob sync\n", rank, i, pi[i]);
@@ -2619,10 +2619,7 @@ int BayesRRm::runGibbs()
         }
 
         //set no. of markers included in the model
-        //cout << "M " << M  << endl;
-        //cout << "v[0] " << v[0] << endl;
         m0 = int(M) - int(cass[0]);
-        //cout << "m0 " << m0 << endl;
 
         //sample sigmaG from inverse gamma
         sigmaG = dist.inv_scaled_chisq_rng(v0G + double(m0), (betasqn * double(m0) + v0G * s02G) / (v0G + double(m0)));
