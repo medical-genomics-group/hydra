@@ -20,29 +20,31 @@ const unsigned Megabase = 1e6;
 class Options {
 public:
 
-    unsigned shuffleMarkers    = 1;
+    unsigned shuffleMarkers      = 1;
 #ifdef USE_MPI
-    bool     restart           = false;
-    bool     sparseSync        = false;
-    unsigned syncRate          = 1;
-    bool     bedToSparse       = false;
-    bool     readFromBedFile   = false; //EO: by default read from sparse representation files
-    unsigned blocksPerRank     = 1;     //EO: for bed -> sparse conversion, to split blocks if too large
-    bool     checkRam          = false;
-    unsigned checkRamTasks     = 0;
-    unsigned checkRamTpn       = 0;
+    bool     restart             = false;
+    bool     sparseSync          = false;
+    unsigned syncRate            = 1;
+    bool     bedToSparse         = false;
+    bool     readFromBedFile     = false;
+    bool     readFromSparseFiles = false;
+    bool     mixedRepresentation = false;
+    unsigned blocksPerRank       = 1;     //EO: for bed -> sparse conversion, to split blocks if too large
+    bool     checkRam            = false;
+    unsigned checkRamTasks       = 0;
+    unsigned checkRamTpn         = 0;
 #endif
-    unsigned numberMarkers     = 0;
-    unsigned numberIndividuals = 0;
+    unsigned numberMarkers       = 0;
+    unsigned numberIndividuals   = 0;
     unsigned chainLength;
     unsigned burnin;
     unsigned seed;
     unsigned numThread;
-    int numThreadSpawned       = 0;    // Default to 0, let TBB do its thing
-    unsigned thin;                     // save every this th sampled value in MCMC
-    unsigned save;                     // sampling rate of the epsilon vector
-    vector<double> S;                  // variance components
-
+    int numThreadSpawned         = 0;    // Default to 0, let TBB do its thing
+    unsigned thin;                       // save every this th sampled value in MCMC
+    unsigned save;                       // sampling rate of the epsilon vector
+    vector<double> S;                    // variance components
+ 
     //marion : include annotation variables
     unsigned int numGroups;
     Eigen::MatrixXd mS;
@@ -64,15 +66,20 @@ public:
 
     string markerBlocksFile;
     string bedFile;
-    string mcmcOutDir = "";
-    string mcmcOutNam = "default_output_name";
-    string mcmcOut    = "default_output_name";
-    string sparseDir,      sparseBsn;
+    string mcmcOutDir  = "";
+    string mcmcOutNam  = "default_output_name";
+    string mcmcOut     = "default_output_name";
+    string sparseDir   = "";
+    string sparseBsn   = "";
     string optionFile;
-    string covariatesFile;              // for extra covariates.
-    bool   covariates = false;          // for extra covatiates.
-    bool   compress  = false;
-    bool deltaUpdate = true; // Use the delta epsilon to pass the message in mpi
+    string covariatesFile;         // for extra covariates.
+    bool   covariates  = false;    // for extra covatiates.
+    bool   compress    = false;
+    bool   deltaUpdate = true;     // Use the delta epsilon to pass the message in mpi
+
+    // Use BED representation over SPARSE if fraction of non-zero elements (fnz)
+    // is greater than this threshold:
+    double threshold_fnz = 0.06;
 
     string options_s;
 

@@ -23,29 +23,6 @@
 
 #include <omp.h>
 
-/*
-BayesRRm_mt::BayesRRm_mt(Data &data, Options &opt, const long memPageSize)
-: data(data)
-, opt(opt)
-, bedFile(opt.bedFile + ".bed")
-, memPageSize(memPageSize)
-, outputFile(opt.mcmcOut + ".csv")
-, seed(opt.seed)
-, max_iterations(opt.chainLength)
-, burn_in(opt.burnin)
-  //, dist(opt.seed)
-, usePreprocessedData(opt.analysisType == "PPBayes")
-, showDebug(false)
-{
-    float* ptr =static_cast<float*>(&opt.S[0]);
-    cva = (Eigen::Map<Eigen::VectorXf>(ptr, static_cast<long>(opt.S.size()))).cast<double>();
-}
-BayesRRm_mt::BayesRRm_mt(Data &data, Options &opt, const long memPageSize)
-    : BayesRRm(data, opt, memPageSize)
-{
-}
-*/
-
 BayesRRm_mt::~BayesRRm_mt()
 {
 }
@@ -315,7 +292,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
 #ifdef _OPENMP
     int tn = omp_get_thread_num();
     printf("MPI GIBBS MULTI-TRAITS on thread %d\n", tn);
-#warning "Using OpenMP"
+    //#warning "Using OpenMP"
 #endif
     char   buff[LENBUF]; 
     int    nranks, rank, name_len, result;
@@ -367,18 +344,15 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
     const int           NT     = opt.phenotypeFiles.size();
 
     std::vector<int>    markerI;
-    VectorXd            muk(K);          // mean of k-th component marker effect size
+    VectorXd            muk(K);           // mean of k-th component marker effect size
     MatrixXd            muk8(NT, K);
-    VectorXd            denom(K-1);      // temporal variable for computing the inflation of the effect variance for a given non-zero component
+    VectorXd            denom(K-1);       // temporal variable for computing the inflation of the effect variance for a given non-zero component
     MatrixXd            denom8(NT, K-1);
-    VectorXd            cVa(K);          // component-specific variance
-    VectorXd            cVaI(K);         // inverse of the component variances
-    double              num;             // storing dot product
-    //int                 m0;              // total number of markers in model
-    double              m0;
-    //VectorXd            v(K);            // variable storing the component assignment
-    VectorXd            sum_cass(K);     // To store the sum of the cass elements over all ranks
-    MatrixXd            sum_cass8(NT, K);
+    VectorXd            cVa(K);           // component-specific variance
+    VectorXd            cVaI(K);          // inverse of the component variances
+    double              num;              // storing dot product
+    int                 m0;               // total number of markers in model
+    MatrixXi            sum_cass8(NT, K); // To store the sum of the cass elements over all ranks
     VectorXd            Acum(M);
     MatrixXd            Acum8(NT, M);
     VectorXd            Gamma(data.numFixedEffects);
@@ -535,31 +509,43 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
     // Read the data (from sparse representation by default)
     // -----------------------------------------------------
     size_t *N1S, *N1L,  *N2S, *N2L,  *NMS, *NML;
-    N1S = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
-    N1L = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
-    N2S = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
-    N2L = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
-    NMS = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
-    NML = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
-    dalloc += 6.0 * double(Mtot) * sizeof(size_t) / 1E9;
+    N1S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
+    N1L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
+    N2S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
+    N2L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
+    NMS = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
+    NML = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
+    dalloc += 6.0 * double(M) * sizeof(size_t) / 1E9;
+
+
+    // Boolean mask for using BED representation or not (SPARSE otherwise)
+    // For markers with USEBED == true then the BED representation is 
+    // converted on the fly to SPARSE the time for the corresponding marker
+    // to be processed
+    // --------------------------------------------------------------------
+    bool *USEBED;
+    USEBED = (bool*)_mm_malloc(M * sizeof(bool), 64);  check_malloc(USEBED, __LINE__, __FILE__);
+    for (int i=0; i<M; i++) USEBED[i] = false;
+    int nusebed = 0;
+
 
     uint *I1, *I2, *IM;
-    size_t bytes = 0;
-    
+
+    size_t taskBytes = 0;
+
     if (opt.readFromBedFile) {
         data.load_data_from_bed_file(opt.bedFile, Ntot, M, rank, MrankS[rank],
-                                     dalloc,
                                      N1S, N1L, I1,
                                      N2S, N2L, I2,
-                                     NMS, NML, IM);
+                                     NMS, NML, IM,
+                                     taskBytes);
     } else {
         string sparseOut = mpi_get_sparse_output_filebase(rank);
         data.load_data_from_sparse_files(rank, nranks, M, MrankS, MrankL, sparseOut,
-                                         dalloc,
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,
                                          NMS, NML, IM,
-					 bytes);
+                                         taskBytes);
     }
 
 
@@ -570,9 +556,9 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
         MPI_Barrier(MPI_COMM_WORLD);
         if (rank == 0)
             printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", data.numNAs);
-        data.sparse_data_correct_for_missing_phenotype(N1S, N1L, I1, M);
-        data.sparse_data_correct_for_missing_phenotype(N2S, N2L, I2, M);
-        data.sparse_data_correct_for_missing_phenotype(NMS, NML, IM, M);
+        data.sparse_data_correct_for_missing_phenotype(N1S, N1L, I1, M, USEBED);
+        data.sparse_data_correct_for_missing_phenotype(N2S, N2L, I2, M, USEBED);
+        data.sparse_data_correct_for_missing_phenotype(NMS, NML, IM, M, USEBED);
 
         MPI_Barrier(MPI_COMM_WORLD);
         if (rank == 0) printf("INFO   : finished applying NA corrections.\n");
@@ -902,7 +888,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
                 std::shuffle(markerI.begin(), markerI.end(), dist8[i].rng);
         }
 
-        m0 = 0.0;
+        m0 = 0;
         cass8.setZero();
 
         for (int i=0; i<NT; i++) {
@@ -1036,8 +1022,8 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
                                     //if (i == 0)
                                     //    printf("@B@ bet8 update %4d/%4d/%4d muk8[%4d,%4d] = %15.10f with p=%15.10f <= acum=%15.10f, denom = %15.10f, sigmaE = %15.10f: beta = %15.10f\n", iteration, rank, marker, i, k, muk8(i, k), p8[i], acum8[i], denom8(i, k-1), sigmaE8[i], Beta8[marker + i * M]);
                                 }                                
-                                cass8(i, k) += 1.0d;
-                                components8(i, marker) = k;
+                                cass8(i, k)            += 1;
+                                components8(i, marker)  = k;
                                 break;
                             } else {
                                 //if too big or too small
@@ -1177,9 +1163,8 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
         // ------------------------
         if (nranks > 1) {
             double sum_beta_squaredNorm8[8] = {0.0};
-            check_mpi(MPI_Allreduce(&beta_squaredNorm8, &sum_beta_squaredNorm8, NT,            MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-
-            check_mpi(MPI_Allreduce(cass8.data(),        sum_cass8.data(),      cass8.size(),  MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(&beta_squaredNorm8, &sum_beta_squaredNorm8, NT,            MPI_DOUBLE,  MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(cass8.data(),        sum_cass8.data(),      cass8.size(),  MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             cass8  = sum_cass8;
             for (int i=0; i<NT; i++)
                 beta_squaredNorm8[i] = sum_beta_squaredNorm8[i];
@@ -1189,9 +1174,9 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
 
         // Update global parameters
         // ------------------------
-        m0 = double(Mtot) - cass8(0, 0);
+        m0 = Mtot - cass8(0, 0);
         for (int i=0; i<NT; i++)
-            sigmaG8[i] = dist8[i].inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm8[i] * m0 + v0G*s02G) /(v0G+m0));
+            sigmaG8[i] = dist8[i].inv_scaled_chisq_rng(v0G + double(m0), (beta_squaredNorm8[i] * double(m0) + v0G * s02G) /(v0G + double(m0)));
         //printf("sigmaG8 = [%15.10f, %15.10f]\n", sigmaG8[0], sigmaG8[7]);
 
 
@@ -1288,20 +1273,13 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
         if (rank%10==0) {
             for (int i=0; i<2; i++) {
-                printf("RESULT : it %4d, rank %4d, pheno %d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %d\n", iteration, rank, i, v0G+m0,(beta_squaredNorm8[i] * m0 + v0G*s02G) /(v0G+m0), sigmaG8[i], sigmaE8[i], beta_squaredNorm8[i], int(m0));
+                printf("RESULT : it %4d, rank %4d, pheno %d: sigmaG(%15.10f, %15.10f) = %15.10f, sigmaE = %15.10f, betasq = %15.10f, m0 = %d\n", iteration, rank, i, v0G + double(m0), (beta_squaredNorm8[i] * double(m0) + v0G * s02G) /(v0G + double(m0)), sigmaG8[i], sigmaE8[i], beta_squaredNorm8[i], m0);
             }
             fflush(stdout);
         }
 
-        //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
-        //printf("inv scaled parameters %20.15f __ %20.15f\n", v0G+m0, (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
-        //sigmaE = dist.inv_scaled_chisq_rng(v0E+Ntot,((epsilon).squaredNorm()+v0E*s02E)/(v0E+Ntot));
-        //printf("sigmaG = %20.15f, sigmaE = %20.15f, e_sqn = %20.15f\n", sigmaG, sigmaE, e_sqn);
-        //printf("it %6d, rank %3d: epsilon[0] = %15.10f, y[0] = %15.10f, m0=%10.1f,  sigE=%15.10f,  sigG=%15.10f [%6d / %6d]\n", iteration, rank, epsilon[0], y[0], m0, sigmaE, sigmaG, markerI[0], markerI[M-1]);
-
-        
         for (int i=0; i<NT; i++)
-            pi8.row(i) =  dist8[i].dirichilet_rng(cass8.row(i).array() + 1.0);
+            pi8.row(i) =  dist8[i].dirichlet_rng(cass8.row(i).array() + 1);
         //cout << "pi8= " << pi8 << endl;
 
 
@@ -1312,7 +1290,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
         if (iteration%opt.thin == 0 && 1 == 2) {
             
             left = snprintf(buff, LENBUF, "%5d, %4d, %20.15f, %20.15f, %20.15f, %20.15f, %7d, %2d",
-                            iteration, rank, mu, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), int(m0), int(pi.size()));
+                            iteration, rank, mu, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), m0, int(pi.size()));
             assert(left > 0);
 
             for (int ii=0; ii<pi.size(); ++ii) {
@@ -1426,6 +1404,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
     _mm_free(Beta8);
     _mm_free(mave);
     _mm_free(mstd);
+    _mm_free(USEBED);
     _mm_free(N1S);
     _mm_free(N1L);
     _mm_free(I1);

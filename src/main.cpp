@@ -44,15 +44,6 @@ int main(int argc, const char * argv[]) {
 
 #ifdef USE_MPI
 
-        // marion : originally I had something like this to read the annotation and mS file
-        /*
-         * if (opt.bayesType == "bayesG") {
-        	data.readGroupFile(opt.groupFile);
-        	data.readmSFile(opt.mSfile);
-        }
-         */// but maybe we can have something like : if we use --group option then read these files
-
-
         if (opt.bedToSparse || opt.checkRam) {
 
             data.readFamFile(opt.bedFile + ".fam");
@@ -66,8 +57,11 @@ int main(int argc, const char * argv[]) {
                 analysis.checkRamUsage();
             }
         } else if ((opt.bayesType == "bayesMPI" || opt.bayesType == "bayesWMPI") && opt.analysisType == "RAM") {
-            
-            if (opt.readFromBedFile) {
+
+
+            // Reading from BED file
+            // ---------------------
+            if (opt.readFromBedFile && !opt.readFromSparseFiles) {
                 //printf("INFO   : reading from BED file\n");
                 data.readFamFile(opt.bedFile + ".fam");
                 data.readBimFile(opt.bedFile + ".bim");
@@ -77,21 +71,23 @@ int main(int argc, const char * argv[]) {
                 if (opt.covariates) {
                     //data.readCovariateFile(opt.covariatesFile);
                     if(opt.bayesType == "bayesWMPI"){
-			data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
-		    }else{
+                        data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
+                    }else{
                     	data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
-		    }
-
+                    }
+                    
                 }else{
-		    if(opt.bayesType == "bayesWMPI"){
-                         data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
-		    }else{
+                    if(opt.bayesType == "bayesWMPI"){
+                        data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
+                    }else{
                     	data.readPhenotypeFile(opt.phenotypeFile);
-		    }
-		}
+                    }
+                }
+            } 
 
-            } else { // Read from sparse representation files
-
+            // Read from sparse representation files
+            // -------------------------------------
+            else if (opt.readFromSparseFiles && !opt.readFromBedFile) {
                 if (opt.multi_phen) {
                     throw("EO: Disabled for now");
                     data.readPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals, data.phenosData);
@@ -106,20 +102,34 @@ int main(int argc, const char * argv[]) {
                 //    std::cout << "reading covariates file: "  << opt.covariatesFile << endl;
                 //    data.readCovariateFile(opt.covariatesFile);
                 //}
-            }
+            }            
+            // Mixing bed in memomory + sparse representations
+            // -----------------------------------------------
+            else if (opt.readFromSparseFiles && opt.readFromBedFile) {
+                //cout << "WARNING: mixed-representation processing type requested!" << endl;
+                opt.mixedRepresentation = true;
 
+                data.readPhenotypeFile(opt.phenotypeFiles[0], opt.numberIndividuals, data.y);
+
+            } else {
+                cerr << "FATAL: either go for BED, SPARSE or BOTH" << endl;
+                exit(1);
+            }
+            
             if (opt.markerBlocksFile != "") {
                 data.readMarkerBlocksFile(opt.markerBlocksFile);
             }
+
             if (opt.multi_phen) {
                 //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 //analysis.runMpiGibbsMultiTraits();
-            }else if(opt.bayesType == "bayesWMPI"){
-	        //data.readBedFile_noMPI_unstandardised(opt.bedFile+".bed"); // This part to read the non-standardised data
-		BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+
+            } else if(opt.bayesType == "bayesWMPI"){
+                //data.readBedFile_noMPI_unstandardised(opt.bedFile+".bed"); // This part to read the non-standardised data
+                BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs_bW();
-	     }
-	     else {
+
+            } else {
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs();
             }
@@ -131,18 +141,18 @@ int main(int argc, const char * argv[]) {
         if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
 #endif
             clock_t start = clock();
-
+            
             // Read input files
             data.readFamFile(opt.bedFile + ".fam");
             data.readBimFile(opt.bedFile + ".bim");
             data.readPhenotypeFile(opt.phenotypeFile);
-
+            
             // Limit number of markers to process
             if (opt.numberMarkers > 0 && opt.numberMarkers < data.numSnps)
                 data.numSnps = opt.numberMarkers;
-
+            
             data.readBedFile_noMPI(opt.bedFile+".bed");
-
+            
             // Option bayesType="bayesMmap" is going to be deprecated
             if (opt.bayesType == "bayesMmap" || opt.bayesType == "bayes"){
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
@@ -154,25 +164,26 @@ int main(int argc, const char * argv[]) {
             } else if (opt.bayesType == "bayesG") {
                 //TODO add Bayes groups
             }
-
+            
             clock_t end   = clock();
             printf("OVERALL read+compute time = %.3f sec.\n", (float)(end - start) / CLOCKS_PER_SEC);
         }
-
+        
         // Pre-processing the data (centering and scaling)
         else if (opt.analysisType == "Preprocess") {
             cout << "Start preprocessing " << opt.bedFile + ".bed" << endl;
-
+            
             clock_t start_bed = clock();
             data.preprocessBedFile(opt.bedFile + ".bed",
-                    opt.bedFile + ".ppbed",
-                    opt.bedFile + ".ppbedindex",
-                    opt.compress);
-
+                                   opt.bedFile + ".ppbed",
+                                   opt.bedFile + ".ppbedindex",
+                                   opt.compress);
+            
             clock_t end = clock();
             printf("Finished preprocessing the bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
             cout << endl;
         }
+
 #ifndef USE_MPI
         else if (opt.analysisType == "PPBayes" || opt.analysisType == "PPAsyncBayes") {
             clock_t start = clock();
@@ -182,15 +193,15 @@ int main(int argc, const char * argv[]) {
                 cout << "Start reading preprocessed bed file: " << opt.bedFile + ".ppbed" << endl;
                 clock_t start_bed = clock();
                 data.mapCompressedPreprocessBedFile(opt.bedFile + ".ppbed",
-                        opt.bedFile + ".ppbedindex");
+                                                    opt.bedFile + ".ppbedindex");
                 clock_t end = clock();
                 printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
                 cout << endl;
-
+                
                 std::unique_ptr<tbb::task_scheduler_init> taskScheduler { nullptr };
                 if (opt.numThreadSpawned > 0)
                     taskScheduler = std::make_unique<tbb::task_scheduler_init>(opt.numThreadSpawned);
-
+                
                 BayesRRmz analysis(data, opt);
                 analysis.runGibbs();
                 data.unmapCompressedPreprocessedBedFile();
@@ -201,17 +212,17 @@ int main(int argc, const char * argv[]) {
                 clock_t end = clock();
                 printf("Finished reading preprocessed bed file in %.3f sec.\n", double(end - start_bed) / double(CLOCKS_PER_SEC));
                 cout << endl;
-
+                
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
-		//here we check if we want to restart a chain
-		if(opt.restart){
-		  //TODO function to read output file
-		  //TODO function to run restarted mpi
-		  
-		}
-		else{
-		  analysis.runGibbs();
-		}
+                //here we check if we want to restart a chain
+                if(opt.restart){
+                    //TODO function to read output file
+                    //TODO function to run restarted mpi
+                    
+                }
+                else{
+                    analysis.runGibbs();
+                }
                 data.unmapPreprocessedBedFile();
                 end = clock();
                 printf("OVERALL read+compute time = %.3f sec.\n", double(end - start) / double(CLOCKS_PER_SEC));
@@ -221,18 +232,14 @@ int main(int argc, const char * argv[]) {
         else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);
         }
-
-        //#endif
-
-    }
-        
+    } 
     catch (const string &err_msg) {
         cerr << "\n" << err_msg << endl;
     }
     catch (const char *err_msg) {
         cerr << "\n" << err_msg << endl;
     }
-
+    
 #ifdef USE_MPI
     MPI_Finalize();
 #else
@@ -240,6 +247,6 @@ int main(int argc, const char * argv[]) {
     cout << "\nAnalysis finished: " << timer.getDate();
     cout << "Computational time: "  << timer.format(timer.getElapse()) << endl;
 #endif
-
+    
     return 0;
 }

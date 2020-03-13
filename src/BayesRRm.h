@@ -56,8 +56,8 @@ class BayesRRm
     VectorXd muk;       // mean of k-th component marker effect size
     VectorXd denom;     // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
     int      m0;        // total number of markers in model
-    VectorXd cass;      // variable storing the component assignment //EO RENAMED v -> cass 
-    MatrixXd cass8;
+    VectorXi cass;      // variable storing the component assignment //EO RENAMED v -> cass 
+    MatrixXi cass8;
     VectorXd cVaI;      // inverse of the component variances
 
     // Mean and residual variables

@@ -18,7 +18,7 @@ CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 CXXFLAGS += -D USE_MPI
 #CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 CXXFLAGS += -qopenmp
-#CXXFLAGS += -qopt-report=2
+CXXFLAGS += -qopt-report=2
 #CXXFLAGS += -qopt-report-phase=loop,vec
 #CXXFLAGS += -qopt-report-file=stdout
 CXXFLAGS += -L/usr/lib64

@@ -66,12 +66,12 @@ double Distributions_boost::unif_rng(){
     return real_variate_generator();
 }
 
-Eigen::VectorXd Distributions_boost::dirichilet_rng(Eigen::VectorXd alpha) {
+Eigen::VectorXd Distributions_boost::dirichlet_rng(Eigen::VectorXi alpha) {
     int len;
     len=alpha.size();
     Eigen::VectorXd result(len);
     for(int i=0;i<len;i++)
-        result[i]=rgamma(alpha[i],(double)1.0);
+        result[i]=rgamma((double)alpha[i], 1.0);
     result/=result.sum();
     return result;
 }

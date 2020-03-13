@@ -116,6 +116,7 @@ void Data::read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, 
     check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
 }
 
+
 //EO: .gam files only contain a dump of last saved iteration (no history)
 //  : format is: iter, length, vector
 void Data::read_mcmc_output_gam_file(const string mcmcOut, const int gamma_length, const uint iteration_restart,
@@ -382,10 +383,15 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     int lastSavedIt = 0;
     
     if (file.is_open()) {
+
         std::string str;
+
         while (std::getline(file, str)) {
+
             if (str.length() > 0) {
+
                 int nread = sscanf(str.c_str(), "%5d", &it_);
+
                 if (it_%optSave == 0) {
                     lastSavedIt = it_;
                     char cstr[str.length()+1];
@@ -603,35 +609,41 @@ void Data::sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, cons
     }
 }
 
+
 //EO: load data from a bed file
+// TODO: clean up API + code
 // ----------------------------
-void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, const int rank, const int start, 
-                                   double& dalloc,
+void Data::load_data_from_bed_file(const string bedfp_noext, const uint Ntot, const int M,
+                                   const int rank, const int start,
                                    size_t* N1S, size_t* N1L, uint*& I1,
                                    size_t* N2S, size_t* N2L, uint*& I2,
-                                   size_t* NMS, size_t* NML, uint*& IM) {
+                                   size_t* NMS, size_t* NML, uint*& IM,
+                                   size_t& taskBytes) {
 
     MPI_File   bedfh;
     MPI_Offset offset;
 
-    bedfp += ".bed";
+    string bedfp = bedfp_noext + ".bed";
     check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh),  __LINE__, __FILE__);
 
     // Length of a "column" in bytes
     const size_t snpLenByt = (Ntot % 4) ? Ntot / 4 + 1 : Ntot / 4;
     //if (rank==0) printf("INFO   : marker length in bytes (snpLenByt) = %zu bytes.\n", snpLenByt);
 
+
     // Alloc memory for raw BED data
     // -----------------------------
     const size_t rawdata_n = size_t(M) * size_t(snpLenByt) * sizeof(char);
+    taskBytes = rawdata_n;
     char* rawdata = (char*)_mm_malloc(rawdata_n, 64);  check_malloc(rawdata, __LINE__, __FILE__);
-    dalloc += rawdata_n / 1E9;
     //printf("rank %d allocation %zu bytes (%.3f GB) for the raw data.\n", rank, rawdata_n, double(rawdata_n/1E9));
+
 
     // Compute the offset of the section to read from the BED file
     // -----------------------------------------------------------
     //offset = size_t(3) + size_t(MrankS[rank]) * size_t(snpLenByt) * sizeof(char);
     offset = size_t(3) + size_t(start) * size_t(snpLenByt) * sizeof(char);
+
 
     // Read the BED file
     // -----------------
@@ -647,10 +659,6 @@ void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, c
     mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
     MPI_Barrier(MPI_COMM_WORLD);
-    //const auto et1 = std::chrono::high_resolution_clock::now();
-    //const auto dt1 = et1 - st1;
-    //const auto du1 = std::chrono::duration_cast<std::chrono::milliseconds>(dt1).count();
-    //if (rank == 0)  std::cout << "INFO   : time to read the BED file: " << du1 / double(1000.0) << " seconds." << std::endl;
 
     // Close BED file
     check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
@@ -664,7 +672,6 @@ void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, c
     I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
     I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
     IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
-    dalloc += (N1 + N2 + NM) * sizeof(size_t) / 1E9;
     
     sparse_data_fill_indices(rawdata, M, snpLenByt,
                              N1S, N1L, I1,
@@ -675,14 +682,13 @@ void Data::load_data_from_bed_file(string bedfp, const uint Ntot, const int M, c
 }
 
 
-void Data::load_data_from_sparse_files(const int rank, const int nranks, const int M,
-                                       const int* MrankS, const int* MrankL,
+void Data::load_data_from_sparse_files(const int rank,           const int nranks,  const int M,
+                                       const int* MrankS,        const int* MrankL,
                                        const string sparseOut,
-                                       double& dalloc,
-                                       size_t* N1S,   size_t* N1L, uint*& I1,
-                                       size_t* N2S,   size_t* N2L, uint*& I2,
-                                       size_t* NMS,   size_t* NML, uint*& IM,
-				       size_t& totalBytes) {
+                                       size_t* N1S, size_t* N1L, uint*& I1,
+                                       size_t* N2S, size_t* N2L, uint*& I2,
+                                       size_t* NMS, size_t* NML, uint*& IM,
+                                       size_t& taskBytes) {
 
     char processor_name[MPI_MAX_PROCESSOR_NAME];
     int  processor_name_len;
@@ -693,11 +699,14 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     size_t N2 = get_number_of_elements_from_sparse_files(sparseOut, "2", MrankS, MrankL, N2S, N2L);
     size_t NM = get_number_of_elements_from_sparse_files(sparseOut, "m", MrankS, MrankL, NMS, NML);
 
+
+    // EO: Disable this, not sure whether this is really useful information
+    /*
     size_t N1max = 0, N2max = 0, NMmax = 0;
     check_mpi(MPI_Allreduce(&N1, &N1max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allreduce(&N2, &N2max, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allreduce(&NM, &NMmax, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
-
+    
     size_t N1tot = 0, N2tot = 0, NMtot = 0;
     check_mpi(MPI_Allreduce(&N1, &N1tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
     check_mpi(MPI_Allreduce(&N2, &N2tot, 1, MPI_UNSIGNED_LONG_LONG, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -710,14 +719,19 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
         printf("INFO   : rank %3d/%3d  N1tot = %15lu, N2tot = %15lu, NMtot = %15lu\n", rank, nranks, N1tot, N2tot, NMtot);
         printf("INFO   : RAM for task %3d/%3d on node %s: %7.3f GB\n", rank, nranks, processor_name, (N1 + N2 + NM) * sizeof(uint) / 1E9);
     }
+    */
+
+    taskBytes = (N1 + N2 + NM) * sizeof(uint);
+
+    /*
     if (rank == 0) 
         printf("INFO   : Total RAM for storing sparse indices %.3f GB\n", double(totalBytes) * 1E-9);
     fflush(stdout);
+    */
 
     I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
     I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
     IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
-    dalloc += double(N1 + N2 + NM) * 1E-9;
 
     //EO: base the number of read calls on a max buffer size of 2 GiB
     //    rather than count be lower that MAX_INT/2
@@ -726,12 +740,6 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     int NREADS2 = int(ceil(double(N2 * sizeof(uint)) / double(2147483648)));
     int NREADSM = int(ceil(double(NM * sizeof(uint)) / double(2147483648)));
 
-    /*
-    int NREADS1 = check_int_overflow(size_t(ceil(double(N1max)/double(INT_MAX/2))), __LINE__, __FILE__);
-    int NREADS2 = check_int_overflow(size_t(ceil(double(N2max)/double(INT_MAX/2))), __LINE__, __FILE__);
-    int NREADSM = check_int_overflow(size_t(ceil(double(NMmax)/double(INT_MAX/2))), __LINE__, __FILE__);
-    */
-    //MPI_Barrier(MPI_COMM_WORLD);
     //printf("INFO   : rank %d, number of calls to read the sparse files: NREADS1 = %d, NREADS2 = %d, NREADSM = %d\n", rank, NREADS1, NREADS2, NREADSM);
     //fflush(stdout);
    
@@ -742,13 +750,11 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
     check_mpi(MPI_Allreduce(&NREADSM, &MAX_NREADSM, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD), __LINE__, __FILE__);
 
     if (rank % 10 ==0) {
-        printf("INFO   : rank %d, numbers of calls to read the sparse files: NREADS1,2,M = %3d, %3d, %3d vs MAX_NREADS1,2,M = %3d, %3d, %3d\n",
+        printf("INFO   : rank %3d, number of calls to read the sparse files: NREADS{1,2,M} = %3d, %3d, %3d vs MAX_NREADS1,2,M = %3d, %3d, %3d\n",
                rank, NREADS1, NREADS2, NREADSM, MAX_NREADS1, MAX_NREADS2, MAX_NREADSM);
         fflush(stdout);
     }
-    //read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], NREADS1, I1);
-    //read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], NREADS2, I2);
-    //read_sparse_data_file(sparseOut + ".sim", NM, NMS[0], NREADSM, IM);    
+
     read_sparse_data_file(sparseOut + ".si1", N1, N1S[0], MAX_NREADS1, I1);
     read_sparse_data_file(sparseOut + ".si2", N2, N2S[0], MAX_NREADS2, I2);
     read_sparse_data_file(sparseOut + ".sim", NM, NMS[0], MAX_NREADSM, IM);    
@@ -760,31 +766,274 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
 }
 
 
+// EO Mixed-type representation: BED + SPARSE
+// Based on a criterion (threshold_fnz) giving the fraction of non-zero elements in 
+// the genotype, some markers will be handled as BED data, the others as SPARSE.
+// The BED information can be either (hard-coded switch):
+//   1) read directly from BED file
+//   2) read from SPARSE files and converted to BED (default)
+//
+// The structures holding the 1s are use to hold the BED information, the others
+// being not used and lengths made 0.
+//
+// For BED format description: http://zzz.bwh.harvard.edu/plink/binary.shtml
+// Byte read backwards: from right to left: 33221100
+// BUT:
+// !!!   WE USE AN INVERTED BED FORMAT REPRESENTATION   !!!
+// So zero is coded as 11, and so on...
+// ---------------------------------------------------------------------------------
+
+void Data::load_data_from_mixed_representations(const string bedfp_noext,   const string sparseOut,
+                                                const int    rank,          const int    nranks,
+                                                const int    Ntot,          const int    M,
+                                                const int*   MrankS,        const int*   MrankL,
+                                                size_t* N1S,  size_t* N1L,  uint*& I1,
+                                                size_t* N2S,  size_t* N2L,  uint*& I2,
+                                                size_t* NMS,  size_t* NML,  uint*& IM,
+                                                const double threshold_fnz, bool* USEBED,
+                                                size_t& taskBytes) {
+
+
+    // Get N.S and N.L arrays filled from sparse files
+    size_t N1c = get_number_of_elements_from_sparse_files(sparseOut, "1", MrankS, MrankL, N1S, N1L);
+    size_t N2c = get_number_of_elements_from_sparse_files(sparseOut, "2", MrankS, MrankL, N2S, N2L);
+    size_t NMc = get_number_of_elements_from_sparse_files(sparseOut, "m", MrankS, MrankL, NMS, NML);
+
+
+    // Length of a marker in [byte] in BED representation (1 ind is 2 bits, so 1 byte is 4 inds)
+    const size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
+
+    // Length of a marker in [uint] in BED representation (1 ind is 2 bits, so 1 uint is 16 inds)
+    const size_t snpLenUint = (Ntot % 16) ? Ntot / 16 + 1 : Ntot / 16;
+
+
+    // Make a copy of the original Length arrays
+    //
+    size_t *sparse_N1S = (size_t*)_mm_malloc(M * sizeof(size_t), 64);  check_malloc(sparse_N1S, __LINE__, __FILE__);
+    size_t *sparse_N2S = (size_t*)_mm_malloc(M * sizeof(size_t), 64);  check_malloc(sparse_N2S, __LINE__, __FILE__);
+    size_t *sparse_NMS = (size_t*)_mm_malloc(M * sizeof(size_t), 64);  check_malloc(sparse_NMS, __LINE__, __FILE__);
+
+    for (int i=0; i<M; i++) {
+        sparse_N1S[i] = N1S[i];
+        sparse_N2S[i] = N2S[i];
+        sparse_NMS[i] = NMS[i];
+    }
+
+
+    // Compute size of arrays to allocate for the mixed representation
+    // 2 & M as usual
+    // 1 to hold BED data only, that is snpLenUint uints
+    // ---------------------------------------------------------------
+    size_t N1 = 0, N2 = 0, NM = 0;
+
+    for (int i=0; i<M; i++) {
+        
+        double mfnz = double(N1L[i] + N2L[i] + NML[i]) / double(Ntot);
+        USEBED[i] = (mfnz > threshold_fnz) ? true : false;
+
+        N1S[i] = N1;
+        N2S[i] = N2;
+        NMS[i] = NM;
+
+        if (USEBED[i]) {
+            //printf("rank %2d, marker %2d: WILL USE BED\n", rank, i);
+            N1 += snpLenUint; //EO: store all BED in N1
+            //N2 += 0; NM += 0;
+        } else {
+            N1 += N1L[i]; 
+            N2 += N2L[i];
+            NM += NML[i];
+        }
+        //printf("rank %02d, marker %7d: 1,2,M lengths = %6lu, %6lu, %6lu => %d\n", rank, i, N1L[i], N2L[i], NML[i], USEBED[i]);
+    }
+
+    // Alloc as uint
+    taskBytes = 0;
+    I1 = (uint*)_mm_malloc(N1 * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
+    I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
+    IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
+
+    taskBytes += (N1 + N2 + NM) * sizeof(uint);
+
+    MPI_File   bedfh, si1fh, si2fh, simfh;
+    MPI_Offset bedoff;
+    MPI_Status status;
+
+    string bedfp = bedfp_noext + ".bed";
+    string si1fp = sparseOut   + ".si1";
+    string si2fp = sparseOut   + ".si2";
+    string simfp = sparseOut   + ".sim";
+
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh),  __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, si1fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si1fh),  __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, si2fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si2fh),  __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, simfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &simfh),  __LINE__, __FILE__);
+
+    int dtsize = 0;
+    MPI_Type_size(MPI_UNSIGNED, &dtsize);
+
+
+    const bool   FAKE_USEBED[1] = {false};
+    const size_t FAKE_NS[1]     = {0};
+
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int i=0; i<M; i++) {
+
+        // For markers elected for BED representation we either read from BED file or
+        // from SPARSE files and convert to BED
+        // By default: read from SPARSE
+
+        if (USEBED[i]) {
+
+            if (1 == 0) {
+
+                bedoff = size_t(3) + (size_t(MrankS[rank]) + i) * size_t(snpLenByt) * sizeof(char);
+                check_mpi(MPI_File_read_at(bedfh, bedoff, &I1[N1S[i]], snpLenByt, MPI_CHAR, &status), __LINE__, __FILE__);
+
+            } else {
+
+                // Step 0: Cast allocated uint memory of size snpLenUint to char to hold BED data
+                char* bdat = reinterpret_cast<char*>(&I1[N1S[i]]);
+
+                // Step 1: Set all to 1 
+                memset(bdat, 0b11111111, snpLenUint * 4);
+
+                // Step 2: Set the 1s
+                uint* tmp = (uint*)_mm_malloc(N1L[i] * size_t(dtsize), 64);  check_malloc(tmp, __LINE__, __FILE__);
+                check_mpi(MPI_File_read_at(si1fh, sparse_N1S[i] * size_t(dtsize), tmp, N1L[i], MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                sparse_data_correct_for_missing_phenotype(FAKE_NS, &N1L[i], tmp, 1, FAKE_USEBED);
+                fflush(stdout);
+                int ibyt = 0, iind = 0;
+                for (int j=0; j<N1L[i]; j++) {
+                    ibyt = tmp[j] / 4;          // 4 inds per byte in BED format
+                    iind = tmp[j] - ibyt * 4;   // 2 bits per ind in byte, position in byte from right to left
+                    bdat[ibyt] ^= (0b00000001 << iind * 2);
+                }
+                _mm_free(tmp);
+                
+                // Step 3: Set the 2s
+                tmp = (uint*)_mm_malloc(N2L[i] * size_t(dtsize), 64);  check_malloc(tmp, __LINE__, __FILE__);
+                check_mpi(MPI_File_read_at(si2fh, sparse_N2S[i] * size_t(dtsize), tmp, N2L[i], MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                sparse_data_correct_for_missing_phenotype(FAKE_NS, &N2L[i], tmp, 1, FAKE_USEBED);
+                ibyt = 0, iind = 0;
+                for (int j=0; j<N2L[i]; j++) {
+                    ibyt = tmp[j] / 4;
+                    iind = tmp[j] - ibyt * 4;
+                    bdat[ibyt] ^= (0b00000011 << iind * 2);
+                }
+                _mm_free(tmp);
+
+                // Step 4: Set the Ms
+                tmp = (uint*)_mm_malloc(NML[i] * size_t(dtsize), 64);  check_malloc(tmp, __LINE__, __FILE__);
+                check_mpi(MPI_File_read_at(simfh, sparse_NMS[i] * size_t(dtsize), tmp, NML[i], MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                sparse_data_correct_for_missing_phenotype(FAKE_NS, &NML[i], tmp, 1, FAKE_USEBED);
+                ibyt = 0, iind = 0;
+                for (int j=0; j<NML[i]; j++) {
+                    ibyt = tmp[j] / 4;
+                    iind = tmp[j] - ibyt * 4;
+                    bdat[ibyt] ^= (0b00000010 << iind * 2);
+                }
+                _mm_free(tmp);
+           }
+
+            // I1 now holds the raw BED data;
+            N1L[i] = snpLenUint;
+            N2L[i] = 0;
+            NML[i] = 0;
+
+        } else {         // read SPARSE files
+
+            check_mpi(MPI_File_read_at(si1fh, sparse_N1S[i] * size_t(dtsize), &I1[N1S[i]], N1L[i], MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_read_at(si2fh, sparse_N2S[i] * size_t(dtsize), &I2[N2S[i]], N2L[i], MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_read_at(simfh, sparse_NMS[i] * size_t(dtsize), &IM[NMS[i]], NML[i], MPI_UNSIGNED, &status), __LINE__, __FILE__);
+        }
+
+        //printf("----> out rank %2d, marker %2d (S): %lu, %lu, %lu (L): %lu, %lu, %lu\n", rank, i, N1S[i], N2S[i], NMS[i], N1L[i], N2L[i], NML[i]);
+    }
+
+    _mm_free(sparse_N1S);
+    _mm_free(sparse_N2S);
+    _mm_free(sparse_NMS);
+
+
+    //MPI_Barrier(MPI_COMM_WORLD);
+
+    // Close BED and SPARSE files
+    check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&si1fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&si2fh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&simfh), __LINE__, __FILE__);
+}
+
+
+size_t Data::get_number_of_elements_from_sparse_files(const std::string basename, const std::string id, const int* MrankS, const int* MrankL,
+                                                      size_t* S, size_t* L) {
+
+    MPI_Status status;
+    MPI_File   ssfh, slfh;
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    // Number of markers in block handled by task
+    const uint M = MrankL[rank];
+
+    const std::string sl = basename + ".sl" + id;
+    const std::string ss = basename + ".ss" + id;
+
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, ss.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &ssfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, sl.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &slfh), __LINE__, __FILE__);
+
+    // Compute the lengths of ones and twos vectors for all markers in the block
+    MPI_Offset offset =  MrankS[rank] * sizeof(size_t);
+    check_mpi(MPI_File_read_at_all(ssfh, offset, S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+    check_mpi(MPI_File_read_at_all(slfh, offset, L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
+
+    // Close sparse files
+    check_mpi(MPI_File_close(&ssfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&slfh), __LINE__, __FILE__);
+
+
+    // Absolute offsets in 0s, 1s, and 2s
+    const size_t nsoff = S[0];
+
+    size_t N = S[M-1] + L[M-1] - nsoff;
+
+    return N;
+}
+
+
 // EO: Apply corrections to the sparse structures (1,2,m)
 //     Watch out that NAs have to be considered globally accross the structures
 // ---------------------------------------------------------------------------
-void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M) {
+void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M, const bool* USEBED) {
 
-    // Alloc one tmp vector large enough
-    uint max = 0;
-    for (int i=0; i<M; ++i)
-        if (NL[i] > max) max = NL[i];
-
-    uint* tmp = (uint*)_mm_malloc(max * sizeof(uint), 64);  check_malloc(tmp, __LINE__, __FILE__);
-
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
     for (int i=0; i<M; ++i) {
 
-        //cout << "dealing with marker " << i << " out of " << M << endl;
+        // Skip for markers in BED representation (NA correction handled separately)
+        if (USEBED[i]) continue;
+
+        uint* tmp = (uint*)_mm_malloc(NL[i] * sizeof(uint), 64);  check_malloc(tmp, __LINE__, __FILE__);
 
         const size_t beg = NS[i], len = NL[i];
+
         size_t k   = 0;
         uint   nas = 0;
 
         if (len > 0) {
 
             // Make a tmp copy of the original data
-            for (size_t iii=beg; iii<beg+len; ++iii) tmp[iii-beg] = I[iii];
-            
+            for (size_t iii=beg; iii<beg+len; ++iii) {
+                tmp[iii-beg] = I[iii];
+                //if (iii<3)  cout << "tmp[iii-beg] = " << tmp[iii-beg] << endl;
+            }
+
             for (size_t iii=beg; iii<beg+len; ++iii) {
                 bool isna   = false;
                 uint allnas = 0;
@@ -792,6 +1041,7 @@ void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* N
                     if (NAsInds[ii] > tmp[iii-beg]) break;
                     if (NAsInds[ii] <= tmp[iii-beg]) allnas += 1;
                     if (tmp[iii-beg] == NAsInds[ii]) { // NA found
+                        //cout << "found NA at " << tmp[iii-beg]  << endl;
                         isna = true;
                         nas += 1;
                         break;
@@ -803,8 +1053,8 @@ void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* N
             }
         }
         NL[i] -= nas;
+        _mm_free(tmp);
     }
-    _mm_free(tmp);
 }
 
 
@@ -841,13 +1091,14 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
         }
 
         for (int ii=0; ii<numInds; ++ii) {
-            if      (tmpi[ii] <  0) { cm += 1; NM += 1; }
-            else if (tmpi[ii] == 0) { c0 += 1; N0 += 1; }
-            else if (tmpi[ii] == 1) { c1 += 1; N1 += 1; }
-            else if (tmpi[ii] == 2) { c2 += 1; N2 += 1; }
+            if      (tmpi[ii] <  0) { cm += 1;  NM += 1; }
+            else if (tmpi[ii] == 0) { c0 += 1;  N0 += 1; }
+            else if (tmpi[ii] == 1) { c1 += 1;  N1 += 1; }
+            else if (tmpi[ii] == 2) { c2 += 1;  N2 += 1; }
         }
         
         assert(cm+c0+c1+c2 == numInds);
+        //printf("N0, N1, N2, NM = %lu, %lu, %lu, %lu\n", N0, N1, N2, NM);
     }
 
     _mm_free(tmpi);
@@ -865,6 +1116,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
                                     size_t* NMS, size_t* NML, uint* IM) {
     
     assert(numInds<=NB*4);
+
 
     // temporary array used for translation
     int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(int8_t), 64);  check_malloc(tmpi, __LINE__, __FILE__);
@@ -922,40 +1174,6 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
     _mm_free(tmpi);
 }
 
-size_t Data::get_number_of_elements_from_sparse_files(const std::string basename, const std::string id, const int* MrankS, const int* MrankL,
-                                                      size_t* S, size_t* L) {
-
-    MPI_Status status;
-    MPI_File   ssfh, slfh;
-
-    int rank;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    // Number of markers in block handled by task
-    const uint M = MrankL[rank];
-
-    const std::string sl = basename + ".sl" + id;
-    const std::string ss = basename + ".ss" + id;
-
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, ss.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &ssfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, sl.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &slfh), __LINE__, __FILE__);
-
-    // Compute the lengths of ones and twos vectors for all markers in the block
-    MPI_Offset offset =  MrankS[rank] * sizeof(size_t);
-    check_mpi(MPI_File_read_at_all(ssfh, offset, S, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
-    check_mpi(MPI_File_read_at_all(slfh, offset, L, M, MPI_UNSIGNED_LONG_LONG, &status), __LINE__, __FILE__);
-
-    // Absolute offsets in 0s, 1s, and 2s
-    const size_t nsoff = S[0];
-
-    size_t N = S[M-1] + L[M-1] - nsoff;
-
-    // Close bed and sparse files
-    check_mpi(MPI_File_close(&ssfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&slfh), __LINE__, __FILE__);
-
-    return N;
-}
 
 /*
 void Data::sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
@@ -1581,9 +1799,11 @@ void Data::readBedFile_noMPI(const string &bedFile) {
     //float mean = 0.0;
     double mean = 0.0;
 
-    // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
-    // --------------------------------------------------------------------------------------------------
+
+    // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: heterozygote; 01: missing
+    // ----------------------------------------------------------------------------------------------------
     for (j = 0, snp = 0; j < numSnps; j++) {
+
         snpInfo = snpInfoVec[j];
         mean = 0.0;
         nmiss = 0;

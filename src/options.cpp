@@ -35,10 +35,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bedToSparse = true;
             ss << "--bed-to-sparse " << "\n";
         }
-        else if (!strcmp(argv[i], "--read-from-bed-file")) {
-            readFromBedFile = true;
-            ss << "--read-from-bed-file " << "\n";
-        }
         else if (!strcmp(argv[i], "--blocks-per-rank")) {
             blocksPerRank = atoi(argv[++i]);
             ss << "--blocks-per-rank " << "\n";
@@ -51,7 +47,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
             restart = true;
             ss << "--restart " << "\n";
         }
-	else if (!strcmp(argv[i], "--raw-update")) {
+        else if (!strcmp(argv[i], "--raw-update")) {
             deltaUpdate = false;
             ss << "--raw-update " << "\n";
         }
@@ -87,9 +83,14 @@ void Options::inputOptions(const int argc, const char* argv[]){
             ss << "--compress " << "\n";
         }
         else if (!strcmp(argv[i], "--bfile")) {
-            bedFile = argv[++i];
+            readFromBedFile = true;
+            bedFile         = argv[++i];
             ss << "--bfile " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--threshold-fnz")) {
+            threshold_fnz = atof(argv[++i]);
+            ss << "--threshold-fnz " << argv[i] << "\n";
+        }        
         else if (!strcmp(argv[i], "--pheno")) {
             phenotypeFile = argv[++i];
             ss << "--pheno " << argv[i] << "\n";
@@ -132,18 +133,17 @@ void Options::inputOptions(const int argc, const char* argv[]){
             //for (int i=0; i<nphen; i++)
             //    cout << " " << i << ": " << phenotypeFiles[i] << endl;
         }
-  	// Failure vector file
+        // Failure vector file
         else if (!strcmp(argv[i], "--failure")) {
         	failureFile = argv[++i];
         	ss << "--failure " << argv[i] << "\n";
 		}
-	//Number of quadrature points        
+        //Number of quadrature points        
         else if (!strcmp(argv[i], "--quad_points")) {
         	quad_points = argv[++i];
-                ss << "--quad_points " << argv[i] << "\n";
-          	}
-
-	else if (!strcmp(argv[i], "--interleave-phenotypes")) {
+            ss << "--quad_points " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--interleave-phenotypes")) {
             interleave = true;
             ss << "--interleave-phenotypes " << "\n";
         }
@@ -168,7 +168,9 @@ void Options::inputOptions(const int argc, const char* argv[]){
             syncRate = atoi(argv[++i]);
             ss << "--sync-rate " << argv[i] << "\n";
         }
+#endif
         else if (!strcmp(argv[i], "--sparse-dir")) {    //EO
+            readFromSparseFiles = true;
             sparseDir = argv[++i];
             ss << "--sparse-dir " << argv[i] << "\n";
         }
@@ -176,7 +178,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             sparseBsn = argv[++i];
             ss << "--sparse-basename " << argv[i] << "\n";
         }
-#endif
         else if (!strcmp(argv[i], "--number-markers")) {    //EO
             numberMarkers = atoi(argv[++i]);
             ss << "--number-markers " << argv[i] << "\n";
@@ -276,6 +277,12 @@ void Options::inputOptions(const int argc, const char* argv[]){
     
     mcmcOut = mcmcOutDir + "/" + mcmcOutNam;
 
+
+    //EO: sparseDir and sparseBsn must be either both set or unset
+    //------------------------------------------------------------
+    if ( (!sparseBsn.empty() && sparseDir.empty()) || (sparseBsn.empty() && !sparseDir.empty()))
+        throw "--sparse-dir and --sparse-basename must either be both set or unset";
+
 }
 
 void Options::readFile(const string &file){  // input options from file
@@ -294,8 +301,6 @@ void Options::readFile(const string &file){  // input options from file
             bedFile = value;
         } else if (key == "phenotypeFile") {
             phenotypeFile = value;
-        } else if (key == "bedFile") {
-            bedFile = value;
         } else if (key == "analysisType") {
             analysisType = value;
         } else if (key == "bayesType") {

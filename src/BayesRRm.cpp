@@ -913,10 +913,9 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
 //-------------
 int BayesRRm::runMpiGibbs() {
 
-#ifdef _OPENMP
-#warning "using OpenMP"
-#endif
-
+    //#ifdef _OPENMP
+    //#warning "using OpenMP"
+    //#endif
 
     char   buff[LENBUF]; 
     int    nranks, rank, name_len, result;
@@ -936,12 +935,33 @@ int BayesRRm::runMpiGibbs() {
         opt.printProcessingOptions();
     }
 
+#ifdef _OPENMP
+#pragma omp parallel
+#endif
+    {
+        if (rank == 0) {
+            int nt = omp_get_num_threads();
+            if (omp_get_thread_num() == 0) 
+                printf("INFO   : OMP parallel regions will use %d thread(s)\n", nt);
+        }
+    }
+
+
+
     // Set Ntot and Mtot
     // -----------------
     uint Ntot = set_Ntot(rank);
     const uint Mtot = set_Mtot(rank);
     if (rank == 0)
         printf("INFO   : Full dataset includes Mtot=%d markers and Ntot=%d individuals.\n", Mtot, Ntot);
+
+    // Length of a marker in [byte] in BED representation (1 ind is 2 bits, so 1 byte is 4 inds)
+    const size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
+
+    // Length of a marker in [uint] in BED representation (1 ind is 2 bits, so 1 uint is 16 inds)
+    const size_t snpLenUint = (Ntot % 16) ? Ntot / 16 + 1 : Ntot / 16;
+
+    if (rank == 0) printf("INFO   : snpLenByt = %zu bytes; snpLenUint = %zu\n", snpLenByt, snpLenUint);
 
 
     // Define global marker indexing
@@ -951,7 +971,7 @@ int BayesRRm::runMpiGibbs() {
 
     uint M = MrankL[rank];
     if (rank % 10 == 0) {
-        printf("INFO   : rank %4d will handle a block of %6d markers starting at %d\n", rank, MrankL[rank], MrankS[rank]);
+        printf("INFO   : rank %3d will handle a block of %6d markers starting at %d\n", rank, MrankL[rank], MrankS[rank]);
     }
 
 
@@ -972,26 +992,19 @@ int BayesRRm::runMpiGibbs() {
     VectorXd            cVa(K);          // component-specific variance
     VectorXd            cVaI(K);         // inverse of the component variances
     double              num;             // storing dot product
-    //int                 m0;              // total number of markers in model
-    double              m0;
-    VectorXd            cass(K);            // variable storing the component assignment
-    VectorXd            sum_cass(K);        // To store the sum of v elements over all ranks
+    int                 m0;              // total number of markers in model
+    VectorXi            cass(K);         // variable storing the component assignment
+    VectorXi            sum_cass(K);     // To store the sum of v elements over all ranks
     VectorXd            Acum(M);
     VectorXd            Gamma(data.numFixedEffects);
+
     //daniel The following variables are related to the restarting
     typedef Matrix<bool, Dynamic, 1> VectorXb;
-    VectorXb            adaV(M);   //daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0
+    VectorXb            adaV(M);         //daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0
 
     std::vector<int>     mark2sync;
     std::vector<double>  dbet2sync;
 
-
-    //marion : for annotation code
-    /*
-      sigmaGG = VectorXd(groupCount); 	//vector with sigmaG (variance) for each annotation
-      betasqnG = VectorXd(groupCount);	//vector with sum of beta squared for each annotation
-      v = MatrixXd(groupCount,K);         // variable storing the component assignment
-    */
 
     dalloc +=     M * sizeof(int)    / 1E9; // for components
     dalloc += 2 * M * sizeof(double) / 1E9; // for Beta and Acum
@@ -1178,43 +1191,125 @@ int BayesRRm::runMpiGibbs() {
     
     double tl = -mysecond();
 
+
     // Read the data (from sparse representation by default)
     // -----------------------------------------------------
     size_t *N1S, *N1L,  *N2S, *N2L,  *NMS, *NML;
-    N1S = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
-    N1L = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
-    N2S = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
-    N2L = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
-    NMS = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
-    NML = (size_t*)_mm_malloc(size_t(Mtot) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
-    dalloc += 6.0 * double(Mtot) * sizeof(size_t) / 1E9;
+    N1S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
+    N1L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
+    N2S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
+    N2L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
+    NMS = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
+    NML = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
+    dalloc += 6.0 * double(M) * sizeof(size_t) / 1E9;
 
+
+    // Boolean mask for using BED representation or not (SPARSE otherwise)
+    // For markers with USEBED == true then the BED representation is 
+    // converted on the fly to SPARSE the time for the corresponding marker
+    // to be processed
+    // --------------------------------------------------------------------
+    bool *USEBED;
+    USEBED = (bool*)_mm_malloc(M * sizeof(bool), 64);  check_malloc(USEBED, __LINE__, __FILE__);
+    for (int i=0; i<M; i++) USEBED[i] = false;
+    int nusebed = 0;
+
+    // Sparse indices storage for BED markers needing expansion to SPARSE at processing time
+    // (so 1 marker max)
+    uint *XI1 = NULL, *XI2 = NULL, *XIM = NULL;
+
+    // Sparse indices storage
     uint *I1, *I2, *IM;
-    size_t totalBytes = 0;
 
-    if (opt.readFromBedFile) {
+    size_t taskBytes = 0;
+
+    string sparseOut = mpi_get_sparse_output_filebase(rank);
+
+    if (opt.readFromBedFile && !opt.readFromSparseFiles) {
         data.load_data_from_bed_file(opt.bedFile, Ntot, M, rank, MrankS[rank],
-                                     dalloc,
                                      N1S, N1L, I1,
                                      N2S, N2L, I2,
-                                     NMS, NML, IM);
-    } else {
-        string sparseOut = mpi_get_sparse_output_filebase(rank);
+                                     NMS, NML, IM,
+                                     taskBytes);
+
+    } else if (opt.readFromSparseFiles && !opt.readFromBedFile) {
         data.load_data_from_sparse_files(rank, nranks, M, MrankS, MrankL, sparseOut,
-                                         dalloc,
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,
                                          NMS, NML, IM,
-                                         totalBytes);
+                                         taskBytes);
+        //for (int i=0; i<M; i++)
+        //    printf("OUT SPARSE bef rank %02d, marker %7d: 1,2,M  S = %6lu, %6lu, %6lu, L = %6lu, %6lu, %6lu\n", rank, i, N1S[i], N2S[i], NMS[i], N1L[i], N2L[i], NML[i]);
+
+    } else if (opt.mixedRepresentation) {
+
+        // Test on binary reading of BED file
+        //EO: be aware that we use an inverted BED format!
+        /*
+        bitset<8> bo = 0b10011100;
+        unsigned allele1, allele2;
+        unsigned raw1, raw2;
+        int k = 0;
+        while (k < 7) {
+            int miss = 0;
+            raw1    = bo[k];
+            allele1 = (!bo[k++]);
+            raw2    = bo[k];
+            allele2 = (!bo[k++]);
+            if (allele1 == 0 && allele2 == 1) miss = 1;
+            printf("raw bed = %d %d; allele1, allele2 = %d %d  miss? %d\n", raw1, raw2, allele1, allele2, miss);
+        }
+        */
+
+        data.load_data_from_mixed_representations(opt.bedFile, sparseOut,
+                                                  rank, nranks, Ntot, M, MrankS, MrankL,
+                                                  N1S, N1L, I1,
+                                                  N2S, N2L, I2,
+                                                  NMS, NML, IM,
+                                                  opt.threshold_fnz, USEBED,
+                                                  taskBytes);
+
+        // Store once for all the number of elements for markers stored as BED 
+        for (int i=0; i<M; i++) {
+            if (USEBED[i]) {
+                nusebed += 1;
+                size_t X1 = 0, X2 = 0, XM = 0;
+                data.sparse_data_get_sizes_from_raw(reinterpret_cast<char*>(&I1[N1S[i]]), 1, snpLenByt, X1, X2, XM);
+                //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu\n", rank, i, X1, X2, XM);
+
+                //EO: N{1,2,M}L structures must not be changed anymore!
+                //------------------------------------------------------
+                N1L[i] = X1;  N2L[i] = X2;  NML[i] = XM;
+            }
+        }
+
+    } else {
+        printf("FATAL  : either BED, SPARSE or MIXED");
+        exit(1);
     }
 
-    MPI_Barrier(MPI_COMM_WORLD);
 
     tl += mysecond();
 
-    if (rank == 0) {
-        printf("INFO   : Total time to load the data: %lu bytes in %.3f seconds => BW = %7.3f GB/s\n", totalBytes, tl, (double)totalBytes * 1E-9 / tl);
-        fflush(stdout);
+    //EO: BW cannot be evaluated properly in case of mixed representation as NA corrections
+    //    are applied in the loading routine
+    //
+    if (opt.mixedRepresentation) {
+        printf("INFO   : rank %3d took %.3f seconds to load  %lu bytes and apply NA corrections to BED markers\n", rank, tl, taskBytes);        
+    } else {
+        printf("INFO   : rank %3d took %.3f seconds to load  %lu bytes  =>  BW = %7.3f GB/s\n", rank, tl, taskBytes, (double)taskBytes * 1E-9 / tl);
+    }
+    fflush(stdout);
+
+    MPI_Barrier(MPI_COMM_WORLD);
+
+
+    // For mixed representation get global number of markers dealt with as BED
+    //
+    if (opt.mixedRepresentation) {
+        int nusebed_tot = 0;
+        MPI_Reduce(&nusebed, &nusebed_tot, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+        if (rank == 0) printf("INFO   : there is %d markers using BED representation out of %d (%6.2f%%)\n", nusebed_tot, Mtot, (double)nusebed_tot/(double)Mtot * 100.0);
     }
 
 
@@ -1222,32 +1317,55 @@ int BayesRRm::runMpiGibbs() {
     // ----------------------------------------------------------
     if (data.numNAs > 0) {
 
-        if (rank == 0)
-            printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs in .phen).\n", data.numNAs);
+        double tna = MPI_Wtime();
 
-        data.sparse_data_correct_for_missing_phenotype(N1S, N1L, I1, M);
-        data.sparse_data_correct_for_missing_phenotype(N2S, N2L, I2, M);
-        data.sparse_data_correct_for_missing_phenotype(NMS, NML, IM, M);
+        if (rank == 0)
+            printf("INFO   : applying %d corrections to genotype data due to missing phenotype data (NAs)...\n", data.numNAs);
+
+        data.sparse_data_correct_for_missing_phenotype(N1S, N1L, I1, M, USEBED);
+        data.sparse_data_correct_for_missing_phenotype(N2S, N2L, I2, M, USEBED);
+        data.sparse_data_correct_for_missing_phenotype(NMS, NML, IM, M, USEBED);
 
         MPI_Barrier(MPI_COMM_WORLD);
-        if (rank == 0) printf("INFO   : finished applying NA corrections.\n");
+
+        tna = MPI_Wtime() - tna;
+
+        if (rank == 0) {
+            if (opt.mixedRepresentation) {
+                printf("INFO   : ... finished applying NA corrections in %.2f seconds for SPARSE markers in mixed representation.\n", tna);
+            } else {
+                printf("INFO   : ... finished applying NA corrections in %.2f seconds.\n", tna);
+            }
+        }
 
         // Adjust N upon number of NAs
         Ntot -= data.numNAs;
+
         if (rank == 0 && data.numNAs > 0)
-            printf("INFO   : Ntot adjusted by -%d to account for NAs in phenotype file. Now Ntot=%d\n", data.numNAs, Ntot);
+            printf("INFO   : Ntot adjusted by -%d to account for NAs in phenotype file. Now Ntot = %d\n", data.numNAs, Ntot);
     }
-    
+
+
+    // Compute dalloc increment from NA adjusted structures
+    //
+    double aa_ = 0.0;
+    for (int i=0; i<M; i++) {
+        if (USEBED[i]) { // Although N2L and NML do contain the info, I2 and IM were not allocated for BED markers! Done on the fly
+            dalloc += (double) (snpLenUint * sizeof(uint)) * 1E-9;
+        } else {
+            dalloc += (double)(N1L[i] + N2L[i] + NML[i]) * (double) sizeof(uint) * 1E-9;
+        }
+    }
+
 
     // Compute statistics (from sparse info)
-    // -------------------------------------
-    //if (rank == 0) printf("INFO   : start computing statistics on Ntot = %d individuals\n", Ntot);
-    double dN   = (double) Ntot;
-    double dNm1 = (double)(Ntot - 1);
-    double *mave, *mstd;
-    mave = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mave, __LINE__, __FILE__);
-    mstd = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
-    dalloc += 2 * size_t(M) * sizeof(double) / 1E9;
+    //
+    double  dN   = (double) Ntot;
+    double  dNm1 = (double)(Ntot - 1);
+    double* mave = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mave, __LINE__, __FILE__);
+    double* mstd = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
+    
+    dalloc += 3 * size_t(M) * sizeof(double) * 1E-9;
 
     double tmp0, tmp1, tmp2;
     for (int i=0; i<M; ++i) {
@@ -1256,21 +1374,21 @@ int BayesRRm::runMpiGibbs() {
         tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
         tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
         mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
-        //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
     const auto et2 = std::chrono::high_resolution_clock::now();
     const auto dt2 = et2 - st2;
     const auto du2 = std::chrono::duration_cast<std::chrono::milliseconds>(dt2).count();
-    if (rank == 0)   std::cout << "INFO   : time to preprocess the data: " << du2 / double(1000.0) << " seconds." << std::endl;
+    if (rank == 0)
+        printf("INFO   : overall time to preprocess the data: %.3f seconds\n", (double) du2 / 1000.0);
 
 
     // Build list of markers    
     // ---------------------
     for (int i=0; i<M; ++i) markerI.push_back(i);
 
-
+    
     // Processing part
     // ---------------
     const auto st3 = std::chrono::high_resolution_clock::now();
@@ -1370,6 +1488,7 @@ int BayesRRm::runMpiGibbs() {
     int    tot_nsync_ar1 = 0;
     int    tot_nsync_ar2 = 0;
     int    *glob_info, *tasks_len, *tasks_dis, *stats_len, *stats_dis;
+
     if (opt.sparseSync) {
         glob_info  = (int*)    _mm_malloc(size_t(nranks * 2) * sizeof(int),    64);  check_malloc(glob_info,  __LINE__, __FILE__);
         tasks_len  = (int*)    _mm_malloc(size_t(nranks)     * sizeof(int),    64);  check_malloc(tasks_len,  __LINE__, __FILE__);
@@ -1430,7 +1549,7 @@ int BayesRRm::runMpiGibbs() {
             //std::random_shuffle(markerI.begin(), markerI.end());
         }
         
-        m0 = 0.0;
+        m0 = 0;
         cass.setZero();
 
         sigE_G  = sigmaE / sigmaG;
@@ -1454,8 +1573,8 @@ int BayesRRm::runMpiGibbs() {
 
             if (j < M) {
 
-                marker  = markerI[j];
-                beta =  Beta(marker);
+                marker = markerI[j];
+                beta   = Beta(marker);
 
                 if (adaV[j]) {
 
@@ -1465,17 +1584,42 @@ int BayesRRm::runMpiGibbs() {
                         denom(i-1) = dNm1 + sigE_G * cVaI(i);
                         //printf("it %d, rank %d, m %d: denom[%d] = %20.15f, cvai = %20.15f\n", iteration, rank, marker, i-1, denom(i-1), cVaI(i));
                     }
-                    //cout << "denom = " << endl << denom << endl;
-                    
-                    num = sparse_dotprod(epsilon,
-                                         I1, N1S[marker], N1L[marker],
-                                         I2, N2S[marker], N2L[marker],
-                                         IM, NMS[marker], NML[marker],
-                                         mave[marker],    mstd[marker], Ntot, marker);
-                    //cout << "num = " << num << endl;
 
-                    //PROFILE
+                    num = 0.0;
+
+                    if (USEBED[marker]) {
+
+                        // Need to get sizes first from raw stored in I1, then allocate
+                        if (XI1) _mm_free(XI1);  if (XI2) _mm_free(XI2);  if (XIM) _mm_free(XIM);
+                        XI1 = (uint*)_mm_malloc(N1L[marker] * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
+                        XI2 = (uint*)_mm_malloc(N2L[marker] * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
+                        XIM = (uint*)_mm_malloc(NML[marker] * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
+                       
+                        size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
+                        size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
+                        data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[marker]]), 1, snpLenByt,
+                                                      &fake_n1s, &fake_n1l, XI1,
+                                                      &fake_n2s, &fake_n2l, XI2,
+                                                      &fake_n2s, &fake_nml, XIM);
+
+                        num = sparse_dotprod(epsilon,
+                                             XI1, 0, N1L[marker],
+                                             XI2, 0, N2L[marker],
+                                             XIM, 0, NML[marker],
+                                             mave[marker],    mstd[marker], Ntot, marker);
+
+                    } else {
+
+                        num = sparse_dotprod(epsilon,
+                                             I1, N1S[marker], N1L[marker],
+                                             I2, N2S[marker], N2L[marker],
+                                             IM, NMS[marker], NML[marker],
+                                             mave[marker],    mstd[marker], Ntot, marker);
+                    }
+
+                    //printf("it %2d, rank %2d, m %3d: num = %22.15f  USEBED=%d\n", iteration, rank, marker, num, USEBED[marker]);
                     //continue;
+
                     
                     num += beta * double(Ntot - 1);
                     //printf("it %d, rank %d, mark %d: num = %20.15f, %20.15f, %20.15f\n", iteration, rank, marker, num, mave[marker], mstd[marker]);
@@ -1524,8 +1668,8 @@ int BayesRRm::runMpiGibbs() {
                                 Beta(marker) = dist.norm_rng(muk[k], sigmaE/denom[k-1]);
                                 //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with p=%15.10f <= acum = %15.10f, denom = %15.10f, sigmaE = %15.10f: beta = %15.10f\n", iteration, rank, marker, k, muk[k], p, acum, denom[k-1], sigmaE, Beta(marker));
                             }
-                            cass[k] += 1.0d;
-                            components[marker] = k;
+                            cass[k]            += 1;
+                            components[marker]  = k;
                             break;
                         } else {
                             //if too big or too small
@@ -1546,6 +1690,9 @@ int BayesRRm::runMpiGibbs() {
                 }
                 //printf("After acum = %15.10f\n", acum);
                 
+                //printf("it %d, task %3d, marker %5d: @SO_FAR_SO_GOOD@\n", iteration, rank, marker);
+                //continue;
+
 
                 betaOld   = beta;
                 beta      = Beta(marker);
@@ -1561,15 +1708,26 @@ int BayesRRm::runMpiGibbs() {
 
                         mark2sync.push_back(marker);
                         dbet2sync.push_back(deltaBeta);
-
-                    } else {
-
-                        sparse_scaadd(deltaEps, deltaBeta, 
-                                      I1, N1S[marker], N1L[marker],
-                                      I2, N2S[marker], N2L[marker],
-                                      IM, NMS[marker], NML[marker],
-                                      mave[marker], mstd[marker], Ntot);
                         
+                    } else {
+                        //printf("it %d, task %3d, marker %5d: @BEFORE@\n", iteration, rank, marker);
+                        //fflush(stdout);
+                        if (USEBED[marker]) {
+                            sparse_scaadd(deltaEps, deltaBeta, 
+                                          XI1, 0, N1L[marker],
+                                          XI2, 0, N2L[marker],
+                                          XIM, 0, NML[marker],
+                                          mave[marker], mstd[marker], Ntot);
+                        } else {
+                            sparse_scaadd(deltaEps, deltaBeta, 
+                                          I1, N1S[marker], N1L[marker],
+                                          I2, N2S[marker], N2L[marker],
+                                          IM, NMS[marker], NML[marker],
+                                          mave[marker], mstd[marker], Ntot);
+                        }
+                        //printf("it %d, task %3d, marker %5d: @AFTER@\n", iteration, rank, marker);
+                        //fflush(stdout);
+
                         // Update local sum of delta epsilon
                         sum_vectors_f64(dEpsSum, deltaEps, Ntot);
                     }
@@ -1587,13 +1745,19 @@ int BayesRRm::runMpiGibbs() {
 
             task_sum_abs_deltabeta += fabs(deltaBeta);
 
+            //printf("it %d, task %3d, marker %5d: @HERE WE ARE@\n", iteration, rank, marker);
+            //continue;
+
             // Check whether we have a non-zero beta somewhere
             //if (nranks > 1 && (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1)) {
             if (nranks > 1 && (sinceLastSync >= opt.syncRate || j == lmax-1)) {
-                
-                //MPI_Barrier(MPI_COMM_WORLD);
-                double tb = MPI_Wtime();                
 
+                MPI_Barrier(MPI_COMM_WORLD);
+                //printf("it %d, task %3d, marker %5d: @HERE WE ARE NOW@ %20.15f\n", iteration, rank, marker, task_sum_abs_deltabeta);
+                //fflush(stdout);
+                
+                double tb = MPI_Wtime();
+                
                 check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta, &cumSumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
                 double te = MPI_Wtime();
@@ -1601,12 +1765,14 @@ int BayesRRm::runMpiGibbs() {
                 it_sync_ar1   += te - tb;
                 tot_nsync_ar1 += 1;
                 it_nsync_ar1  += 1;
-
+                //printf("it %d, task %3d, marker %5d: @HERE WE ARE NOW 2@\n", iteration, rank, marker);
+                //fflush(stdout);
             } else {
 
                 cumSumDeltaBetas = task_sum_abs_deltabeta;
             }
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
+            //fflush(stdout);
 
             //if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
             if ( (sinceLastSync >= opt.syncRate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
@@ -1781,18 +1947,11 @@ int BayesRRm::runMpiGibbs() {
                 cumSumDeltaBetas       = 0.0;
                 task_sum_abs_deltabeta = 0.0;
                 
-                sinceLastSync = 0;
-                
-            } //else {
-                //sinceLastSync += 1;
-                
-                //task_sum_abs_deltabeta += fabs(deltaBeta);
-            //}
+                sinceLastSync = 0;                
+            }
 
         } // END PROCESSING OF ALL MARKERS
 
-        //PROFILE
-        //continue;
 
         beta_squaredNorm = Beta.squaredNorm();
         //printf("rank %d it %d  beta_squaredNorm = %15.10f\n", rank, iteration, beta_squaredNorm);
@@ -1803,18 +1962,18 @@ int BayesRRm::runMpiGibbs() {
         // ------------------------
         if (nranks > 1) {
             MPI_Barrier(MPI_COMM_WORLD);
-            check_mpi(MPI_Allreduce(&beta_squaredNorm, &sum_beta_squaredNorm, 1,           MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            check_mpi(MPI_Allreduce(cass.data(),       sum_cass.data(),       cass.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(&beta_squaredNorm, &sum_beta_squaredNorm, 1,           MPI_DOUBLE,  MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(cass.data(),       sum_cass.data(),       cass.size(), MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             cass             = sum_cass;
             beta_squaredNorm = sum_beta_squaredNorm;
         }
 
         // Update global parameters
         // ------------------------
-        m0      = double(Mtot) - cass[0];
-        sigmaG  = dist.inv_scaled_chisq_rng(v0G+m0, (beta_squaredNorm * m0 + v0G*s02G) /(v0G+m0));
-        pi      = dist.dirichilet_rng(cass.array() + 1.0);
-        //printf("rank %d own sigmaG = %20.15f with Mtot = %d and m0 = %d\n", rank, sigmaG, Mtot, int(m0));
+        m0      = Mtot - cass[0];
+        sigmaG  = dist.inv_scaled_chisq_rng(v0G + double(m0), (beta_squaredNorm * double(m0) + v0G * s02G) /(v0G + double(m0)));
+        pi      = dist.dirichlet_rng(cass.array() + 1);
+        //printf("rank %d own sigmaG = %20.15f with Mtot = %d and m0 = %d\n", rank, sigmaG, Mtot, m0);
 
         // Broadcast sigmaG of rank 0
         check_mpi(MPI_Bcast(&sigmaG, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -1914,7 +2073,7 @@ int BayesRRm::runMpiGibbs() {
                    it_nsync_ar1 + it_nsync_ar2, it_nsync_ar1, it_nsync_ar2,
                    (it_sync_ar1) / double(it_nsync_ar1) * 1000.0,
                    (it_sync_ar2) / double(it_nsync_ar2) * 1000.0,
-                   sigmaG, sigmaE, beta_squaredNorm, int(m0));
+                   sigmaG, sigmaE, beta_squaredNorm, m0);
             fflush(stdout);
         }
 
@@ -1925,7 +2084,6 @@ int BayesRRm::runMpiGibbs() {
         //printf("it %6d, rank %3d: epsilon[0] = %15.10f, y[0] = %15.10f, m0=%10.1f,  sigE=%15.10f,  sigG=%15.10f [%6d / %6d]\n", iteration, rank, epsilon[0], y[0], m0, sigmaE, sigmaG, markerI[0], markerI[M-1]);
 
         //BCAST
-        //pi = dist.dirichilet_rng(cass.array() + 1.0);
         check_mpi(MPI_Bcast(pi.data(), pi.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //for (int i=0; i<pi.size(); i++) {
         //    printf("rank %3d: pi[%d] = %15.10f after glob sync\n", rank, i, pi[i]);
@@ -1937,7 +2095,7 @@ int BayesRRm::runMpiGibbs() {
             
             //EO: now only global parameters to out (breaks backward compatibility 2019/11/20!)
             if (rank == 0) {
-                left = snprintf(buff, LENBUF, "%5d, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), int(m0), int(pi.size()));
+                left = snprintf(buff, LENBUF, "%5d, %20.15f, %20.15f, %20.15f, %7d, %2d", iteration, sigmaG, sigmaE, sigmaG/(sigmaE+sigmaG), m0, int(pi.size()));
                 assert(left > 0);
                 
                 for (int ii=0; ii<pi.size(); ++ii) {
@@ -2094,6 +2252,7 @@ int BayesRRm::runMpiGibbs() {
     _mm_free(deltaSum);
     _mm_free(mave);
     _mm_free(mstd);
+    _mm_free(USEBED);
     _mm_free(N1S);
     _mm_free(N1L);
     _mm_free(I1);
@@ -2103,7 +2262,9 @@ int BayesRRm::runMpiGibbs() {
     _mm_free(NMS);
     _mm_free(NML);
     _mm_free(IM);
-        
+    if (XI1) _mm_free(XI1);
+    if (XI2) _mm_free(XI2);
+    if (XIM) _mm_free(XIM);
     if (opt.sparseSync) {
         _mm_free(glob_info);
         _mm_free(tasks_len);
@@ -2363,7 +2524,7 @@ void BayesRRm::init(int K, unsigned int markerCount, unsigned int individualCoun
     muk     = VectorXd(K);      // mean of k-th component marker effect size
     denom   = VectorXd(K - 1);  // temporal variable for computing the inflation of the effect variance for a given non-zero component
     m0      = 0;                // total number of markers in model
-    cass    = VectorXd(K);      // variable storing the component assignment
+    cass    = VectorXi(K);      // variable storing the component assignment
 
     // Mean and residual variables
     mu     = 0.0;   // mean or intercept
@@ -2580,8 +2741,8 @@ int BayesRRm::runGibbs()
                         Beta(marker) = dist.norm_rng(muk[k], sigmaE/denom[k-1]);
                         //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with p=%15.10f <= acum=%15.10f\n", iteration, rank, marker, k, muk[k], p, acum);
                     }
-                    cass[k] += 1.0d;
-                    components[marker] = k;
+                    cass[k]            += 1;
+                    components[marker]  = k;
                     break;
                 } else {
                     //if too big or too small
@@ -2619,27 +2780,21 @@ int BayesRRm::runGibbs()
         }
 
         //set no. of markers included in the model
-        m0 = int(M) - int(cass[0]);
+        m0 = M - cass[0];
 
         //sample sigmaG from inverse gamma
         sigmaG = dist.inv_scaled_chisq_rng(v0G + double(m0), (betasqn * double(m0) + v0G * s02G) / (v0G + double(m0)));
 
-        pi = dist.dirichilet_rng(cass.array() + 1.0);
+        pi = dist.dirichlet_rng(cass.array() + 1);
 
         const double epsilonSqNorm = epsilon.squaredNorm();
 
         //sample residual variance sigmaE from inverse gamma
         sigmaE = dist.inv_scaled_chisq_rng(v0E + double(N), (epsilonSqNorm + v0E * s02E) / (v0E + double(N)));
 
-        //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, epsilonSqNorm, v0E, s02E, N, sigmaE);
-
-        //sample hyperparameter pi from dirichlet
-        //pi = dist.dirichilet_rng(cass.array() + 1.0);
-        //cout << pi << endl;
-
         if (showDebug)
             printDebugInfo();
-
+        
         //output time taken for each iteration
         const auto endTime = std::chrono::high_resolution_clock::now();
         const auto dif = endTime - iterStart;

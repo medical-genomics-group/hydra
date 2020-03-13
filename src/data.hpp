@@ -202,21 +202,32 @@ public:
                                     uint*         I1,        uint*   I2,        uint*   IM,
                                     const int M);
 
-    void load_data_from_bed_file(string bedfp, const uint Ntot, const int M, const int rank, const int start, double& dalloc,
-                                 size_t* N1S,   size_t* N1L, uint*& I1,
-                                 size_t* N2S,   size_t* N2L, uint*& I2,
-                                 size_t* NMS,   size_t* NML, uint*& IM);
+    void load_data_from_bed_file(const string bedfp, const uint Ntot, const int M,
+                                 const int    rank,  const int start,
+                                 size_t* N1S, size_t* N1L, uint*& I1,
+                                 size_t* N2S, size_t* N2L, uint*& I2,
+                                 size_t* NMS, size_t* NML, uint*& IM,
+                                 size_t& taskBytes);
 
     void load_data_from_sparse_files(const int rank, const int nranks, const int M,
                                      const int* MrankS, const int* MrankL,
                                      const string sparseOut,
-                                     double& dalloc,
                                      size_t* N1S, size_t* N1L, uint*& I1,
                                      size_t* N2S, size_t* N2L, uint*& I2,
                                      size_t* NMS, size_t* NML, uint*& IM,
-                                     size_t& bytes);
+                                     size_t& taskBytes);
 
-    void sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M);
+    void load_data_from_mixed_representations(const string bedfp,         const string sparseOut,
+                                              const int    rank,          const int nranks,
+                                              const int    Ntot,          const int M,
+                                              const int*   MrankS,        const int* MrankL,
+                                              size_t* N1S,  size_t* N1L,  uint*& I1,
+                                              size_t* N2S,  size_t* N2L,  uint*& I2,
+                                              size_t* NMS,  size_t* NML,  uint*& IM,
+                                              const double threshold_fnz, bool* USEBED,
+                                              size_t& taskBytes);
+    
+    void sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M, const bool* USEBED);
 
     void sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t& N1, size_t& N2, size_t& NM);
 
@@ -252,47 +263,48 @@ public:
 
         int rank, dtsize;
         MPI_Status status;
-
+        
         MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         MPI_Type_size(MPI_DT, &dtsize);
-	//printf("dtsize = %d vs %lu\n", dtsize, sizeof(buffer[0]));
-	//fflush(stdout);
+        //printf("dtsize = %d vs %lu\n", dtsize, sizeof(buffer[0]));
+        //fflush(stdout);
         assert(dtsize == sizeof(buffer[0]));
-
+        
         if (NREADS == 0) return;
-
+        
         int SPLIT_ON = check_int_overflow(size_t(ceil(double(N)/double(NREADS))), __LINE__, __FILE__);
         int count = SPLIT_ON;
-
-	double totime = 0.0;
-	bytes = 0;
-
+        
+        double totime = 0.0;
+        bytes = 0;
+        
         for (uint i=0; i<NREADS; ++i) {
+            
+            double t1 = -mysecond();
 
-	  double t1 = -mysecond();
             const size_t iim = size_t(i) * size_t(SPLIT_ON);
-	    
+
             // Last iteration takes only the leftover
             if (i == NREADS-1) count = check_int_overflow(N - iim, __LINE__, __FILE__);
-
-	    //printf("read %d with count = %d x %lu = %lu Bytes to read\n", i, count, sizeof(buffer[0]), sizeof(buffer[0]) * size_t(count));
-	    //fflush(stdout);
-
+            
+            //printf("read %d with count = %d x %lu = %lu Bytes to read\n", i, count, sizeof(buffer[0]), sizeof(buffer[0]) * size_t(count));
+            //fflush(stdout);
+            
             //check_mpi(MPI_File_read_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
             check_mpi(MPI_File_read_at(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
-	    t1 += mysecond();
-	    totime += t1;
-	    bytes += size_t(count) * size_t(dtsize);
-        if (rank % 10 == 0) {
-            printf("INFO   : rank %3d cumulated read time at %2d/%2d: %7.3f sec, avg time %7.3f, BW = %7.3f GB/s\n",
-                   rank, i+1, NREADS, totime, totime / (i + 1), double(bytes) / totime / 1E9 );
-            fflush(stdout);
+            t1 += mysecond();
+            totime += t1;
+            bytes += size_t(count) * size_t(dtsize);
+            if (rank % 10 == 0) {
+                printf("INFO   : rank %3d cumulated read time at %2d/%2d: %7.3f sec, avg time %7.3f, BW = %7.3f GB/s\n",
+                       rank, i+1, NREADS, totime, totime / (i + 1), double(bytes) / totime / 1E9 );
+                fflush(stdout);
+            }
+
+            //MPI_Barrier(MPI_COMM_WORLD);
         }
 
-	    //MPI_Barrier(MPI_COMM_WORLD);
-        }
-
-	//MPI_Barrier(MPI_COMM_WORLD);
+        //MPI_Barrier(MPI_COMM_WORLD);
     }
 
 
