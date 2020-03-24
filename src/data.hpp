@@ -107,7 +107,7 @@ public:
     // marion : vector for annotation file and matrix for mS
     VectorXi G; 			 // groups
     MatrixXd mS;			 // mixtures in groups
-
+    MatrixXd priors;         // group priors v0, s0
   
     MatrixXf XPX;            // X'X the MME lhs
     MatrixXf ZPX;            // Z'X the covariance matrix of SNPs and fixed effects
@@ -346,6 +346,8 @@ public:
     void readGroupFile(const string &groupFile);
     void readGroupFile_new(const string &groupFile);
     void readmSFile(const string& mSfile);
+    void read_group_priors(const string& file);
+
 
 };
 

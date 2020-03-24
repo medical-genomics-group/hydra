@@ -226,8 +226,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if (!strcmp(argv[i], "--group")) {
         	groupFile = argv[++i];
             ss << "--group " << argv[i] << "\n";
-        }
-        else if (!strcmp(argv[i], "--thread")) {
+        } else if (!strcmp(argv[i], "--groupPriorsFile")) {
+            priorsFile = argv[++i];
+            ss << "--groupPriorsFile" << argv[i] << "\n";
+        } else if (!strcmp(argv[i], "--thread")) {
             numThread = atoi(argv[++i]);
             ss << "--thread " << argv[i] << "\n";
         }

@@ -531,7 +531,7 @@ void Data::load_data_from_sparse_files(const int rank, const int nranks, const i
                                        size_t* N1S,   size_t* N1L, uint*& I1,
                                        size_t* N2S,   size_t* N2L, uint*& I2,
                                        size_t* NMS,   size_t* NML, uint*& IM,
-				       size_t& totalBytes) {
+                       size_t& totalBytes) {
 
     char processor_name[MPI_MAX_PROCESSOR_NAME];
     int  processor_name_len;
@@ -1305,7 +1305,7 @@ void Data::readMarkerBlocksFile(const string &markerBlocksFile) {
     blocksEnds.clear();
     std::string str;
     
-	while (std::getline(in, str)) {
+    while (std::getline(in, str)) {
         std::vector<std::string> results;
         boost::split(results, str, [](char c){return c == ' ';});
         if (results.size() != 2) {
@@ -1315,8 +1315,8 @@ void Data::readMarkerBlocksFile(const string &markerBlocksFile) {
         }
         blocksStarts.push_back(stoi(results[0]));
         blocksEnds.push_back(stoi(results[1]));        
-	}
-	in.close();
+    }
+    in.close();
 
     numBlocks = (unsigned) blocksStarts.size();
     //cout << "Found definitions for " << nbs << " marker blocks." << endl;
@@ -1808,7 +1808,7 @@ M Data::readCSVFile (const string &path) {
 }
 
 void Data::readCovariateFile(const string &covariateFile ) {
-	X = readCSVFile<MatrixXd>(covariateFile);
+    X = readCSVFile<MatrixXd>(covariateFile);
 }
 
 
@@ -1836,25 +1836,25 @@ void Data::readGroupFile(const string &groupFile) {
 //group index starts from 0
 void Data::readGroupFile_new(const string& groupFile){
 
-	ifstream input(groupFile);
-	vector<int> tmp;
-	string col1;
-	int col2;
+    ifstream input(groupFile);
+    vector<int> tmp;
+    string col1;
+    int col2;
 
-	if(!input.is_open()){
-		cout<<"Error opening the file"<< endl;
-		return;
-	}
+    if(!input.is_open()){
+        cout<<"Error opening the file"<< endl;
+        return;
+    }
 
-	while(true){
-		input >> col1 >> col2;
-		if(input.eof()) break;
-		tmp.push_back(col2);
-	}
+    while(true){
+        input >> col1 >> col2;
+        if(input.eof()) break;
+        tmp.push_back(col2);
+    }
 
-	G=Eigen::VectorXi::Map(tmp.data(), tmp.size());
+    G=Eigen::VectorXi::Map(tmp.data(), tmp.size());
     
-	cout << "Groups read from file" << endl;
+    cout << "Groups read from file" << endl;
 }
 
 
@@ -1865,34 +1865,67 @@ void Data::readmSFile(const string& mSfile){
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-	ifstream in(mSfile);
+    ifstream in(mSfile);
 
-	if(!in.is_open()){
-		cout<<"Error opening the file"<< endl;
-		return;
-	}
+    if(!in.is_open()){
+        cout<<"Error opening the file"<< endl;
+        return;
+    }
 
-	else if(in.is_open()){
+    else if(in.is_open()){
 
-		string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
 
-		Gadget::Tokenizer strvec;
-		Gadget::Tokenizer strT;
+        Gadget::Tokenizer strvec;
+        Gadget::Tokenizer strT;
 
-		strvec.getTokens(whole_text, ";");
-		strT.getTokens(strvec[0],",");
+        strvec.getTokens(whole_text, ";");
+        strT.getTokens(strvec[0],",");
         
-		mS=Eigen::MatrixXd(strvec.size(),strT.size());
-		numGroups=strvec.size();
+        mS=Eigen::MatrixXd(strvec.size(),strT.size());
+        numGroups=strvec.size();
         //cout << "numGroups = " << numGroups << endl;
-		for (unsigned j=0; j<strvec.size(); ++j) {
-			strT.getTokens(strvec[j],",");
-			for(unsigned k=0; k<strT.size(); ++k)
-				mS(j,k) = stod(strT[k]);
-		}
-	}
+        for (unsigned j=0; j<strvec.size(); ++j) {
+            strT.getTokens(strvec[j],",");
+            for(unsigned k=0; k<strT.size(); ++k)
+                mS(j,k) = stod(strT[k]);
+        }
+    }
 
     if (rank == 0)
         cout << "Mixtures read from file" << endl;
 }
 
+/*
+ * Reads priors v0, s0 for groups from file
+ * in : path to file (expected format as "v0,s0; v0,s0; ...")
+ * out: void
+ */
+void Data::read_group_priors(const string& file){
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    try {
+        ifstream in(file);
+        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+
+        Gadget::Tokenizer strvec;
+        Gadget::Tokenizer strT;
+        // get element sizes to instantiate result vector
+        strvec.getTokens(whole_text, ";");
+        strT.getTokens(strvec[0], ",");
+        priors = Eigen::MatrixXd(strvec.size(), strT.size());
+        numGroups = strvec.size();
+        cout << "numGroups = " << numGroups << endl;
+        for (unsigned j=0; j<strvec.size(); ++j) {
+            strT.getTokens(strvec[j], ",");
+            for (unsigned k=0; k<2; ++k) {
+                priors(j, k) = stod(strT[k]);
+            }
+        }
+    } catch (const ifstream::failure& e) {
+        cout<<"Error opening the file"<< endl;
+    }
+    if (rank == 0) {
+        cout << "Mixtures read from file" << endl;
+    }
+}
