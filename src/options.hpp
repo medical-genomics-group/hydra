@@ -97,6 +97,9 @@ public:
         sparseBsn               = "";
         optionFile				= "";
         numGroups				= 2;
+        groupFile               = "";
+        priorsFile              = "";
+        mSfile                  = "";
     }
 
     void inputOptions(const int argc, const char* argv[]);
