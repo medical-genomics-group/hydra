@@ -29,8 +29,8 @@ class BayesRRm
     const double	   sigma0  = 0.0001;
     const double	   v0E     = 0.0001;
     const double       s02E    = 0.0001;
-    const double       v0G     = 0.0001;
-    const double       s02G    = 0.0001;
+    double             v0G     = 0.0001;
+    double             s02G    = 0.0001;
     const double       s02F    = 1.0;
     const size_t       LENBUF  = 50000;
 

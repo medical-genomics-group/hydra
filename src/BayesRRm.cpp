@@ -1826,6 +1826,11 @@ int BayesRRm::runMpiGibbs() {
         for (int i=0; i<numGroups; i++) {
             //printf("%d: m0 = %d - %d\n", i, MtotGrp[i], cass(i, 0));
             m0[i]        = MtotGrp[i] - cass(i, 0);
+            // AH: naive check that v0G and s02G were supplied from file
+            if (opt.priorsFile != "") {
+                v0G = data.priors(i, 0);
+                s02G = data.priors(i, 1);
+            }
             sigmaG[i]    = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
             //we moved the pi update here to use the same loop
             estPi.row(i) = dist.dirichilet_rng(cass.row(i).array().cast<double>() + 1.0);

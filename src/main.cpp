@@ -98,6 +98,8 @@ int main(int argc, const char * argv[]) {
                 data.readGroupFile(opt.groupIndexFile);
                 if (opt.groupMixtureFile == "") throw("with --mpiBayesGroups activated you must use the --groupMixtureFile!");
                 data.readmSFile(opt.groupMixtureFile);
+                // TODO: group priors file should be optional
+                data.read_group_priors(opt.priorsFile);
             }
 
             if (opt.multi_phen) {
