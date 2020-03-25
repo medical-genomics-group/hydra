@@ -14,5 +14,6 @@ brr
 /MR_ADV/
 slurm-*.out
 bayesOutput_??.*
-/tbb/
 /test/
+src/mpi_gibbs*
+tbb
