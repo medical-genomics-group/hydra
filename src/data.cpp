@@ -766,6 +766,51 @@ void Data::load_data_from_sparse_files(const int rank,           const int nrank
 }
 
 
+void Data::get_bed_marker_from_sparse(char* bdat, 
+                                      const int    Ntot,
+                                      const size_t S1, const size_t L1, const uint* I1,
+                                      const size_t S2, const size_t L2, const uint* I2,
+                                      const size_t SM, const size_t LM, const uint* IM) {
+
+
+    // Length of a marker in [byte] in BED representation (1 ind is 2 bits, so 1 byte is 4 inds)
+    //cout << "ntot = " << Ntot << endl;
+    //printf("L1,2,M = %lu, %lu, %lu\n", L1,L2,LM);
+    const size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
+
+    // Step 1: Set all to 1
+    memset(bdat, 0b11111111, snpLenByt);
+
+
+    //return;
+    
+    // Step 2: Set the 1s
+    int ibyt = 0, iind = 0;
+    for (int j=0; j<L1; j++) {
+        ibyt = I1[j] / 4;          // 4 inds per byte in BED format
+        iind = I1[j] - ibyt * 4;   // 2 bits per ind in byte, position in byte from right to left
+        bdat[ibyt] ^= (0b00000001 << iind * 2);
+    }
+    
+    // Step 3: Set the 2s
+    ibyt = 0, iind = 0;
+    for (int j=0; j<L2; j++) {
+        ibyt = I2[j] / 4;
+        iind = I2[j] - ibyt * 4;
+        bdat[ibyt] ^= (0b00000011 << iind * 2);
+    }
+    
+    // Step 4: Set the Ms
+    ibyt = 0, iind = 0;
+    for (int j=0; j<LM; j++) {
+        ibyt = IM[j] / 4;
+        iind = IM[j] - ibyt * 4;
+        bdat[ibyt] ^= (0b00000010 << iind * 2);
+    }
+}
+
+
+
 // EO Mixed-type representation: BED + SPARSE
 // Based on a criterion (threshold_fnz) giving the fraction of non-zero elements in 
 // the genotype, some markers will be handled as BED data, the others as SPARSE.
@@ -1082,7 +1127,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
             }
         }
         
-        for (int ii=0; ii<numInds; ++ii) {
+        for (int ii=0; ii<numInds-numNAs; ++ii) {
             if (tmpi[ii] == 1) {
                 tmpi[ii] = -1;
             } else {
@@ -1090,14 +1135,15 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
             }
         }
 
-        for (int ii=0; ii<numInds; ++ii) {
+        for (int ii=0; ii<numInds-numNAs; ++ii) {
             if      (tmpi[ii] <  0) { cm += 1;  NM += 1; }
             else if (tmpi[ii] == 0) { c0 += 1;  N0 += 1; }
             else if (tmpi[ii] == 1) { c1 += 1;  N1 += 1; }
             else if (tmpi[ii] == 2) { c2 += 1;  N2 += 1; }
         }
-        
-        assert(cm+c0+c1+c2 == numInds);
+        //printf("N0, N1, N2, NM = %lu, %lu, %lu, %lu\n", N0, N1, N2, NM);
+        //printf("%d - %d = %d\n", numInds, numNAs, numInds - numNAs);
+        assert(cm+c0+c1+c2 == numInds - numNAs);        
         //printf("N0, N1, N2, NM = %lu, %lu, %lu, %lu\n", N0, N1, N2, NM);
     }
 
@@ -1115,7 +1161,8 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
                                     size_t* N2S, size_t* N2L, uint* I2,
                                     size_t* NMS, size_t* NML, uint* IM) {
     
-    assert(numInds<=NB*4);
+    
+    assert(numInds - numNAs <= NB * 4);
 
 
     // temporary array used for translation
@@ -1134,7 +1181,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
             }
         }
         
-        for (int ii=0; ii<numInds; ++ii) {
+        for (int ii=0; ii<numInds-numNAs; ++ii) {
             if (tmpi[ii] == 1) {
                 tmpi[ii] = -1;
             } else {
@@ -1144,7 +1191,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
 
         size_t n0 = 0, n1 = 0, n2 = 0, nm = 0;
         
-        for (uint ii=0; ii<numInds; ++ii) {
+        for (uint ii=0; ii<numInds-numNAs; ++ii) {
             if (tmpi[ii] < 0) {
                 IM[im] = ii;
                 im += 1;
@@ -1164,7 +1211,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
             }
         }
 
-        assert(nm + n0 + n1 + n2 == numInds);
+        assert(nm + n0 + n1 + n2 == numInds - numNAs);
 
         N1S[i] = N1;  N1L[i] = n1;  N1 += n1;
         N2S[i] = N2;  N2L[i] = n2;  N2 += n2;

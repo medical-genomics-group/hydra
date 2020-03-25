@@ -24,6 +24,7 @@ public:
 #ifdef USE_MPI
     bool     restart             = false;
     bool     sparseSync          = false;
+    bool     bedSync             = false;
     unsigned syncRate            = 1;
     bool     bedToSparse         = false;
     bool     readFromBedFile     = false;

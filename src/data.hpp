@@ -209,6 +209,7 @@ public:
                                  size_t* NMS, size_t* NML, uint*& IM,
                                  size_t& taskBytes);
 
+
     void load_data_from_sparse_files(const int rank, const int nranks, const int M,
                                      const int* MrankS, const int* MrankL,
                                      const string sparseOut,
@@ -217,6 +218,14 @@ public:
                                      size_t* NMS, size_t* NML, uint*& IM,
                                      size_t& taskBytes);
 
+
+    void get_bed_marker_from_sparse(char* bed,
+                                    const int    Ntot,
+                                    const size_t S1, const size_t L1, const uint* I1,
+                                    const size_t S2, const size_t L2, const uint* I2,
+                                    const size_t SM, const size_t LM, const uint* IM);
+
+ 
     void load_data_from_mixed_representations(const string bedfp,         const string sparseOut,
                                               const int    rank,          const int nranks,
                                               const int    Ntot,          const int M,

@@ -956,10 +956,10 @@ int BayesRRm::runMpiGibbs() {
         printf("INFO   : Full dataset includes Mtot=%d markers and Ntot=%d individuals.\n", Mtot, Ntot);
 
     // Length of a marker in [byte] in BED representation (1 ind is 2 bits, so 1 byte is 4 inds)
-    const size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
+    size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
 
     // Length of a marker in [uint] in BED representation (1 ind is 2 bits, so 1 uint is 16 inds)
-    const size_t snpLenUint = (Ntot % 16) ? Ntot / 16 + 1 : Ntot / 16;
+    size_t snpLenUint = (Ntot % 16) ? Ntot / 16 + 1 : Ntot / 16;
 
     if (rank == 0) printf("INFO   : snpLenByt = %zu bytes; snpLenUint = %zu\n", snpLenByt, snpLenUint);
 
@@ -1214,9 +1214,6 @@ int BayesRRm::runMpiGibbs() {
     for (int i=0; i<M; i++) USEBED[i] = false;
     int nusebed = 0;
 
-    // Sparse indices storage for BED markers needing expansion to SPARSE at processing time
-    // (so 1 marker max)
-    uint *XI1 = NULL, *XI2 = NULL, *XIM = NULL;
 
     // Sparse indices storage
     uint *I1, *I2, *IM;
@@ -1275,7 +1272,7 @@ int BayesRRm::runMpiGibbs() {
                 nusebed += 1;
                 size_t X1 = 0, X2 = 0, XM = 0;
                 data.sparse_data_get_sizes_from_raw(reinterpret_cast<char*>(&I1[N1S[i]]), 1, snpLenByt, X1, X2, XM);
-                //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu\n", rank, i, X1, X2, XM);
+                //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu < << <<<\n", rank, i, X1, X2, XM);
 
                 //EO: N{1,2,M}L structures must not be changed anymore!
                 //------------------------------------------------------
@@ -1341,8 +1338,13 @@ int BayesRRm::runMpiGibbs() {
         // Adjust N upon number of NAs
         Ntot -= data.numNAs;
 
-        if (rank == 0 && data.numNAs > 0)
-            printf("INFO   : Ntot adjusted by -%d to account for NAs in phenotype file. Now Ntot = %d\n", data.numNAs, Ntot);
+        // Length of a marker in [byte] in BED representation (1 ind is 2 bits, so 1 byte is 4 inds)
+        size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
+
+        // Length of a marker in [uint] in BED representation (1 ind is 2 bits, so 1 uint is 16 inds)
+        size_t snpLenUint = (Ntot % 16) ? Ntot / 16 + 1 : Ntot / 16;
+
+        if (rank == 0) printf("INFO   : snpLenByt = %zu bytes; snpLenUint = %zu after accounting for NAs\n", snpLenByt, snpLenUint);
     }
 
 
@@ -1489,12 +1491,12 @@ int BayesRRm::runMpiGibbs() {
     int    tot_nsync_ar2 = 0;
     int    *glob_info, *tasks_len, *tasks_dis, *stats_len, *stats_dis;
 
-    if (opt.sparseSync) {
-        glob_info  = (int*)    _mm_malloc(size_t(nranks * 2) * sizeof(int),    64);  check_malloc(glob_info,  __LINE__, __FILE__);
-        tasks_len  = (int*)    _mm_malloc(size_t(nranks)     * sizeof(int),    64);  check_malloc(tasks_len,  __LINE__, __FILE__);
-        tasks_dis  = (int*)    _mm_malloc(size_t(nranks)     * sizeof(int),    64);  check_malloc(tasks_dis,  __LINE__, __FILE__);
-        stats_len  = (int*)    _mm_malloc(size_t(nranks)     * sizeof(int),    64);  check_malloc(stats_len,  __LINE__, __FILE__);
-        stats_dis  = (int*)    _mm_malloc(size_t(nranks)     * sizeof(int),    64);  check_malloc(stats_dis,  __LINE__, __FILE__);
+    if (opt.bedSync || opt.sparseSync) {
+        glob_info = (int*) _mm_malloc(size_t(nranks * 2) * sizeof(int), 64);  check_malloc(glob_info,  __LINE__, __FILE__);
+        tasks_len = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(tasks_len,  __LINE__, __FILE__);
+        tasks_dis = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(tasks_dis,  __LINE__, __FILE__);
+        stats_len = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(stats_len,  __LINE__, __FILE__);
+        stats_dis = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(stats_dis,  __LINE__, __FILE__);
     }
 
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
@@ -1571,6 +1573,10 @@ int BayesRRm::runMpiGibbs() {
 	 
             sinceLastSync += 1;
 
+            // Sparse indices storage for BED markers needing expansion to SPARSE at processing time
+            //
+            uint *XI1 = NULL, *XI2 = NULL, *XIM = NULL;
+
             if (j < M) {
 
                 marker = markerI[j];
@@ -1589,25 +1595,25 @@ int BayesRRm::runMpiGibbs() {
 
                     if (USEBED[marker]) {
 
-                        // Need to get sizes first from raw stored in I1, then allocate
-                        if (XI1) _mm_free(XI1);  if (XI2) _mm_free(XI2);  if (XIM) _mm_free(XIM);
-                        XI1 = (uint*)_mm_malloc(N1L[marker] * sizeof(uint), 64);  check_malloc(I1, __LINE__, __FILE__);
-                        XI2 = (uint*)_mm_malloc(N2L[marker] * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
-                        XIM = (uint*)_mm_malloc(NML[marker] * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
+                        // Allocate from sizes determined earlier on
+                        //
+                        XI1 = (uint*)_mm_malloc(N1L[marker] * sizeof(uint), 64);  check_malloc(XI1, __LINE__, __FILE__);
+                        XI2 = (uint*)_mm_malloc(N2L[marker] * sizeof(uint), 64);  check_malloc(XI2, __LINE__, __FILE__);
+                        XIM = (uint*)_mm_malloc(NML[marker] * sizeof(uint), 64);  check_malloc(XIM, __LINE__, __FILE__);
                        
                         size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
                         size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
                         data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[marker]]), 1, snpLenByt,
                                                       &fake_n1s, &fake_n1l, XI1,
                                                       &fake_n2s, &fake_n2l, XI2,
-                                                      &fake_n2s, &fake_nml, XIM);
+                                                      &fake_nms, &fake_nml, XIM);
+                        //printf("??? %lu %lu %lu\n", fake_n1l, fake_n2l, fake_nml);
 
                         num = sparse_dotprod(epsilon,
                                              XI1, 0, N1L[marker],
                                              XI2, 0, N2L[marker],
                                              XIM, 0, NML[marker],
                                              mave[marker],    mstd[marker], Ntot, marker);
-
                     } else {
 
                         num = sparse_dotprod(epsilon,
@@ -1650,7 +1656,7 @@ int BayesRRm::runMpiGibbs() {
                     //printf("%d/%d/%d  p = %15.10f\n", iteration, rank, j, p);
                     
                     acum = 0.0;
-                    if(((logL.segment(1,km1).array()-logL[0]).abs().array() > 700.0).any() ){
+                    if (((logL.segment(1,km1).array()-logL[0]).abs().array() > 700.0).any()) {
                         acum = 0.0;
                     } else{
                         acum = 1.0 / ((logL.array()-logL[0]).exp().sum());
@@ -1693,7 +1699,6 @@ int BayesRRm::runMpiGibbs() {
                 //printf("it %d, task %3d, marker %5d: @SO_FAR_SO_GOOD@\n", iteration, rank, marker);
                 //continue;
 
-
                 betaOld   = beta;
                 beta      = Beta(marker);
                 deltaBeta = betaOld - beta;
@@ -1704,7 +1709,7 @@ int BayesRRm::runMpiGibbs() {
                     
                     //printf("it %d, task %3d, marker %5d has non-zero deltaBeta = %15.10f (%15.10f, %15.10f) => %15.10f) 1,2,M: %lu, %lu, %lu\n", iteration, rank, marker, deltaBeta, mave[marker], mstd[marker],  deltaBeta * mstd[marker], N1L[marker], N2L[marker], NML[marker]);
 
-                    if (opt.sparseSync && nranks > 1) {
+                    if ((opt.bedSync || opt.sparseSync) && nranks > 1) {
 
                         mark2sync.push_back(marker);
                         dbet2sync.push_back(deltaBeta);
@@ -1714,15 +1719,15 @@ int BayesRRm::runMpiGibbs() {
                         //fflush(stdout);
                         if (USEBED[marker]) {
                             sparse_scaadd(deltaEps, deltaBeta, 
-                                          XI1, 0, N1L[marker],
-                                          XI2, 0, N2L[marker],
-                                          XIM, 0, NML[marker],
+                                          XI1, 0,           N1L[marker],
+                                          XI2, 0,           N2L[marker],
+                                          XIM, 0,           NML[marker],
                                           mave[marker], mstd[marker], Ntot);
                         } else {
                             sparse_scaadd(deltaEps, deltaBeta, 
-                                          I1, N1S[marker], N1L[marker],
-                                          I2, N2S[marker], N2L[marker],
-                                          IM, NMS[marker], NML[marker],
+                                          I1,  N1S[marker], N1L[marker],
+                                          I2,  N2S[marker], N2L[marker],
+                                          IM,  NMS[marker], NML[marker],
                                           mave[marker], mstd[marker], Ntot);
                         }
                         //printf("it %d, task %3d, marker %5d: @AFTER@\n", iteration, rank, marker);
@@ -1745,11 +1750,17 @@ int BayesRRm::runMpiGibbs() {
 
             task_sum_abs_deltabeta += fabs(deltaBeta);
 
+
+            _mm_free(XI1);  XI1 = NULL;
+            _mm_free(XI2);  XI2 = NULL;
+            _mm_free(XIM);  XIM = NULL;
+
+
             //printf("it %d, task %3d, marker %5d: @HERE WE ARE@\n", iteration, rank, marker);
             //continue;
 
             // Check whether we have a non-zero beta somewhere
-            //if (nranks > 1 && (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1)) {
+            //
             if (nranks > 1 && (sinceLastSync >= opt.syncRate || j == lmax-1)) {
 
                 MPI_Barrier(MPI_COMM_WORLD);
@@ -1774,7 +1785,7 @@ int BayesRRm::runMpiGibbs() {
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
             //fflush(stdout);
 
-            //if ( (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
+
             if ( (sinceLastSync >= opt.syncRate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
                 
                 // Update local copy of epsilon
@@ -1784,9 +1795,163 @@ int BayesRRm::runMpiGibbs() {
     
                     double tb = MPI_Wtime();
                     
+                    // Bed synchronization
+                    //
+                    if (opt.bedSync) {
+
+                        // 1. Get overall number of markers contributing to synchronization
+                        // EO: check types below but should be fine as numbers should be relatively small
+                        //                        
+                        int task_m2s = (int) mark2sync.size();
+
+                        // Build task markers to sync statistics: mu | dbs | mu | dbs | ...
+                        //printf("task %d has %d m2s\n", rank, task_m2s);
+                        double* task_stat = (double*) _mm_malloc(size_t(task_m2s) * 2 * sizeof(double), 64);
+                        check_malloc(task_stat, __LINE__, __FILE__);
+                        for (int i=0; i<task_m2s; i++) {
+                            task_stat[2 * i + 0] = mave[ mark2sync[i] ];
+                            task_stat[2 * i + 1] = mstd[ mark2sync[i] ] * dbet2sync[i];
+                        }
+
+                        check_mpi(MPI_Allgather(&task_m2s, 1, MPI_INT, tasks_len, 1, MPI_INT, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                        int tdisp_ = 0, sdisp_ = 0, glob_m2s = 0, glob_size = 0;
+
+                        for (int i=0; i<nranks; i++) {
+                            glob_m2s     += tasks_len[i];     // in number of markers
+                            stats_len[i]  = tasks_len[i] * 2;
+                            stats_dis[i]  = sdisp_;
+                            sdisp_       += stats_len[i];
+                            tasks_len[i] *= snpLenByt;        // each marker is same length in BED
+                            tasks_dis[i]  = tdisp_;           // in bytes
+                            tdisp_       += tasks_len[i];     // now in bytes
+                        }
+                        glob_size = tdisp_; // in bytes
+                        
+                        /*
+                        if (rank == 0) {
+                            for (int i=0; i<nranks; i++) 
+                                printf("| %d:%d", i, tasks_len[i]/(int)snpLenByt);
+                            printf(" |  => Tot = %d\n", glob_m2s);
+                        }
+                        fflush(stdout);
+                        */
+
+                        // Alloc to store all task's markers in BED format
+                        //
+                        
+                        char* task_bed = (char*)_mm_malloc(snpLenByt * task_m2s, 64);  check_malloc(task_bed, __LINE__, __FILE__);
+                        
+                        for (int i=0; i<mark2sync.size(); i++) {
+                            
+                            int m2si = mark2sync[i];
+                            
+                            if (USEBED[m2si]) {
+                                //printf("rank %d will sync m %d => ISBED\n", rank, m2si);
+                                memcpy(&task_bed[i * snpLenByt], reinterpret_cast<char*>(&I1[N1S[m2si]]), snpLenByt);
+                            
+                            } else {
+                                //printf("rank %d will sync m %d => NEED TO CONVERT\n", rank, m2si);
+                                //cout << ">ntot = " << Ntot << endl;
+                                data.get_bed_marker_from_sparse(&task_bed[(size_t)i * snpLenByt],
+                                                                Ntot,
+                                                                N1S[m2si], N1L[m2si], &I1[N1S[m2si]],
+                                                                N2S[m2si], N2L[m2si], &I2[N2S[m2si]],
+                                                                NMS[m2si], NML[m2si], &IM[NMS[m2si]]);
+                                // local check ;-)
+                                //size_t X1 = 0, X2 = 0, XM = 0;
+                                //data.sparse_data_get_sizes_from_raw(&task_bed[(size_t) i * snpLenByt], 1, snpLenByt, X1, X2, XM);
+                                //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu #?# vs %9lu %9lu %9lu\n", rank, i, X1, X2, XM, N1L[m2si], N2L[m2si], NML[m2si]);
+                                //fflush(stdout);
+
+                            }
+                        }
+
+
+                        // Collect BED data from all markers to sync from all tasks
+                        //
+                        char* glob_bed = (char*)_mm_malloc(snpLenByt * glob_m2s, 64);  check_malloc(task_bed, __LINE__, __FILE__);
+                        
+                        check_mpi(MPI_Allgatherv(task_bed, tasks_len[rank], MPI_CHAR,
+                                                 glob_bed, tasks_len, tasks_dis, MPI_CHAR, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                        double* glob_stats = (double*) _mm_malloc(size_t(glob_m2s * 2) * sizeof(double), 64);
+                        check_malloc(glob_stats, __LINE__, __FILE__);
+                        
+                        check_mpi(MPI_Allgatherv(task_stat, task_m2s * 2, MPI_DOUBLE,
+                                                 glob_stats, stats_len, stats_dis, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__); 
+
+                        // Now apply corrections from each marker to sync
+                        //
+                        for (int i=0; i<glob_m2s; i++) {
+
+                            double lambda0 = glob_stats[2 * i + 1] * (0.0 - glob_stats[2 * i]);
+                            //printf("rank %d, %2d lambda0 = %20.15f\n", rank, i, lambda0);
+                            //printf("rank %d lambda0 = %15.10f with mu = %15.10f, dbetsig = %15.10f %d/%d\n", rank, lambda0, glob_stats[2 * i], glob_stats[2 * i + 1], i, glob_m2s);
+                                                       
+                            
+                            // Get sizes from BED data
+                            // note: locally available from markers local to task but ignored for now
+                            //
+                            size_t X1 = 0, X2 = 0, XM = 0;
+                            data.sparse_data_get_sizes_from_raw(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, X1, X2, XM);
+                            //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu ###\n", rank, i, X1, X2, XM);
+                            //fflush(stdout);
+                            // Allocate sparse structure
+                            //
+                            uint* XI1 = (uint*)_mm_malloc(X1 * sizeof(uint), 64);  check_malloc(XI1, __LINE__, __FILE__);
+                            uint* XI2 = (uint*)_mm_malloc(X2 * sizeof(uint), 64);  check_malloc(XI2, __LINE__, __FILE__);
+                            uint* XIM = (uint*)_mm_malloc(XM * sizeof(uint), 64);  check_malloc(XIM, __LINE__, __FILE__);
+                            
+                            
+                            // Fill the structure
+                            size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
+                            size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
+                            data.sparse_data_fill_indices(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt,
+                                                          &fake_n1s, &fake_n1l, XI1,
+                                                          &fake_n2s, &fake_n2l, XI2,
+                                                          &fake_nms, &fake_nml, XIM);
+
+                            // Use it
+                            // Set all to 0 contribution
+                            if (i == 0) {
+                                set_vector_f64(deltaSum, lambda0, Ntot);
+                            } else {
+                                offset_vector_f64(deltaSum, lambda0, Ntot);
+                            }
+                            
+                            // M -> revert lambda 0 (so that equiv to add 0.0)
+                            sparse_add(deltaSum, -lambda0, XIM, 0, XM);
+                            
+                            // 1 -> add dbet * sig * ( 1.0 - mu)
+                            double lambda = glob_stats[2 * i + 1] * (1.0 - glob_stats[2 * i]);
+                            sparse_add(deltaSum, lambda - lambda0, XI1, 0, X1);
+                            
+                            // 2 -> add dbet * sig * ( 2.0 - mu)
+                            lambda = glob_stats[2 * i + 1] * (2.0 - glob_stats[2 * i]);
+                            sparse_add(deltaSum, lambda - lambda0, XI2, 0, X2);
+
+                            // Free memory and reset pointers
+                            _mm_free(XI1);  XI1 = NULL;
+                            _mm_free(XI2);  XI2 = NULL;
+                            _mm_free(XIM);  XIM = NULL;
+                        }
+                        //fflush(stdout);
+
+                        //MPI_Barrier(MPI_COMM_WORLD);
+
+                        _mm_free(glob_stats);
+                        _mm_free(glob_bed);                       
+                        _mm_free(task_bed);
+                        _mm_free(task_stat);
+
+                        mark2sync.clear();
+                        dbet2sync.clear();                            
+                    }
+
                     // Sparse synchronization
                     // ----------------------
-                    if (opt.sparseSync) {
+                    else if (opt.sparseSync) {
                             
                         uint task_m2s = (uint) mark2sync.size();
                         //printf("task %3d has %3d markers to share at %d\n", rank, task_m2s, sinceLastSync);
@@ -1810,7 +1975,7 @@ int BayesRRm::runMpiGibbs() {
                         // Get the total numbers of markers and corresponding indices to gather
 
                         const int NEL = 2;
-                        uint task_info[NEL] = {};                        
+                        uint task_info[NEL] = {};
                         task_info[0] = task_m2s;
                         task_info[1] = task_size;
 
@@ -1821,7 +1986,7 @@ int BayesRRm::runMpiGibbs() {
                             tasks_len[i]  = glob_info[2 * i + 1];
                             tasks_dis[i]  = tdisp_;
                             tdisp_       += tasks_len[i];
-                            stats_len[i]  = glob_info[2 * i] * 2;
+                            stats_len[i]  = glob_info[2 * i] * 2; // number of markers in task i times 2 for stat1 and stat2
                             stats_dis[i]  = sdisp_;
                             sdisp_       += glob_info[2 * i] * 2;
                             glob_size    += tasks_len[i];
@@ -1838,17 +2003,53 @@ int BayesRRm::runMpiGibbs() {
                         
                         int loc = 0;
                         for (int i=0; i<task_m2s; i++) {
-                            task_dat[loc] = N1L[ mark2sync[i] ];                 loc += 1;
-                            task_dat[loc] = N2L[ mark2sync[i] ];                 loc += 1;
-                            task_dat[loc] = NML[ mark2sync[i] ];                 loc += 1;
-                            for (uint ii = 0; ii < N1L[ mark2sync[i] ]; ii++) {
-                                task_dat[loc] = I1[ N1S[ mark2sync[i] ] + ii ];  loc += 1;
-                            }                  
-                            for (uint ii = 0; ii < N2L[ mark2sync[i] ]; ii++) {
-                                task_dat[loc] = I2[ N2S[ mark2sync[i] ] + ii ];  loc += 1;
-                            }
-                            for (uint ii = 0; ii < NML[ mark2sync[i] ]; ii++) {
-                                task_dat[loc] = IM[ NMS[ mark2sync[i] ] + ii ];  loc += 1;
+
+                            int m2si = mark2sync[i];
+
+                            task_dat[loc] = N1L[m2si];  loc += 1;
+                            task_dat[loc] = N2L[m2si];  loc += 1;
+                            task_dat[loc] = NML[m2si];  loc += 1;
+                            
+                            if (USEBED[m2si]) {
+
+                                //EO TODO: keep sparse expansion from earlier on inbetween syncronization
+
+                                uint* XI1 = (uint*)_mm_malloc(N1L[m2si] * sizeof(uint), 64);  check_malloc(XI1, __LINE__, __FILE__);
+                                uint* XI2 = (uint*)_mm_malloc(N2L[m2si] * sizeof(uint), 64);  check_malloc(XI2, __LINE__, __FILE__);
+                                uint* XIM = (uint*)_mm_malloc(NML[m2si] * sizeof(uint), 64);  check_malloc(XIM, __LINE__, __FILE__);
+
+                                size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
+                                size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
+                                data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[m2si]]), 1, snpLenByt,
+                                                              &fake_n1s, &fake_n1l, XI1,
+                                                              &fake_n2s, &fake_n2l, XI2,
+                                                              &fake_nms, &fake_nml, XIM);
+
+                                for (uint ii = 0; ii < fake_n1l; ii++) {
+                                    task_dat[loc] = XI1[ fake_n1s + ii ];  loc += 1;
+                                }                  
+                                for (uint ii = 0; ii < fake_n2l; ii++) {
+                                    task_dat[loc] = XI2[ fake_n2s + ii ];  loc += 1;
+                                }
+                                for (uint ii = 0; ii < fake_nml; ii++) {
+                                    task_dat[loc] = XIM[ fake_nms + ii ];  loc += 1;
+                                }
+
+                                _mm_free(XI1);  XI1 = NULL;
+                                _mm_free(XI2);  XI2 = NULL;
+                                _mm_free(XIM);  XIM = NULL;
+
+                            } else {
+
+                                for (uint ii = 0; ii < N1L[m2si]; ii++) {
+                                    task_dat[loc] = I1[ N1S[m2si] + ii ];  loc += 1;
+                                }                  
+                                for (uint ii = 0; ii < N2L[m2si]; ii++) {
+                                    task_dat[loc] = I2[ N2S[m2si] + ii ];  loc += 1;
+                                }
+                                for (uint ii = 0; ii < NML[m2si]; ii++) {
+                                    task_dat[loc] = IM[ NMS[m2si] + ii ];  loc += 1;
+                                }
                             }
                         }                        
                         assert(loc == task_size);
@@ -1874,7 +2075,7 @@ int BayesRRm::runMpiGibbs() {
                         size_t loci = 0;
                         for (int i=0; i<glob_m2s ; i++) {
                             
-                            //printf("m2s %d/%d (loci = %d): %d, %d, %d\n", i, glob_m2s, loci, glob_dat[loci], glob_dat[loci + 1], glob_dat[loci + 2]);
+                            //printf("m2s %d/%d (loci = %lu): %d, %d, %d\n", i, glob_m2s, loci, glob_dat[loci], glob_dat[loci + 1], glob_dat[loci + 2]);
                             
                             double lambda0 = glob_stats[2 * i + 1] * (0.0 - glob_stats[2 * i]);
                             //printf("rank %d lambda0 = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", rank, lambda0, glob_stats[2 * i], glob_stats[2 * i + 1]);
@@ -1909,6 +2110,7 @@ int BayesRRm::runMpiGibbs() {
 
                             loci += 3 + glob_dat[loci] + glob_dat[loci + 1] + glob_dat[loci + 2];
                         }
+
                         _mm_free(glob_stats);
                         _mm_free(glob_dat);                        
 
@@ -1920,7 +2122,7 @@ int BayesRRm::runMpiGibbs() {
                         check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
                     }
-                    
+
                     sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
                     
                     double te = MPI_Wtime();
@@ -1951,6 +2153,8 @@ int BayesRRm::runMpiGibbs() {
             }
 
         } // END PROCESSING OF ALL MARKERS
+
+        //exit(0);
 
 
         beta_squaredNorm = Beta.squaredNorm();
@@ -2262,10 +2466,7 @@ int BayesRRm::runMpiGibbs() {
     _mm_free(NMS);
     _mm_free(NML);
     _mm_free(IM);
-    if (XI1) _mm_free(XI1);
-    if (XI2) _mm_free(XI2);
-    if (XIM) _mm_free(XIM);
-    if (opt.sparseSync) {
+    if (opt.bedSync || opt.sparseSync) {
         _mm_free(glob_info);
         _mm_free(tasks_len);
         _mm_free(tasks_dis);
