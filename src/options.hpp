@@ -52,6 +52,7 @@ public:
     string groupFile;
     string mSfile;
     string priorsFile;
+    string dPriorsFile;
 
     string title;
     string analysisType;
@@ -99,6 +100,7 @@ public:
         numGroups				= 2;
         groupFile               = "";
         priorsFile              = "";
+        dPriorsFile             = "";
         mSfile                  = "";
     }
 

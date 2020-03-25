@@ -1929,3 +1929,37 @@ void Data::read_group_priors(const string& file){
         cout << "Mixtures read from file" << endl;
     }
 }
+
+/*
+ * Reads parameters for Dirichlet distribution from file to member variable
+ * in : path to file (expected format as "x,y,z; a,b,c; ..." when k=3)
+ * out: void
+ */
+void Data::read_dirichlet_priors(const string& file){
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    try {
+        ifstream in(file);
+        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+
+        Gadget::Tokenizer strvec;
+        Gadget::Tokenizer strT;
+        // get element sizes to instantiate result vector
+        strvec.getTokens(whole_text, ";");
+        strT.getTokens(strvec[0], ",");
+        dPriors = Eigen::MatrixXd(strvec.size(), strT.size());
+        numGroups = strvec.size();
+        cout << "numGroups = " << numGroups << endl;
+        for (unsigned j=0; j<strvec.size(); ++j) {
+            strT.getTokens(strvec[j], ",");
+            for (unsigned k=0; k<strT.size(); ++k) {
+                dPriors(j, k) = stod(strT[k]);
+            }
+        }
+    } catch (const ifstream::failure& e) {
+        cout<<"Error opening the file"<< endl;
+    }
+    if (rank == 0) {
+        cout << "Dirichlet parameters read from file" << endl;
+    }
+}

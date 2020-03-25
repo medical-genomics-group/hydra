@@ -108,6 +108,7 @@ public:
     VectorXi G; 			 // groups
     MatrixXd mS;			 // mixtures in groups
     MatrixXd priors;         // group priors v0, s0
+    MatrixXd dPriors;        // group priors of dirichlet distribution
   
     MatrixXf XPX;            // X'X the MME lhs
     MatrixXf ZPX;            // Z'X the covariance matrix of SNPs and fixed effects
@@ -347,8 +348,7 @@ public:
     void readGroupFile_new(const string &groupFile);
     void readmSFile(const string& mSfile);
     void read_group_priors(const string& file);
-
-
+    void read_dirichlet_priors(const string& file);
 };
 
 #endif /* data_hpp */

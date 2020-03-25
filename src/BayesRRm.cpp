@@ -1830,10 +1830,12 @@ int BayesRRm::runMpiGibbs() {
             if (opt.priorsFile != "") {
                 v0G = data.priors(i, 0);
                 s02G = data.priors(i, 1);
+                // get vector of parameters for the current group
+                dirc = data.dPriors.row(i).array().cast<double>();
             }
             sigmaG[i]    = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
             //we moved the pi update here to use the same loop
-            estPi.row(i) = dist.dirichilet_rng(cass.row(i).array().cast<double>() + 1.0);
+            estPi.row(i) = dist.dirichilet_rng(cass.row(i).array().cast<double>() + dirc);
         }
         //printf("rank %d own sigmaG[0] = %20.15f with Mtot = %d and m0[0] = %d\n", rank, sigmaG[0], Mtot, int(m0[0]));
 

@@ -100,6 +100,7 @@ int main(int argc, const char * argv[]) {
                 data.readmSFile(opt.groupMixtureFile);
                 // TODO: group priors file should be optional
                 data.read_group_priors(opt.priorsFile);
+                data.read_dirichlet_priors(opt.dPriorsFile);
             }
 
             if (opt.multi_phen) {
