@@ -98,11 +98,13 @@ int main(int argc, const char * argv[]) {
                 data.readGroupFile(opt.groupIndexFile);
                 if (opt.groupMixtureFile == "") throw("with --mpiBayesGroups activated you must use the --groupMixtureFile!");
                 data.readmSFile(opt.groupMixtureFile);
-                // TODO: group priors file should be optional
+            }
+            if (opt.priorsFile != "") {
                 data.read_group_priors(opt.priorsFile);
+            }
+            if (opt.dPriorsFile != "") {
                 data.read_dirichlet_priors(opt.dPriorsFile);
             }
-
             if (opt.multi_phen) {
                 //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 //analysis.runMpiGibbsMultiTraits();
