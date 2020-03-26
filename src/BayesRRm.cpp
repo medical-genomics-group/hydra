@@ -1832,6 +1832,9 @@ int BayesRRm::runMpiGibbs() {
             if (opt.priorsFile != "") {
                 v0G = data.priors(i, 0);
                 s02G = data.priors(i, 1);
+            }
+            // AH: similarly for dirichlet priors
+            if (opt.dPriorsFile != "") {
                 // get vector of parameters for the current group
                 dirc = data.dPriors.row(i).transpose().array();
             }
