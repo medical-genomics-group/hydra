@@ -56,8 +56,7 @@ class BayesRRm
     int      m0;        // total number of markers in model
     VectorXd cass;      // variable storing the component assignment //EO RENAMING: was v
     MatrixXd cass8;
-    ArrayXd dirc;       // AH: array of dirichlet parameters
-
+   
     // Mean and residual variables
     double mu;          // mean or intercept
     VectorXd sigmaG;    // genetic variance
