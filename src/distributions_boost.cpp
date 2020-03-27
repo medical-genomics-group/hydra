@@ -76,6 +76,16 @@ Eigen::VectorXd Distributions_boost::dirichlet_rng(Eigen::VectorXi alpha) {
     return result;
 }
 
+Eigen::VectorXd Distributions_boost::dirichlet_rng(Eigen::VectorXd alpha) {
+    int len;
+    len=alpha.size();
+    Eigen::VectorXd result(len);
+    for(int i=0; i<len; i++)
+        result[i]=rgamma(alpha[i],(double)1.0);
+    result/=result.sum();
+    return result;
+}
+
 double Distributions_boost::inv_gamma_rng(double shape,double scale){
     return ((double)1.0 / rgamma(shape, 1.0/scale));
 }

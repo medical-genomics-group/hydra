@@ -30,6 +30,18 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bedSync = true;
             ss << "--bed-sync " << "\n";
         }
+        else if (!strcmp(argv[i], "--mpiBayesGroups")) {
+            mpiBayesGroups = true;
+            ss << "--mpiBayesGroups " << "\n";
+        }
+        else if (!strcmp(argv[i], "--groupIndexFile")) {
+            groupIndexFile = argv[++i];
+            ss << "--groupIndexFile " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--groupMixtureFile")) {
+            groupMixtureFile = argv[++i];
+            ss << "--groupMixtureFile " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--mpibayes")) {
             analysisType = "RAM";
             bayesType = argv[++i];
@@ -172,7 +184,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             syncRate = atoi(argv[++i]);
             ss << "--sync-rate " << argv[i] << "\n";
         }
-#endif
         else if (!strcmp(argv[i], "--sparse-dir")) {    //EO
             readFromSparseFiles = true;
             sparseDir = argv[++i];
@@ -182,6 +193,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
             sparseBsn = argv[++i];
             ss << "--sparse-basename " << argv[i] << "\n";
         }
+#endif
         else if (!strcmp(argv[i], "--number-markers")) {    //EO
             numberMarkers = atoi(argv[++i]);
             ss << "--number-markers " << argv[i] << "\n";
@@ -225,7 +237,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
         }
         //marion : include mS for annotations
         else if (!strcmp(argv[i], "--mS")) {
-        	mSfile = argv[++i];
+            mSfile = argv[++i];
             ss << "--mS " << argv[i] << "\n";
         }
         //marion : include annotation index file
@@ -233,11 +245,19 @@ void Options::inputOptions(const int argc, const char* argv[]){
         	groupFile = argv[++i];
             ss << "--group " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--groupPriorsFile")) {
+            priorsFile = argv[++i];
+            ss << "--groupPriorsFile" << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--dPriorsFile")) {
+            dPriorsFile = argv[++i];
+            ss << "--dPriorsFile" << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--thread")) {
             numThread = atoi(argv[++i]);
             ss << "--thread " << argv[i] << "\n";
         }
-        else if(!strcmp(argv[i], "--thread-spawned")) {
+        else if (!strcmp(argv[i], "--thread-spawned")) {
             numThreadSpawned = atoi(argv[++i]);
             ss << "--thread-spawned " << argv[i] << "\n";
         }
@@ -256,7 +276,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
 
     options_s = ss.str();
     //cout << ss.str() << endl;
-
 
     //EO: check output directory exists or can be created
     int ldir = mcmcOutDir.length();
@@ -352,7 +371,7 @@ void Options::readFile(const string &file){  // input options from file
         ss << boost::format("%20s %-1s %-20s\n") %key %":" %value;
     }
     in.close();
-    cout << ss.str() << endl;
+    //cout << ss.str() << endl;
 }
 
 

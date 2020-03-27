@@ -56,56 +56,75 @@ int main(int argc, const char * argv[]) {
             } else if (opt.checkRam) {
                 analysis.checkRamUsage();
             }
+
+
+            //EO@@@ } else if ((opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") || opt.mpiBayesGroups) {
         } else if ((opt.bayesType == "bayesMPI" || opt.bayesType == "bayesWMPI") && opt.analysisType == "RAM") {
 
 
             // Reading from BED file
             // ---------------------
             if (opt.readFromBedFile && !opt.readFromSparseFiles) {
-                //printf("INFO   : reading from BED file\n");
+
                 data.readFamFile(opt.bedFile + ".fam");
                 data.readBimFile(opt.bedFile + ".bim");
-                //data.readPhenotypeFile(opt.phenotypeFile);
 
-                // Read in covariates file if passed
-                if (opt.covariates) {
-                    //data.readCovariateFile(opt.covariatesFile);
-                    if(opt.bayesType == "bayesWMPI"){
-                        data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
-                    }else{
-                    	data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
-                    }
-                    
-                }else{
-                    if(opt.bayesType == "bayesWMPI"){
-                        data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
-                    }else{
-                    	data.readPhenotypeFile(opt.phenotypeFile);
+                //EO: no usable for now
+                if (opt.multi_phen) {
+                    throw("EO: multi-trait disabled for now.");
+                    data.readPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals, data.phenosData);
+                } else {
+                    // Read in covariates file if passed
+                    if (opt.covariates) {
+                        if (opt.bayesType == "bayesWMPI") {
+                            data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
+                        } else {
+                            data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
+                        }
+                    } else {
+                        if (opt.bayesType == "bayesWMPI") {
+                            data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
+                        }else{
+                            data.readPhenotypeFile(opt.phenotypeFile);
+                        }
                     }
                 }
-            } 
+            }
 
             // Read from sparse representation files
             // -------------------------------------
             else if (opt.readFromSparseFiles && !opt.readFromBedFile) {
+
                 if (opt.multi_phen) {
                     throw("EO: Disabled for now");
                     data.readPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals, data.phenosData);
                 } else {
-                    if (opt.covariates) { // Then combine reading of the .phen & .cov
-                        data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
+
+                    // Read in covariates file if passed
+                    if (opt.covariates) {
+                        if (opt.bayesType == "bayesWMPI") {
+                            data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
+                        } else {
+                            data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
+                        }
                     } else {
-                        data.readPhenotypeFile(opt.phenotypeFiles[0], opt.numberIndividuals, data.y);
+                        if (opt.bayesType == "bayesWMPI") {
+                            data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
+                        } else {
+                            data.readPhenotypeFile(opt.phenotypeFiles[0], opt.numberIndividuals, data.y);
+                        }
                     }
                 }
-                //if (opt.covariates) {
-                //    std::cout << "reading covariates file: "  << opt.covariatesFile << endl;
-                //    data.readCovariateFile(opt.covariatesFile);
-                //}
-            }            
-            // Mixing bed in memomory + sparse representations
-            // -----------------------------------------------
+            }
+
+            //EO@@@ mixed should be using sparse + option 
+
+            // Mixing bed in memory + sparse representations
+            // ---------------------------------------------
             else if (opt.readFromSparseFiles && opt.readFromBedFile) {
+
+                throw("EO: CHANGE BEHAVIOUR!");
+
                 //cout << "WARNING: mixed-representation processing type requested!" << endl;
                 opt.mixedRepresentation = true;
 
@@ -118,6 +137,23 @@ int main(int argc, const char * argv[]) {
             
             if (opt.markerBlocksFile != "") {
                 data.readMarkerBlocksFile(opt.markerBlocksFile);
+            }
+
+            //EO@@@ check most intuitive way now that this is default, 1 group
+            if (opt.mpiBayesGroups) {
+                //printf("MPI BAYES GROUPS\n");
+                if (opt.groupIndexFile == "") throw("with --mpiBayesGroups activated you must use the --groupIndexFile!");
+                data.readGroupFile(opt.groupIndexFile);
+                if (opt.groupMixtureFile == "") throw("with --mpiBayesGroups activated you must use the --groupMixtureFile!");
+                data.readmSFile(opt.groupMixtureFile);
+            }
+
+            if (opt.priorsFile != "") {
+                data.read_group_priors(opt.priorsFile);
+            }
+
+            if (opt.dPriorsFile != "") {
+                data.read_dirichlet_priors(opt.dPriorsFile);
             }
 
             if (opt.multi_phen) {
@@ -134,9 +170,9 @@ int main(int argc, const char * argv[]) {
                 analysis.runMpiGibbs();
             }
 
-        } else if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
-
+        } 
 #else
+<<<<<<< HEAD
         // RAM solution (analysisType = RAMBayes)
         if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
 #endif
@@ -229,6 +265,9 @@ int main(int argc, const char * argv[]) {
             }
         }
 #endif
+=======
+#endif    
+>>>>>>> mpi_devel_groups
         else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);
         }

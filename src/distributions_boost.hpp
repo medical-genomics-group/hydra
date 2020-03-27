@@ -32,6 +32,7 @@ public:
 #endif
     double rgamma(double shape, double scale);
     Eigen::VectorXd dirichlet_rng(Eigen::VectorXi alpha);
+    Eigen::VectorXd dirichlet_rng(Eigen::VectorXd alpha);
     double inv_gamma_rng(double shape,double scale);
     double gamma_rng(double shape,double scale);
     double inv_gamma_rate_rng(double shape,double rate);

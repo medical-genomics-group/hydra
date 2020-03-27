@@ -107,45 +107,23 @@ public:
     // marion : vector for annotation file and matrix for mS
     VectorXi G; 			 // groups
     MatrixXd mS;			 // mixtures in groups
+    MatrixXd priors;         // group priors v0, s0
+    MatrixXd dPriors;        // group priors of dirichlet distribution
 
-    VectorXd fail;			 // Failure indicator
-
-// Vectors for the sparse format solution in bW
-//       std::vector<std::vector<int>> Zones; // Vector for each SNP: per SNP all the indices with 1 allele are written down
-//       std::vector<std::vector<int>> Ztwos; // Vector for each SNP: per SNP all the indices with 2 alleles are written down
-//       VectorXd means; //Mean for each SNP
-//       VectorXd sds;
-//       VectorXd mean_sd_ratio;
-
-
-    MatrixXf XPX;            // X'X the MME lhs
-    MatrixXf ZPX;            // Z'X the covariance matrix of SNPs and fixed effects
-    VectorXf XPXdiag;        // X'X diagonal
-    VectorXf ZPZdiag;        // Z'Z diagonal
-    VectorXf XPy;            // X'y the MME rhs for fixed effects
-    VectorXf ZPy;            // Z'y the MME rhs for snp effects
-
-    VectorXf snp2pq;         // 2pq of SNPs
-    VectorXf se;             // se from GWAS summary data
-    VectorXf tss;            // total ss (ypy) for every SNP
-    VectorXf b;              // beta from GWAS summary data
-    VectorXf n;              // sample size for each SNP in GWAS
+    //EO MRG
+    //VectorXf ZPZdiag;        // Z'Z diagonal
+    //VectorXf snp2pq;         // 2pq of SNPs
+    //VectorXf se;             // se from GWAS summary data
+    //VectorXf tss;            // total ss (ypy) for every SNP
+    //VectorXf b;              // beta from GWAS summary data
+    //VectorXf n;              // sample size for each SNP in GWAS
 
     vector<SnpInfo*> snpInfoVec;
     vector<IndInfo*> indInfoVec;
 
     map<string, SnpInfo*> snpInfoMap;
     map<string, IndInfo*> indInfoMap;
-
-    vector<SnpInfo*> incdSnpInfoVec;
-    vector<IndInfo*> keptIndInfoVec;
-
-    vector<string> fixedEffectNames;
-    vector<string> snpEffectNames;
-
-    vector<bool> fullSnpFlag;
-    vector<vector<SnpInfo*> > mldmVec;
-
+    
     unsigned numFixedEffects;
 
     unsigned numSnps = 0;
@@ -185,12 +163,15 @@ public:
                                    VectorXd&    Beta);
 
     void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                   double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart);
-    // Two functions tailored for bW output. Consider using same format in bR
+                                   VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart);
+
+    // Three functions tailored for bW output. Consider using same format in bR
     void read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
                                      double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart);
+
     void read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave, const int gamma_length,
                                      VectorXd& gamma, uint& iteration_restart);
+
     void read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
                                      std::vector<int>& markerI);
 
@@ -385,14 +366,15 @@ public:
     void readCovariateFile(const string &covariateFile);
 
     // marion : annotation variables
-    unsigned numGroups;	// number of annotations
+    unsigned numGroups = 1;	// number of annotations
     void readGroupFile(const string &groupFile);
     void readGroupFile_new(const string &groupFile);
     void readmSFile(const string& mSfile);
-
+    
     //bW var
-     void readFailureFile(const string &failureFile);
-
+    void readFailureFile(const string &failureFile);
+    void read_group_priors(const string& file);
+    void read_dirichlet_priors(const string& file);
 };
 
 #endif /* data_hpp */

@@ -323,7 +323,7 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
     MPI_Status status;
 
     MPI_File betfh;
-cout << betfp.c_str() << endl;
+    //cout << betfp.c_str() << endl;
     check_mpi(MPI_File_open(MPI_COMM_WORLD, betfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &betfh), __LINE__, __FILE__);
 
     // 1. first element of the .bet, .cpn and .acu files is the total number of processed markers
@@ -369,18 +369,19 @@ cout << betfp.c_str() << endl;
 //EO: consider moving the csv output file from ASCII to BIN
 //
 void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                     double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart) {
+                                     VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
     
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    string csv = mcmcOut + ".csv";
+    string        csv = mcmcOut + ".csv";
     std::ifstream file(csv);
-    int it_ = 1E9, rank_ = -1, m0_ = -1, pisize_ = -1, nchar = 0;
-    double mu_, sigg_, sige_, rat_;
-    double pipi[K];
-    int lastSavedIt = 0;
+    int           it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0, ngrp_ = -1;
+    int           lastSavedIt = 0;
+    double        mu_, rat_, tmp;
+    VectorXd      sigg_(numGroups);
+    MatrixXd      pipi(numGroups,K);
     
     if (file.is_open()) {
 
@@ -390,24 +391,54 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
 
             if (str.length() > 0) {
 
-                int nread = sscanf(str.c_str(), "%5d", &it_);
+                int nread = sscanf(str.c_str(), "%5d, %4d", &it_, &ngrp_);
+                //printf("%5d | %4d with optSave = %d\n", it_, ngrp_, optSave);
 
-                if (it_%optSave == 0) {
+                if (it_ % optSave == 0) {
+
                     lastSavedIt = it_;
+
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
-                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %7d, %2d, %n",
-                                   &it_, &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
-                    string pis = str.substr(nchar, str.length()-nchar);
-                    char   pic[pis.length()+1];
-                    strcpy(pic, pis.c_str());
-                    for (int i=0; i<pis.length(); ++i) {
-                        if (pic[i] == ',') pic[i] = ' ';
+                    nread = sscanf(cstr, "%5d, %4d, %n", &it_, &ngrp_, &nchar);
+                    string remain_s = str.substr(nchar, str.length() - nchar);
+                    char   remain_c[remain_s.length() + 1];
+                    strcpy(remain_c, remain_s.c_str());
+
+                    // remove commas
+                    for (int i=0; i<remain_s.length(); ++i) {
+                        if (remain_c[i] == ',') remain_c[i] = ' ';
                     }
-                    //cout << "pic = " << pic << endl;
-                    char* ppic = pic;
-                    for (int i=0; i<K; i++) {
-                        pipi[i] = strtod(ppic, &ppic);
+
+                    char* prc = remain_c;
+                    for (int i=0; i<numGroups; i++) {
+                        sigmaG[i] = strtod(prc, &prc);
+                        //printf("sigmaG[%d] = %20.15f\n", i, sigmaG[i]); 
+                    }
+
+                    sigmaE = strtod(prc, &prc);
+                    //printf("sigmaE = %20.15f\n", sigmaE);
+
+                    rat_ = strtod(prc, &prc);
+                    //printf("rat_ = %20.15f\n", rat_);
+                    
+                    m0_ = std::strtol(prc, &prc, 10);
+                    //printf("m0_ = %d\n", m0_);
+
+                    pirows_ = std::strtol(prc, &prc, 10);
+                    //printf("pirows_ = %d\n", pirows_);
+                    assert(pirows_ == ngrp_);
+                    assert(pi.rows() == pirows_);
+
+                    picols_ = std::strtol(prc, &prc, 10);
+                    //printf("picols_ = %d\n", picols_);
+                    assert(pi.cols() == picols_);
+
+
+                    for (int i=0; i<pirows_; i++) {
+                        for (int j=0; j<picols_; j++) {
+                            pi(i, j) = strtod(prc, &prc);
+                        }
                     }
                 }
             }
@@ -417,23 +448,17 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     
-    //printf("INFO   : read csv last it on rank %3d: %5d %15.10f %15.10f %15.10f %7d %2d ",
-    //       rank, lastSavedIt, mu_, sigg_, sige_, m0_, pisize_);
-    //for (int i=0; i<K; i++)  printf("%15.10f ", pipi[i]);
-    //printf("\n");
-    
-    // Sanity checks and assign
+    // Sanity checks
     assert(lastSavedIt % optSave == 0);
     assert(lastSavedIt >= 0);
     assert(lastSavedIt <= UINT_MAX);
+
     iteration_restart = lastSavedIt;
-    sigmaG            = sigg_;
-    sigmaE            = sige_;
-    for (int i=0; i<K; i++) 
-        pi[i] = pipi[i];
 }
 
-// SO: Currently basically the copy of the previous version. Consider using adding reading mu for bR so the same function could be used
+// SO: Currently basically the copy of the previous version.
+//     Consider using adding reading mu for bR so the same function could be used
+//EO@@@ needs to be adapted for groups
 void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
                                      double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart) {
 
@@ -1721,7 +1746,7 @@ void Data::readMarkerBlocksFile(const string &markerBlocksFile) {
     blocksEnds.clear();
     std::string str;
     
-	while (std::getline(in, str)) {
+    while (std::getline(in, str)) {
         std::vector<std::string> results;
         boost::split(results, str, [](char c){return c == ' ';});
         if (results.size() != 2) {
@@ -1731,8 +1756,8 @@ void Data::readMarkerBlocksFile(const string &markerBlocksFile) {
         }
         blocksStarts.push_back(stoi(results[0]));
         blocksEnds.push_back(stoi(results[1]));        
-	}
-	in.close();
+    }
+    in.close();
 
     numBlocks = (unsigned) blocksStarts.size();
     //cout << "Found definitions for " << nbs << " marker blocks." << endl;
@@ -1826,8 +1851,8 @@ void Data::readBedFile_noMPI(const string &bedFile) {
     printf("numInds = %d, numNAs = %d, numSnps = %d\n", numInds, numNAs, numSnps);
 
     Z.resize(numInds-numNAs, numSnps);
-    ZPZdiag.resize(numSnps);
-    snp2pq.resize(numSnps);
+    //ZPZdiag.resize(numSnps);
+    //snp2pq.resize(numSnps);
 
     // Read bed file
     char ch[1];
@@ -1921,7 +1946,7 @@ void Data::readBedFile_noMPI(const string &bedFile) {
 
         Z.col(j).array() *= std_;
 
-        ZPZdiag[j] = sqn;
+        //ZPZdiag[j] = sqn;
 
         if (++snp == numSnps) break;
     }
@@ -1930,7 +1955,7 @@ void Data::readBedFile_noMPI(const string &bedFile) {
 
     for (i=0; i<numSnps; ++i) {
         //Z.col(i).array() -= Z.col(i).mean(); //EO alread done (so now mean is zero)
-        ZPZdiag[i] = Z.col(i).squaredNorm();
+        //ZPZdiag[i] = Z.col(i).squaredNorm();
     }
 
 #ifndef USE_MPI
@@ -2116,6 +2141,7 @@ void Data::readPhenCovFiles(const string &phenFile, const string covFile, const 
     dest.conservativeResize(numInds-nas);
 }
 
+
 //(S)EO: combined reading of a .phen and .cov and .fail files
 //    Assume .cov and .phen to be consistent with .fam and .bed!
 //--------------------------------------------------------------
@@ -2144,7 +2170,7 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
     std::vector<double> values;
     while (getline(inp, inputStrP)) {
         getline(inc, inputStrC);
-	getline(inf, inputStrF);
+        getline(inf, inputStrF);
         colDataP.getTokens(inputStrP, sep);
         colDataC.getTokens(inputStrC, sep);
         colDataF.getTokens(inputStrF, sep);
@@ -2159,7 +2185,7 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
 
         if (colDataP[1+1] != "NA" && naC == false && colDataF[0] != "-9") {
             dest[nonas] = double( atof(colDataP[1+1].c_str()) );
-	    dfail[nonas] = double( atof(colDataF[0].c_str()) );
+            dfail[nonas] = double( atof(colDataF[0].c_str()) );
             for (int i=2; i<colDataC.size(); i++) {
                 values.push_back(std::stod(colDataC[i]));
             }
@@ -2170,7 +2196,7 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
             NAsInds.push_back(line);
             nas += 1;
         }
-
+        
         line += 1;
     }
     inp.close();
@@ -2190,6 +2216,8 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
     dfail.conservativeResize(numInds-nas);
 
 }
+
+
 //SEO: Function to read phenotype and failure files simultaneously (without covariates)
 void Data::readPhenFailFiles(const string &phenFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank) {
 
@@ -2324,22 +2352,6 @@ void Data::readPhenotypeFile(const string &phenFile) {
 }
 
 
-//TODO Finish function to read the group file
-void Data::readGroupFile(const string &groupFile) {
-    // NA: missing phenotype
-    ifstream in(groupFile.c_str());
-    if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read.");
-
-    cout << "Reading groups from [" + groupFile + "]." << endl;
-
-    std::istream_iterator<double> start(in), end;
-    std::vector<int> numbers(start, end);
-    int* ptr =(int*)&numbers[0];
-    G=(Eigen::Map<Eigen::VectorXi>(ptr,numbers.size()));
-
-    cout << "Groups read from file" << endl;
-}
-
 template<typename M>
 M Data::readCSVFile (const string &path) {
     std::ifstream indata;
@@ -2348,14 +2360,13 @@ M Data::readCSVFile (const string &path) {
     std::string line;
 
     std::vector<double> values;
-    cout << path << endl;
+    //cout << path << endl;
 
     uint rows = 0;
     while (std::getline(indata, line)) {
         std::stringstream lineStream(line);
         std::string cell;
-	        cout << cell  << endl;
-
+        //cout << cell  << endl;
         while (std::getline(lineStream, cell, ',')) {
             values.push_back(std::stod(cell));
         }
@@ -2364,15 +2375,17 @@ M Data::readCSVFile (const string &path) {
     //cout << "rows = " << rows << " vs numInds " << numInds << endl; 
     if (rows != numInds)
         throw(" Error: covariate file has different number of individuals as BED file");
+
     numFixedEffects = values.size()/rows;
+
     return Map<const Matrix<typename M::Scalar, Dynamic, Dynamic, RowMajor>>(values.data(), rows, values.size()/rows);
 }
 
 void Data::readCovariateFile(const string &covariateFile ) {
-	X = readCSVFile<MatrixXd>(covariateFile);
+    X = readCSVFile<MatrixXd>(covariateFile);
 }
 
-
+//EO@@@
 void Data::readFailureFile(const string &failureFile){
 	ifstream input(failureFile);
 	vector<double> tmp;
@@ -2394,29 +2407,50 @@ void Data::readFailureFile(const string &failureFile){
 }
 
 
+//EO@@@
+//TODO Finish function to read the group file
+void Data::readGroupFile(const string &groupFile) {
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+
+    ifstream in(groupFile.c_str());
+    if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read. Use the --groupIndexFile option!");
+
+    if (rank == 0)
+        cout << "Reading groups from [" + groupFile + "]." << endl;
+
+    std::istream_iterator<double> start(in), end;
+    std::vector<int> numbers(start, end);
+    int* ptr =(int*)&numbers[0];
+    G=(Eigen::Map<Eigen::VectorXi>(ptr, numbers.size()));
+}
+
+
 //marion : read annotation file
 //group index starts from 0
 void Data::readGroupFile_new(const string& groupFile){
 
-	ifstream input(groupFile);
-	vector<int> tmp;
-	string col1;
-	int col2;
+    ifstream input(groupFile);
+    vector<int> tmp;
+    string col1;
+    int col2;
 
-	if(!input.is_open()){
-		cout<<"Error opening the file"<< endl;
-		return;
-	}
+    if(!input.is_open()){
+        cout<<"Error opening the file"<< endl;
+        return;
+    }
 
-	while(true){
-		input >> col1 >> col2;
-		if(input.eof()) break;
-		tmp.push_back(col2);
-	}
+    while(true){
+        input >> col1 >> col2;
+        if(input.eof()) break;
+        tmp.push_back(col2);
+    }
 
-	G=Eigen::VectorXi::Map(tmp.data(), tmp.size());
-
-	cout << "Groups read from file" << endl;
+    G=Eigen::VectorXi::Map(tmp.data(), tmp.size());
+    
+    cout << "Groups read from file" << endl;
 }
 
 
@@ -2424,31 +2458,104 @@ void Data::readGroupFile_new(const string& groupFile){
 //save as Eigen Matrix
 void Data::readmSFile(const string& mSfile){
 
-	ifstream in(mSfile);
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-	if(!in.is_open()){
-		cout<<"Error opening the file"<< endl;
-		return;
-	}
+    ifstream in(mSfile);
 
-	else if(in.is_open()){
+    if(!in.is_open()){
+        cout<<"Error opening the file"<< endl;
+        return;
+    }
 
-		string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+    else if(in.is_open()){
 
-		Gadget::Tokenizer strvec;
-		Gadget::Tokenizer strT;
-		strvec.getTokens(whole_text, ";");
-		strT.getTokens(strvec[0],",");
-		mS=Eigen::MatrixXd(strvec.size(),strT.size());
-		numGroups=strvec.size();
+        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
 
-		for (unsigned j=0; j<strvec.size(); ++j) {
-			strT.getTokens(strvec[j],",");
-			for(unsigned k=0;k<strT.size();++k)
-				mS(j,k) = stod(strT[k]);
-		}
-	}
+        Gadget::Tokenizer strvec;
+        Gadget::Tokenizer strT;
 
-	cout << "Mixtures read from file" << endl;
+        strvec.getTokens(whole_text, ";");
+        strT.getTokens(strvec[0],",");
+        
+        mS=Eigen::MatrixXd(strvec.size(),strT.size());
+        numGroups=strvec.size();
+        //cout << "numGroups = " << numGroups << endl;
+        for (unsigned j=0; j<strvec.size(); ++j) {
+            strT.getTokens(strvec[j],",");
+            for(unsigned k=0; k<strT.size(); ++k)
+                mS(j,k) = stod(strT[k]);
+        }
+    }
+
+    if (rank == 0)
+        cout << "Mixtures read from file" << endl;
 }
 
+/*
+ * Reads priors v0, s0 for groups from file
+ * in : path to file (expected format as "v0,s0; v0,s0; ...")
+ * out: void
+ */
+void Data::read_group_priors(const string& file){
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    try {
+        ifstream in(file);
+        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+
+        Gadget::Tokenizer strvec;
+        Gadget::Tokenizer strT;
+        // get element sizes to instantiate result vector
+        strvec.getTokens(whole_text, ";");
+        strT.getTokens(strvec[0], ",");
+        priors = Eigen::MatrixXd(strvec.size(), strT.size());
+        numGroups = strvec.size();
+        cout << "numGroups = " << numGroups << endl;
+        for (unsigned j=0; j<strvec.size(); ++j) {
+            strT.getTokens(strvec[j], ",");
+            for (unsigned k=0; k<2; ++k) {
+                priors(j, k) = stod(strT[k]);
+            }
+        }
+    } catch (const ifstream::failure& e) {
+        cout<<"Error opening the file"<< endl;
+    }
+    if (rank == 0) {
+        cout << "Mixtures read from file" << endl;
+    }
+}
+
+/*
+ * Reads parameters for Dirichlet distribution from file to member variable
+ * in : path to file (expected format as "x,y,z; a,b,c; ..." when k=3)
+ * out: void
+ */
+void Data::read_dirichlet_priors(const string& file){
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    try {
+        ifstream in(file);
+        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+
+        Gadget::Tokenizer strvec;
+        Gadget::Tokenizer strT;
+        // get element sizes to instantiate result vector
+        strvec.getTokens(whole_text, ";");
+        strT.getTokens(strvec[0], ",");
+        dPriors = Eigen::MatrixXd(strvec.size(), strT.size());
+        numGroups = strvec.size();
+        cout << "numGroups = " << numGroups << endl;
+        for (unsigned j=0; j<strvec.size(); ++j) {
+            strT.getTokens(strvec[j], ",");
+            for (unsigned k=0; k<strT.size(); ++k) {
+                dPriors(j, k) = stod(strT[k]);
+            }
+        }
+    } catch (const ifstream::failure& e) {
+        cout<<"Error opening the file"<< endl;
+    }
+    if (rank == 0) {
+        cout << "Dirichlet parameters read from file" << endl;
+    }
+}

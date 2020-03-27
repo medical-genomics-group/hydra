@@ -22,6 +22,9 @@ public:
 
     unsigned shuffleMarkers      = 1;
 #ifdef USE_MPI
+    bool     mpiBayesGroups    = false;
+    string   groupIndexFile    = "";
+    string   groupMixtureFile  = "";
     bool     restart             = false;
     bool     sparseSync          = false;
     bool     bedSync             = false;
@@ -54,7 +57,8 @@ public:
     string failureFile;
     string bayesW_version;
     string quad_points;
-
+    string priorsFile;
+    string dPriorsFile;
 
     string title;
     string analysisType;
@@ -105,7 +109,12 @@ public:
         sparseDir               = "";
         sparseBsn               = "";
         optionFile				= "";
+        //EO@@@ check for default value
         numGroups				= 2;
+        groupFile               = "";
+        priorsFile              = "";
+        dPriorsFile             = "";
+        mSfile                  = "";
     }
 
     void inputOptions(const int argc, const char* argv[]);

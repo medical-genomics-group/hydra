@@ -29,41 +29,40 @@ class BayesRRm
     const double	   sigma0  = 0.0001;
     const double	   v0E     = 0.0001;
     const double       s02E    = 0.0001;
-    const double       v0G     = 0.0001;
-    const double       s02G    = 0.0001;
+    double             v0G     = 0.0001;
+    double             s02G    = 0.0001;
     const double       s02F    = 1.0;
-    const size_t       LENBUF  = 300;
+    const size_t       LENBUF  = 50000;
 
     const bool use_xfiles_in_restart = true; // Restart from .xbet rather than .bet file
 
-    VectorXd    cva;
+    MatrixXd  cVa;       // component-specific variance
+    MatrixXd  cVaI;      // inverse of the component variances
 
     Distributions_boost dist;
     Distributions_boost dist8[8];
     bool usePreprocessedData;
     bool showDebug;
-    double betasqn;
 
     MatrixXd X;         // "fixed effects" matrix.
     VectorXd gamma;     // fixed effects coefficients
 
     // Component variables
-    VectorXd priorPi;   // prior probabilities for each component
-    VectorXd pi;        // mixture probabilities
-    MatrixXd pi8;
-    VectorXd cVa;       // component-specific variance
+    MatrixXd priorPi;   // prior probabilities for each component
+    MatrixXd estPi;     // mixture probabilities
     VectorXd logL;      // log likelihood of component
     VectorXd muk;       // mean of k-th component marker effect size
     VectorXd denom;     // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
     int      m0;        // total number of markers in model
+
+    //EO@@@ watch type change by EO for cass (former v)
     VectorXi cass;      // variable storing the component assignment //EO RENAMED v -> cass 
     MatrixXi cass8;
-    VectorXd cVaI;      // inverse of the component variances
 
     // Mean and residual variables
     double mu;          // mean or intercept
-    double sigmaG;      // genetic variance
-    double sigmaE;      // residuals variance
+    VectorXd sigmaG;    // genetic variance
+    //double sigmaE;      // residuals variance
     double sigmaF;      // covariates variance if using ridge;
 
     double mu8[8];
@@ -72,6 +71,7 @@ class BayesRRm
     double sigmaF8[8];
 
     // Linear model variables
+    //EO@@@ check for double declaration...
     VectorXd Beta;       // effect sizes
     VectorXd y_tilde;    // variable containing the adjusted residuals to exclude the effects of a given marker
     VectorXd epsilon;    // variable containing the residuals
@@ -97,17 +97,26 @@ class BayesRRm
     virtual ~BayesRRm();
 
     void   setDebugEnabled(bool enabled) { showDebug = enabled; }
+
     bool   isDebugEnabled() const { return showDebug; }    
+
     void   offset_vector_f64(double* __restrict__ vec, const double offset, const int N);
+
     void   set_vector_f64(double* __restrict__ vec, const double val, const int N);
+
     void   sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2, const int N);
+
     void   sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N);
+
     double sum_vector_elements_f64_base(const double* __restrict__ vec, const int N);
+
     double sum_vector_elements_f64(const double* __restrict__ vec, const int N);
+
     void   copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N);
+
     void   sparse_add(double*       __restrict__ vec,
-                       const double               val,
-                       const uint*   __restrict__ IX, const size_t NXS, const size_t NXL);
+                      const double               val,
+                      const uint*   __restrict__ IX, const size_t NXS, const size_t NXL);
 
     void   sparse_scaadd(double*     __restrict__ vout,
                          const double  dMULT,
@@ -117,6 +126,7 @@ class BayesRRm
                          const double  mu,
                          const double  sig_inv,
                          const int     N);
+
     double sparse_dotprod(const double* __restrict__ vin1,
                           const uint*   __restrict__ I1,      const size_t N1S,  const size_t N1L,
                           const uint*   __restrict__ I2,      const size_t N2S,  const size_t N2L,
@@ -126,31 +136,38 @@ class BayesRRm
                           const int                  N,
                           const int                  marker);
 
-    int    runGibbs();
+    int runGibbs();
 
 #ifdef USE_MPI
     void   init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
                              const int* MrankS, const int* MrankL, const bool use_xbet);
+
     void   init_from_scratch();
 
     string mpi_get_sparse_output_filebase(const int rank);
-    void   write_sparse_data_files(const uint bpr);
-    int    checkRamUsage();
-    uint   set_Ntot(const int rank);
-    uint   set_Mtot(const int rank);
-    int    runMpiGibbs();
-    int    runMpiGibbsMultiTraits();
-    void   check_whole_array_was_set(const uint* array, const size_t size, const int linenumber, const char* filename);
-    void   mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax);
-    void   mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks);
 
+    void   write_sparse_data_files(const uint bpr);
+
+    int    checkRamUsage();
+
+    uint   set_Ntot(const int rank);
+
+    uint   set_Mtot(const int rank);
+
+    int    runMpiGibbs();
+
+    int    runMpiGibbsMultiTraits();
+
+    void   check_whole_array_was_set(const uint* array, const size_t size, const int linenumber, const char* filename);
+
+    void   mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax);
+
+    void   mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks);
 
 #endif
     
 private:
-    void     init(int K, unsigned int markerCount, unsigned int individualCount, unsigned int missingPhenCount);
-    VectorXd getSnpData(unsigned int marker) const;
-    void     printDebugInfo() const;
+
 };
 
 #endif /* SRC_BAYESRRM_H_ */
