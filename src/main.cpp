@@ -33,6 +33,7 @@ int main(int argc, const char * argv[]) {
     }
 
     try {
+
         Options opt;
 
 #ifndef USE_MPI
@@ -123,8 +124,8 @@ int main(int argc, const char * argv[]) {
             // ---------------------------------------------
             else if (opt.readFromSparseFiles && opt.readFromBedFile) {
 
-                throw("EO: CHANGE BEHAVIOUR!");
-
+                cout << "EO: CHANGE BEHAVIOUR HERE!" << endl;
+                
                 //cout << "WARNING: mixed-representation processing type requested!" << endl;
                 opt.mixedRepresentation = true;
 
@@ -139,14 +140,14 @@ int main(int argc, const char * argv[]) {
                 data.readMarkerBlocksFile(opt.markerBlocksFile);
             }
 
-            //EO@@@ check most intuitive way now that this is default, 1 group
-            if (opt.mpiBayesGroups) {
-                //printf("MPI BAYES GROUPS\n");
-                if (opt.groupIndexFile == "") throw("with --mpiBayesGroups activated you must use the --groupIndexFile!");
-                data.readGroupFile(opt.groupIndexFile);
-                if (opt.groupMixtureFile == "") throw("with --mpiBayesGroups activated you must use the --groupMixtureFile!");
-                data.readmSFile(opt.groupMixtureFile);
-            }
+            //EO: groups
+            //    by default a single group with all the markers in (zero file passed)
+            //    if only one file -> crash
+            //    if two files -> define groups
+            //
+            if ( (opt.groupIndexFile == "" && opt.groupMixtureFile != "") || (opt.groupIndexFile != "" && opt.groupMixtureFile == "") ) {
+                throw("FATAL   : you need to activate both --groupIndexFile and --groupMixtureFile");
+            }            
 
             if (opt.priorsFile != "") {
                 data.read_group_priors(opt.priorsFile);
@@ -170,9 +171,10 @@ int main(int argc, const char * argv[]) {
                 analysis.runMpiGibbs();
             }
 
-        } 
+        }
+        
+        else if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
 #else
-<<<<<<< HEAD
         // RAM solution (analysisType = RAMBayes)
         if (opt.analysisType == "RAMBayes" && ( opt.bayesType == "bayes" || opt.bayesType == "bayesMmap" || opt.bayesType == "horseshoe")) {
 #endif
@@ -265,9 +267,6 @@ int main(int argc, const char * argv[]) {
             }
         }
 #endif
-=======
-#endif    
->>>>>>> mpi_devel_groups
         else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);
         }

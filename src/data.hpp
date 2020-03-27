@@ -105,10 +105,12 @@ public:
     VectorXi phenosNanNum;   // number of NAs in phenotypes phenos
 
     // marion : vector for annotation file and matrix for mS
-    VectorXi G; 			 // groups
+    VectorXi groups;     	 // groups
     MatrixXd mS;			 // mixtures in groups
     MatrixXd priors;         // group priors v0, s0
     MatrixXd dPriors;        // group priors of dirichlet distribution
+
+    VectorXd fail;           // Failure indicator
 
     //EO MRG
     //VectorXf ZPZdiag;        // Z'Z diagonal
@@ -348,6 +350,13 @@ public:
 
 
     void readPhenotypeFile(const string &phenFile);
+    void readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest);
+
+    void readPhenotypeFileAndSetNanMask(const string &phenFile, const int numberIndividuals, VectorXd& phen, VectorXi& mask, uint& nas);
+
+    void readPhenotypeFiles(const vector<string> &phenFile, const int numberIndividuals, MatrixXd& dest);
+
+
 
     void readPhenCovFiles(const string &phenFile, const string covFile, const int numberIndividuals, VectorXd& dest, const int rank);
 
@@ -355,10 +364,6 @@ public:
     void readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
     void readPhenFailFiles(const string &phenFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
 
-    void readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest);
-    void readPhenotypeFiles(const vector<string> &phenFile, const int numberIndividuals, MatrixXd& dest);
-
-    void readPhenotypeFileAndSetNanMask(const string &phenFile, const int numberIndividuals, VectorXd& phen, VectorXi& mask, uint& nas);
 
 
     template<typename M>

@@ -2422,9 +2422,12 @@ void Data::readGroupFile(const string &groupFile) {
         cout << "Reading groups from [" + groupFile + "]." << endl;
 
     std::istream_iterator<double> start(in), end;
+
     std::vector<int> numbers(start, end);
+
     int* ptr =(int*)&numbers[0];
-    G=(Eigen::Map<Eigen::VectorXi>(ptr, numbers.size()));
+
+    groups = Eigen::Map<Eigen::VectorXi>(ptr, numbers.size());
 }
 
 
@@ -2448,7 +2451,7 @@ void Data::readGroupFile_new(const string& groupFile){
         tmp.push_back(col2);
     }
 
-    G=Eigen::VectorXi::Map(tmp.data(), tmp.size());
+    groups = Eigen::VectorXi::Map(tmp.data(), tmp.size());
     
     cout << "Groups read from file" << endl;
 }

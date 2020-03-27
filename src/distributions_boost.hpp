@@ -16,7 +16,7 @@
 
 class Distributions_boost{
 #ifndef USE_MPI
-    boost::mt19937  rng;
+    boost::mt19937 rng;
 #endif
     unsigned int seed;
 public:

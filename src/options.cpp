@@ -30,10 +30,12 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bedSync = true;
             ss << "--bed-sync " << "\n";
         }
+        /*
         else if (!strcmp(argv[i], "--mpiBayesGroups")) {
             mpiBayesGroups = true;
             ss << "--mpiBayesGroups " << "\n";
         }
+        */
         else if (!strcmp(argv[i], "--groupIndexFile")) {
             groupIndexFile = argv[++i];
             ss << "--groupIndexFile " << argv[i] << "\n";

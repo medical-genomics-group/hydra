@@ -1851,7 +1851,8 @@ int BayesW::runMpiGibbs_bW() {
         used_data.sqrt_2sigmaG = sqrt(2*used_data_beta.sigmaG);
 	
         // 5. Sample prior mixture component probability from Dirichlet distribution
-        pi_L = dist.dirichlet_rng(cass.array() + 1);
+        VectorXi dirin = cass.array() + 1;
+        pi_L = dist.dirichlet_rng(dirin);
         check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //Print results
         if(rank == 0){

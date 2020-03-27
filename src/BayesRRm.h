@@ -36,6 +36,8 @@ class BayesRRm
 
     const bool use_xfiles_in_restart = true; // Restart from .xbet rather than .bet file
 
+    VectorXd    cva;
+
     MatrixXd  cVa;       // component-specific variance
     MatrixXd  cVaI;      // inverse of the component variances
 
@@ -62,8 +64,12 @@ class BayesRRm
     // Mean and residual variables
     double mu;          // mean or intercept
     VectorXd sigmaG;    // genetic variance
-    //double sigmaE;      // residuals variance
+    double sigmaE;      // residuals variance
     double sigmaF;      // covariates variance if using ridge;
+
+    //EO: for sequential
+    double   seq_mu,  seq_sigmaG, seq_sigmaE,  betasqn;
+    VectorXd seq_cVa, seq_cVaI,   seq_priorPi, seq_estPi;
 
     double mu8[8];
     double sigmaG8[8];
@@ -167,7 +173,9 @@ class BayesRRm
 #endif
     
 private:
-
+    void     init(int K, unsigned int markerCount, unsigned int individualCount, unsigned int missingPhenCount);
+    VectorXd getSnpData(unsigned int marker) const;
+    void     printDebugInfo() const;
 };
 
 #endif /* SRC_BAYESRRM_H_ */

@@ -22,7 +22,7 @@ public:
 
     unsigned shuffleMarkers      = 1;
 #ifdef USE_MPI
-    bool     mpiBayesGroups    = false;
+    //bool     mpiBayesGroups    = false;
     string   groupIndexFile    = "";
     string   groupMixtureFile  = "";
     bool     restart             = false;
