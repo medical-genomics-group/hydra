@@ -171,11 +171,7 @@ class BayesRRm
     void   mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks);
 
 #endif
-    
-private:
-    void     init(int K, unsigned int markerCount, unsigned int individualCount, unsigned int missingPhenCount);
-    VectorXd getSnpData(unsigned int marker) const;
-    void     printDebugInfo() const;
+
 };
 
 #endif /* SRC_BAYESRRM_H_ */
