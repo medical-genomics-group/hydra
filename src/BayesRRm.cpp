@@ -1159,6 +1159,7 @@ int BayesRRm::runMpiGibbs() {
     listFile << xbetfp << "\n"; // Only tar the last saved iteration, no need for full history
     listFile << xcpnfp << "\n"; // Idem
     //EO@@@ do we need acu files in tarballs?
+    //DT@@@ not really, so we can leave things as is
     listFile << acufp << "\n";
     for (int i=0; i<nranks; i++) {
         listFile << opt.mcmcOut + ".rng." + std::to_string(i) << "\n";

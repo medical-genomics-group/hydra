@@ -110,7 +110,8 @@ public:
         sparseBsn               = "";
         optionFile				= "";
         //EO@@@ check for default value
-        numGroups				= 2;
+	//DT@@@ should be one group the default allowing for no group files
+        numGroups				= 1;
         groupFile               = "";
         priorsFile              = "";
         dPriorsFile             = "";
