@@ -1007,7 +1007,7 @@ int BayesRRm::runMpiGibbs() {
     VectorXd            muk(K);                 // mean of k-th component marker effect size
     VectorXd            denom(K-1);             // temporal variable for computing the inflation of the effect variance for a given non-zero component
     VectorXi            m0(numGroups);          // non-zero elements per group
-    MatrixXi            cass(numGroups,K);      // variable storing the component assignment per group; EO RENAMING was v
+    cass.resize(numGroups,K);      // variable storing the component assignment per group; EO RENAMING was v
     MatrixXi            sum_cass(numGroups,K);  // To store the sum of v elements over all ranks per group;         was sum_v
     VectorXd            Acum(M);
     VectorXb            adaV(M);                // Daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0

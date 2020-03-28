@@ -58,7 +58,8 @@ class BayesRRm
     int      m0;        // total number of markers in model
 
     //EO@@@ watch type change by EO for cass (former v)
-    VectorXi cass;      // variable storing the component assignment //EO RENAMED v -> cass 
+   //DT@@@ there is no side effects for letting cass be a matrix. Just change indexing in Bw
+    MatrixXi cass;
     MatrixXi cass8;
 
     // Mean and residual variables
@@ -78,6 +79,7 @@ class BayesRRm
 
     // Linear model variables
     //EO@@@ check for double declaration...
+    //DT@@@ solved, deleted double declaration and related functions.
     VectorXd Beta;       // effect sizes
     VectorXd y_tilde;    // variable containing the adjusted residuals to exclude the effects of a given marker
     VectorXd epsilon;    // variable containing the residuals

@@ -939,7 +939,7 @@ int BayesW::runMpiGibbs_bW() {
 
     std::vector<int>    markerI;
     VectorXi            sum_cass(K);        // To store the sum of v elements over all ranks
-
+    cass.resize(K,1);
     markerI_restart.resize(M);
     std::fill(markerI_restart.begin(), markerI_restart.end(), 0);
 
@@ -1514,7 +1514,7 @@ int BayesW::runMpiGibbs_bW() {
                         //if zeroth component
                         if (k == 0) {
                             Beta(marker) = 0;
-                            cass[k]            += 1;
+                            cass(k,0)            += 1;
                             components[marker]  = k;
                         }
                         // If is not 0th component then sample using ARS
@@ -1552,7 +1552,7 @@ int BayesW::runMpiGibbs_bW() {
 
                             Beta(marker) = xsamp[0];  // Save the new result
  
-                            cass[k]            += 1;
+                            cass(k,0)            += 1;
                             components[marker]  = k;
                         }
                         break;
@@ -1840,11 +1840,11 @@ int BayesW::runMpiGibbs_bW() {
 
         // Update global parameters
         // ------------------------
-        m0 = Mtot - cass[0];
+        m0 = Mtot - cass(0,0);
         MPI_Barrier(MPI_COMM_WORLD);
 
         // 4. Sample sigmaG
-        used_data_beta.sigmaG = dist.inv_gamma_rng((double) (used_data.alpha_sigma + 0.5 * (Mtot - cass[0])),(double)(used_data.beta_sigma + 0.5 * double(Mtot - cass[0]) * beta_squaredNorm));
+        used_data_beta.sigmaG = dist.inv_gamma_rng((double) (used_data.alpha_sigma + 0.5 * (Mtot - cass(0,0))),(double)(used_data.beta_sigma + 0.5 * double(Mtot - cass(0,0)) * beta_squaredNorm));
         check_mpi(MPI_Bcast(&(used_data_beta.sigmaG), 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
         //Update the sqrt(2sigmab) variable
@@ -1856,7 +1856,7 @@ int BayesW::runMpiGibbs_bW() {
         check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //Print results
         if(rank == 0){
-            cout << iteration << ". " << Mtot - cass[0]  <<"; " <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigmaG << "; " << pi_L[0] << "; " << pi_L[1] << endl;
+	  cout << iteration << ". " << Mtot - cass(0,0)  <<"; " <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << used_data_beta.sigmaG << "; " << pi_L[0] << "; " << pi_L[1] << endl;
         }
 
         double end_it = MPI_Wtime();
