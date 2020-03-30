@@ -13,12 +13,7 @@
 #include "mpi_utils.hpp"
 #endif
 
-Data::Data()
-    : ppBedFd(-1)
-    , ppBedMap(nullptr)
-    , mappedZ(nullptr, 1, 1)
-    , ppbedIndex()
-{
+Data::Data() {
 }
 
 #ifdef USE_MPI
@@ -1367,6 +1362,7 @@ void Data::readFamFile(const string &famFile){
     cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
 #endif
 }
+
 
 void Data::readBimFile(const string &bimFile) {
     // Read bim file: recombination rate is defined between SNP i and SNP i-1

@@ -52,6 +52,7 @@ public:
     void resetWindow(void) {windStart = -1; windSize = 0;};
 };
 
+
 class IndInfo {
 public:
     const string famID;
@@ -76,23 +77,17 @@ public:
     }
 };
 
+
 // An entry for the index to the compressed preprocessed bed file
 struct IndexEntry {
     long pos;
     long size;
 };
 
-using PpBedIndex = std::vector<IndexEntry>;
 
 class Data {
 public:
     Data();
-
-    // mmap related data
-    int ppBedFd;
-    double *ppBedMap;
-    Map<MatrixXd> mappedZ;
-    PpBedIndex ppbedIndex;
 
     // Original data
     MatrixXd X;              // coefficient matrix for fixed effects
