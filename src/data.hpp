@@ -180,11 +180,6 @@ public:
     void read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration_restart, const int thin,
                                    double& mu);
 
-    void sparse_data_correct_NA_OLD(const size_t* N1S, const size_t* N2S, const size_t* NMS, 
-                                    size_t*       N1L,       size_t* N2L,       size_t* NML,
-                                    uint*         I1,        uint*   I2,        uint*   IM,
-                                    const int M);
-
     void load_data_from_bed_file(const string bedfp, const uint Ntot, const int M,
                                  const int    rank,  const int start,
                                  size_t* N1S, size_t* N1L, uint*& I1,
@@ -231,25 +226,11 @@ public:
     size_t get_number_of_elements_from_sparse_files(const std::string basename, const std::string id, const int* MrankS, const int* MrankL,
                                                     size_t* S, size_t* L);
     
-    /*
-    void sparse_data_get_sizes_from_sparse(size_t* N1S, size_t* N1L,
-    size_t* N2S, size_t* N2L,
-                                           size_t* NMS, size_t* NML,
-                                           const int* MrankS, const int* MrankL, const int rank,
-                                           const std::string sparseOut,
-                                           size_t& N1, size_t& N2, size_t& NM);
-    */
-
     void read_sparse_data_file(const std::string filename, const size_t N, const size_t OFF, const int NREAD, uint* out);
 
-    /*
-    void sparse_data_read_files(const size_t N1, const size_t N1SOFF, uint* I1,
-                                const size_t N2, const size_t N2SOFF, uint* I2,
-                                const size_t NM, const size_t NMSOFF, uint* IM,
-                                const std::string sparseOut);
-    */
 
     // MPI_File_read_at_all handling count argument larger than INT_MAX
+    //
     template <typename T>
     void mpi_file_read_at_all(const size_t N, const MPI_Offset offset, const MPI_File fh, const MPI_Datatype MPI_DT, const int NREADS, T buffer, size_t &bytes) {
 
@@ -301,6 +282,7 @@ public:
 
 
     // MPI_File_write_at_all handling count argument larger than INT_MAX
+    //
     template <typename T>
     void mpi_file_write_at_all(const size_t N, MPI_Offset offset, MPI_File fh, MPI_Datatype MPI_DT, const int NWRITES, T buffer) 
     {
@@ -327,27 +309,15 @@ public:
         }
     }
 
-
-    //void compute_markers_statistics(const char* rawdata, const uint M, const uint NB, double* mave, double* mstd, uint* msum);
-    void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx);
-    void get_normalized_marker_data(const char* rawdata, const uint NB, const uint marker, double* Cx, const double mean, const double std_);
     void preprocess_data(const char* data, const uint NC, const uint NB, double* ppdata, const int rank);
 #endif
+
     //EO to read definitions of blocks of markers to process
     void readMarkerBlocksFile(const string &markerBlocksFile);
 
-    void preprocessBedFile(const string &bedFile, const string &preprocessedBedFile, const string &preprocessedBedIndexFile, bool compress);
-    void mapPreprocessBedFile(const string &preprocessedBedFile);
-    void unmapPreprocessedBedFile();
-
-    void mapCompressedPreprocessBedFile(const string &preprocessedBedFile, const string &indexFile);
-    void unmapCompressedPreprocessedBedFile();
-
     void readFamFile(const string &famFile);
-    void readBimFile(const string &bimFile);
-    void readBedFile_noMPI(const string &bedFile);
-    void readBedFile_noMPI_unstandardised(const string &bedFile);
 
+    void readBimFile(const string &bimFile);
 
     void readPhenotypeFile(const string &phenFile);
     void readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest);
@@ -356,24 +326,21 @@ public:
 
     void readPhenotypeFiles(const vector<string> &phenFile, const int numberIndividuals, MatrixXd& dest);
 
-
-
     void readPhenCovFiles(const string &phenFile, const string covFile, const int numberIndividuals, VectorXd& dest, const int rank);
 
+
     // Functions to read for bayesW
+    //
     void readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
+
     void readPhenFailFiles(const string &phenFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
 
-
-
     template<typename M>
-    M    readCSVFile(const string &covariateFile);
-    void readCovariateFile(const string &covariateFile);
+    M readCSVFile(const string &covariateFile);
 
     // marion : annotation variables
     unsigned numGroups = 1;	// number of annotations
     void readGroupFile(const string &groupFile);
-    void readGroupFile_new(const string &groupFile);
     void readmSFile(const string& mSfile);
     
     //bW var

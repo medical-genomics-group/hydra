@@ -156,21 +156,21 @@ int main(int argc, const char * argv[]) {
             }
 
             if (opt.multi_phen) {
+                throw("EO: Disabled for now");
                 //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 //analysis.runMpiGibbsMultiTraits();
 
-            } else if(opt.bayesType == "bayesWMPI"){
-                //data.readBedFile_noMPI_unstandardised(opt.bedFile+".bed"); // This part to read the non-standardised data
+            } else if (opt.bayesType == "bayesWMPI") {
+
                 BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs_bW();
 
             } else {
+
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs();
             }
-
         }
-   
         else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);
         }
