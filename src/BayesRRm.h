@@ -55,7 +55,7 @@ class BayesRRm
     VectorXd logL;      // log likelihood of component
     VectorXd muk;       // mean of k-th component marker effect size
     VectorXd denom;     // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
-    int      m0;        // total number of markers in model
+    VectorXi      m0;        // total number of markers in model
 
     //EO@@@ watch type change by EO for cass (former v)
    //DT@@@ there is no side effects for letting cass be a matrix. Just change indexing in Bw

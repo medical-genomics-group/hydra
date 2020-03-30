@@ -65,7 +65,8 @@ struct pars_beta_sparse{
 
 	/* Number of events (sum of failure indicators) */
 	double d;
-
+  
+        
 };
 
 struct pars_alpha{
@@ -82,6 +83,7 @@ struct pars_alpha{
 
 class BayesW : public BayesRRm
 {
+public:
     const double	alpha_0  = 0.01;
     const double	kappa_0     = 0.01;
     const double    sigma_mu    = 100;
@@ -97,16 +99,17 @@ class BayesW : public BayesRRm
 	struct pars_alpha used_data_alpha;
 
 	// Component variables
-	VectorXd pi_L;        // mixture probabilities
+	MatrixXd pi_L;        // mixture probabilities
 	VectorXd marginal_likelihoods;      // likelihood for each mixture component
-	VectorXd v;         // variable storing the component assignment
-
+    int numGroups;
+  VectorXi groups;
     // Linear model variables
     VectorXd vi;
+    
 
     //VectorXd y;
 
-  public: BayesW(Data &data, Options &opt, const long memPageSize) : BayesRRm(data, opt, memPageSize)
+     BayesW(Data &data, Options &opt, const long memPageSize) : BayesRRm(data, opt, memPageSize)
 	{
 	};
     virtual ~BayesW();
