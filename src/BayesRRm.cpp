@@ -340,6 +340,8 @@ inline double partial_sparse_dotprod(const double* __restrict__ vec,
         dp += vec[ IX[i] ] * fac;
     }
 
+    //printf("partial %lu -> %lu with fac = %20.15f\n", NXS, NXS+NXL, fac);
+
     return dp;
 }
 
@@ -600,7 +602,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         data.mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
         // Get number of ones, twos, and missing
-        data.sparse_data_get_sizes_from_raw(rawdata, MLi, snpLenByt, N1, N2, NM);
+        data.sparse_data_get_sizes_from_raw(rawdata, MLi, snpLenByt, 0, N1, N2, NM);
         //printf("DEBUG  : off rank %d: N1 = %15lu, N2 = %15lu, NM = %15lu\n", rank, N1, N2, NM);
 
         rN1 += N1;
@@ -676,7 +678,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         NML = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
 
         size_t N1 = 0, N2 = 0, NM = 0;
-        data.sparse_data_get_sizes_from_raw(rawdata, uint(MLi), snpLenByt, N1, N2, NM);
+        data.sparse_data_get_sizes_from_raw(rawdata, uint(MLi), snpLenByt, 0, N1, N2, NM);
         //printf("DEBUG  : N1 = %15lu, N2 = %15lu, NM = %15lu\n", N1, N2, NM);
 
         // Alloc and build sparse structure
@@ -690,7 +692,7 @@ void BayesRRm::write_sparse_data_files(const uint bpr) {
         //for (int i=0; i<N2; i++) I2[i] = UINT_MAX;
         //for (int i=0; i<NM; i++) IM[i] = UINT_MAX;
 
-        data.sparse_data_fill_indices(rawdata, MLi, snpLenByt, N1S, N1L, I1,  N2S, N2L, I2,  NMS, NML, IM);
+        data.sparse_data_fill_indices(rawdata, MLi, snpLenByt, 0, N1S, N1L, I1,  N2S, N2L, I2,  NMS, NML, IM);
 
         //check_whole_array_was_set(I1, N1, __LINE__, __FILE__);
         //check_whole_array_was_set(I2, N2, __LINE__, __FILE__);
@@ -997,7 +999,8 @@ int BayesRRm::runMpiGibbs() {
     const unsigned int  K   = int(data.mS.cols()) + 1;
     const unsigned int  km1 = K - 1;
     const int numGroups = data.numGroups;
-    printf("numGroups = %d, data.groups.size() = %lu, Mtot = %d\n", data.numGroups, data.groups.size(), Mtot);
+    if (rank == 0)
+        printf("INFO   : numGroups = %d, data.groups.size() = %lu, Mtot = %d\n", data.numGroups, data.groups.size(), Mtot);
     assert(data.groups.size() == Mtot);
     VectorXi groups     = data.groups;
     cVa.resize(numGroups, K);                   // component-specific variance
@@ -1255,13 +1258,17 @@ int BayesRRm::runMpiGibbs() {
     string sparseOut = mpi_get_sparse_output_filebase(rank);
 
     if (opt.readFromBedFile && !opt.readFromSparseFiles) {
+
         data.load_data_from_bed_file(opt.bedFile, Ntot, M, rank, MrankS[rank],
                                      N1S, N1L, I1,
                                      N2S, N2L, I2,
                                      NMS, NML, IM,
                                      taskBytes);
+        //for (int i=0; i<M; i++)
+        //    printf("OUT BED bef rank %02d, marker %7d: 1,2,M  S = %6lu, %6lu, %6lu, L = %6lu, %6lu, %6lu\n", rank, i, N1S[i], N2S[i], NMS[i], N1L[i], N2L[i], NML[i]);
 
     } else if (opt.readFromSparseFiles && !opt.readFromBedFile) {
+        
         data.load_data_from_sparse_files(rank, nranks, M, MrankS, MrankL, sparseOut,
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,
@@ -1303,7 +1310,7 @@ int BayesRRm::runMpiGibbs() {
             if (USEBED[i]) {
                 nusebed += 1;
                 size_t X1 = 0, X2 = 0, XM = 0;
-                data.sparse_data_get_sizes_from_raw(reinterpret_cast<char*>(&I1[N1S[i]]), 1, snpLenByt, X1, X2, XM);
+                data.sparse_data_get_sizes_from_raw(reinterpret_cast<char*>(&I1[N1S[i]]), 1, snpLenByt, data.numNAs, X1, X2, XM);
                 //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu < << <<<\n", rank, i, X1, X2, XM);
 
                 //EO: N{1,2,M}L structures must not be changed anymore!
@@ -1344,6 +1351,9 @@ int BayesRRm::runMpiGibbs() {
 
     // Correct each marker for individuals with missing phenotype
     // ----------------------------------------------------------
+    if (rank == 0) 
+        printf("INFO   : BEFORE NA correction: Ntot = %d; snpLenByt = %zu [byte]; snpLenUint = %zu [uint]\n", Ntot, snpLenByt, snpLenUint);
+
     if (data.numNAs > 0) {
 
         double tna = MPI_Wtime();
@@ -1371,14 +1381,15 @@ int BayesRRm::runMpiGibbs() {
         Ntot -= data.numNAs;
 
         // Length of a marker in [byte] in BED representation (1 ind is 2 bits, so 1 byte is 4 inds)
-        size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
+        snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
 
         // Length of a marker in [uint] in BED representation (1 ind is 2 bits, so 1 uint is 16 inds)
-        size_t snpLenUint = (Ntot % 16) ? Ntot / 16 + 1 : Ntot / 16;
-
-        if (rank == 0) printf("INFO   : snpLenByt = %zu bytes; snpLenUint = %zu after accounting for NAs\n", snpLenByt, snpLenUint);
+        snpLenUint = (Ntot % 16) ? Ntot / 16 + 1 : Ntot / 16;
     }
 
+    if (rank == 0) 
+        printf("INFO   : AFTER  NA correction: Ntot = %d; snpLenByt = %zu [byte]; snpLenUint = %zu [uint]\n", Ntot, snpLenByt, snpLenUint);
+    fflush(stdout);
 
     // Compute dalloc increment from NA adjusted structures
     //
@@ -1636,7 +1647,9 @@ int BayesRRm::runMpiGibbs() {
                        
                         size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
                         size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
-                        data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[marker]]), 1, snpLenByt,
+                        
+                        //EO: bed data already ajusted for NAs
+                        data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[marker]]), 1, snpLenByt, data.numNAs,
                                                       &fake_n1s, &fake_n1l, XI1,
                                                       &fake_n2s, &fake_n2l, XI2,
                                                       &fake_nms, &fake_nml, XIM);
@@ -1660,10 +1673,11 @@ int BayesRRm::runMpiGibbs() {
                     //continue;
 
                     num += beta * double(Ntot - 1);
-                    //printf("it %d, rank %d, mark %d: num = %20.15f, %20.15f, %20.15f\n", iteration, rank, marker, num, mave[marker], mstd[marker]);
+                    //printf("it %d, rank %d, mark %d: num = %22.15f, %20.15f, %20.15f\n", iteration, rank, marker, num, mave[marker], mstd[marker]);
 
                     //muk for the other components is computed according to equations
                     muk.segment(1, km1) = num / denom.array();
+                    
                     //cout << "muk = " << endl << muk << endl;
                     
                     //first component probabilities remain unchanged
@@ -1745,8 +1759,7 @@ int BayesRRm::runMpiGibbs() {
                         dbet2sync.push_back(deltaBeta);
                         
                     } else {
-                        //printf("it %d, task %3d, marker %5d: @BEFORE@\n", iteration, rank, marker);
-                        //fflush(stdout);
+
                         if (USEBED[marker]) {
                             sparse_scaadd(deltaEps, deltaBeta, 
                                           XI1, 0,           N1L[marker],
@@ -1760,8 +1773,6 @@ int BayesRRm::runMpiGibbs() {
                                           IM,  NMS[marker], NML[marker],
                                           mave[marker], mstd[marker], Ntot);
                         }
-                        //printf("it %d, task %3d, marker %5d: @AFTER@\n", iteration, rank, marker);
-                        //fflush(stdout);
 
                         // Update local sum of delta epsilon
                         sum_vectors_f64(dEpsSum, deltaEps, Ntot);
@@ -1786,18 +1797,12 @@ int BayesRRm::runMpiGibbs() {
             _mm_free(XIM);  XIM = NULL;
 
 
-            //printf("it %d, task %3d, marker %5d: @HERE WE ARE@\n", iteration, rank, marker);
-            //continue;
-
             // Check whether we have a non-zero beta somewhere
             //
             if (nranks > 1 && (sinceLastSync >= opt.syncRate || j == lmax-1)) {
 
                 //MPI_Barrier(MPI_COMM_WORLD);
                 double tb = MPI_Wtime();
-
-                //printf("it %d, task %3d, marker %5d: @HERE WE ARE NOW@ %20.15f\n", iteration, rank, marker, task_sum_abs_deltabeta);
-                //fflush(stdout);
                 
                 check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta, &cumSumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
@@ -1806,12 +1811,12 @@ int BayesRRm::runMpiGibbs() {
                 it_sync_ar1   += te - tb;
                 tot_nsync_ar1 += 1;
                 it_nsync_ar1  += 1;
-                //printf("it %d, task %3d, marker %5d: @HERE WE ARE NOW 2@\n", iteration, rank, marker);
-                //fflush(stdout);
+
             } else {
 
                 cumSumDeltaBetas = task_sum_abs_deltabeta;
             }
+
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
             //fflush(stdout);
 
@@ -1890,7 +1895,7 @@ int BayesRRm::runMpiGibbs() {
                                                                 NMS[m2si], NML[m2si], &IM[NMS[m2si]]);
                                 // local check ;-)
                                 //size_t X1 = 0, X2 = 0, XM = 0;
-                                //data.sparse_data_get_sizes_from_raw(&task_bed[(size_t) i * snpLenByt], 1, snpLenByt, X1, X2, XM);
+                                //data.sparse_data_get_sizes_from_raw(&task_bed[(size_t) i * snpLenByt], 1, snpLenByt, data.numNAs, X1, X2, XM);
                                 //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu #?# vs %9lu %9lu %9lu\n", rank, i, X1, X2, XM, N1L[m2si], N2L[m2si], NML[m2si]);
                                 //fflush(stdout);
 
@@ -1924,7 +1929,7 @@ int BayesRRm::runMpiGibbs() {
                             // note: locally available from markers local to task but ignored for now
                             //
                             size_t X1 = 0, X2 = 0, XM = 0;
-                            data.sparse_data_get_sizes_from_raw(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, X1, X2, XM);
+                            data.sparse_data_get_sizes_from_raw(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, data.numNAs, X1, X2, XM);
                             //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu ###\n", rank, i, X1, X2, XM);
                             //fflush(stdout);
                             // Allocate sparse structure
@@ -1937,7 +1942,9 @@ int BayesRRm::runMpiGibbs() {
                             // Fill the structure
                             size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
                             size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
-                            data.sparse_data_fill_indices(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt,
+                            
+                            //EO: bed data already adjusted for NAs
+                            data.sparse_data_fill_indices(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, data.numNAs,
                                                           &fake_n1s, &fake_n1l, XI1,
                                                           &fake_n2s, &fake_n2l, XI2,
                                                           &fake_nms, &fake_nml, XIM);
@@ -2050,7 +2057,9 @@ int BayesRRm::runMpiGibbs() {
 
                                 size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
                                 size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
-                                data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[m2si]]), 1, snpLenByt,
+
+                                //EO: data already adjusted for NAs
+                                data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[m2si]]), 1, snpLenByt, data.numNAs,
                                                               &fake_n1s, &fake_n1l, XI1,
                                                               &fake_n2s, &fake_n2l, XI2,
                                                               &fake_nms, &fake_nml, XIM);

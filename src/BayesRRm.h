@@ -36,8 +36,7 @@ class BayesRRm
 
     const bool use_xfiles_in_restart = true; // Restart from .xbet rather than .bet file
 
-    VectorXd    cva;
-
+    VectorXd  cva;
     MatrixXd  cVa;       // component-specific variance
     MatrixXd  cVaI;      // inverse of the component variances
 

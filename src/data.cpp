@@ -593,7 +593,7 @@ void Data::load_data_from_bed_file(const string bedfp_noext, const uint Ntot, co
 
     // Length of a "column" in bytes
     const size_t snpLenByt = (Ntot % 4) ? Ntot / 4 + 1 : Ntot / 4;
-    //if (rank==0) printf("INFO   : marker length in bytes (snpLenByt) = %zu bytes.\n", snpLenByt);
+    if (rank==0) printf("INFO   : marker length in bytes (snpLenByt) = %zu bytes.\n", snpLenByt);
 
 
     // Alloc memory for raw BED data
@@ -630,7 +630,9 @@ void Data::load_data_from_bed_file(const string bedfp_noext, const uint Ntot, co
    
 
     size_t N1 = 0, N2 = 0, NM = 0;
-    sparse_data_get_sizes_from_raw(rawdata, M, snpLenByt, N1, N2, NM);
+
+    //EO: reading from bed file, so NAs are not considered yet
+    sparse_data_get_sizes_from_raw(rawdata, M, snpLenByt, 0, N1, N2, NM);
     //printf("read from bed: N1 = %lu, N2 = %lu, NM = %lu\n", N1, N2, NM);
 
     // Alloc and build sparse structure
@@ -638,7 +640,7 @@ void Data::load_data_from_bed_file(const string bedfp_noext, const uint Ntot, co
     I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
     IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
     
-    sparse_data_fill_indices(rawdata, M, snpLenByt,
+    sparse_data_fill_indices(rawdata, M, snpLenByt, 0,
                              N1S, N1L, I1,
                              N2S, N2L, I2,
                              NMS, NML, IM);
@@ -743,12 +745,10 @@ void Data::get_bed_marker_from_sparse(char* bdat,
     //printf("L1,2,M = %lu, %lu, %lu\n", L1,L2,LM);
     const size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
 
-    // Step 1: Set all to 1
+    // Step 1: Set all bits to 1
     memset(bdat, 0b11111111, snpLenByt);
-
-
-    //return;
     
+
     // Step 2: Set the 1s
     int ibyt = 0, iind = 0;
     for (int j=0; j<L1; j++) {
@@ -1068,9 +1068,18 @@ void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* N
 }
 
 
-void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, const uint NB, size_t& N1, size_t& N2, size_t& NM) {
+// EO: needs also NA as parameter, the number of already applied NA corrections
+//     in the raw data.
+//     -> 0 when reading from a bed file
+//     -> data.numNAs when handling an buffered marker stored in BED format
+//
+void Data::sparse_data_get_sizes_from_raw(const char* rawdata, 
+                                          const uint  NC,
+                                          const uint  NB,
+                                          const uint  NA,
+                                          size_t& N1, size_t& N2, size_t& NM) {
 
-    assert(numInds<=NB*4);
+    assert(numInds - NA <= NB * 4);
 
     // temporary array used for translation
     int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(char), 64);  check_malloc(tmpi, __LINE__, __FILE__);
@@ -1078,6 +1087,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
     N1 = 0;
     N2 = 0;
     NM = 0;
+
     size_t N0 = 0;
 
     for (uint i=0; i<NC; ++i) {
@@ -1092,7 +1102,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
             }
         }
         
-        for (int ii=0; ii<numInds-numNAs; ++ii) {
+        for (int ii=0; ii<numInds-NA; ++ii) {
             if (tmpi[ii] == 1) {
                 tmpi[ii] = -1;
             } else {
@@ -1100,15 +1110,15 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
             }
         }
 
-        for (int ii=0; ii<numInds-numNAs; ++ii) {
+        for (int ii=0; ii<numInds-NA; ++ii) {
             if      (tmpi[ii] <  0) { cm += 1;  NM += 1; }
             else if (tmpi[ii] == 0) { c0 += 1;  N0 += 1; }
             else if (tmpi[ii] == 1) { c1 += 1;  N1 += 1; }
             else if (tmpi[ii] == 2) { c2 += 1;  N2 += 1; }
         }
         //printf("N0, N1, N2, NM = %lu, %lu, %lu, %lu\n", N0, N1, N2, NM);
-        //printf("%d - %d = %d\n", numInds, numNAs, numInds - numNAs);
-        assert(cm+c0+c1+c2 == numInds - numNAs);        
+        //printf("%d - %d = %d\n", numInds, NA, numInds - NA);
+        assert(cm+c0+c1+c2 == numInds - NA);        
         //printf("N0, N1, N2, NM = %lu, %lu, %lu, %lu\n", N0, N1, N2, NM);
     }
 
@@ -1121,13 +1131,16 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata, const uint NC, co
 // N*L: store the "L"ength of each marker representation
 // I* : store the indices of the elements
 // -------------------------------------------------------------------------------------------
-void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const uint NB,
+void Data::sparse_data_fill_indices(const char* rawdata,
+                                    const uint  NC,
+                                    const uint  NB,
+                                    const uint  NA,
                                     size_t* N1S, size_t* N1L, uint* I1,
                                     size_t* N2S, size_t* N2L, uint* I2,
                                     size_t* NMS, size_t* NML, uint* IM) {
     
     
-    assert(numInds - numNAs <= NB * 4);
+    assert(numInds - NA <= NB * 4);
 
 
     // temporary array used for translation
@@ -1138,7 +1151,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
 
     for (int i=0; i<NC; ++i) {
 
-        char* locraw = (char*)&rawdata[size_t(i)*size_t(NB)];
+        char* locraw = (char*)&rawdata[size_t(i) * size_t(NB)];
 
         for (int ii=0; ii<NB; ++ii) {
             for (int iii=0; iii<4; ++iii) {
@@ -1146,7 +1159,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
             }
         }
         
-        for (int ii=0; ii<numInds-numNAs; ++ii) {
+        for (int ii=0; ii<numInds-NA; ++ii) {
             if (tmpi[ii] == 1) {
                 tmpi[ii] = -1;
             } else {
@@ -1156,7 +1169,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
 
         size_t n0 = 0, n1 = 0, n2 = 0, nm = 0;
         
-        for (uint ii=0; ii<numInds-numNAs; ++ii) {
+        for (uint ii=0; ii<numInds-NA; ++ii) {
             if (tmpi[ii] < 0) {
                 IM[im] = ii;
                 im += 1;
@@ -1176,7 +1189,7 @@ void Data::sparse_data_fill_indices(const char* rawdata, const uint NC, const ui
             }
         }
 
-        assert(nm + n0 + n1 + n2 == numInds - numNAs);
+        assert(nm + n0 + n1 + n2 == numInds - NA);
 
         N1S[i] = N1;  N1L[i] = n1;  N1 += n1;
         N2S[i] = N2;  N2L[i] = n2;  N2 += n2;
@@ -1914,7 +1927,7 @@ void Data::read_group_priors(const string& file){
         strT.getTokens(strvec[0], ",");
         priors = Eigen::MatrixXd(strvec.size(), strT.size());
         numGroups = strvec.size();
-        cout << "numGroups = " << numGroups << endl;
+        //cout << "numGroups = " << numGroups << endl;
         for (unsigned j=0; j<strvec.size(); ++j) {
             strT.getTokens(strvec[j], ",");
             for (unsigned k=0; k<2; ++k) {
@@ -1949,7 +1962,7 @@ void Data::read_dirichlet_priors(const string& file){
         strT.getTokens(strvec[0], ",");
         dPriors = Eigen::MatrixXd(strvec.size(), strT.size());
         numGroups = strvec.size();
-        cout << "numGroups = " << numGroups << endl;
+        //cout << "numGroups = " << numGroups << endl;
         for (unsigned j=0; j<strvec.size(); ++j) {
             strT.getTokens(strvec[j], ",");
             for (unsigned k=0; k<strT.size(); ++k) {
