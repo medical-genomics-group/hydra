@@ -460,7 +460,7 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
 //     Consider using adding reading mu for bR so the same function could be used
 //EO@@@ needs to be adapted for groups
 void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
-                                     double& sigmaG, double& sigmaE, VectorXd& pi, uint& iteration_restart) {
+                                     VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -468,9 +468,12 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
 
     string csv = mcmcOut + ".csv";
     std::ifstream file(csv);
-    int it_ = 1E9, rank_ = -1, m0_ = -1, pisize_ = -1, nchar = 0;
-    double mu_, sigg_, sige_, rat_;
-    double pipi[K];
+   
+    int it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0, ngrp_ = -1;
+    double mu_, sige_, rat_, siggSum_;
+
+    VectorXd sigg_(numGroups);
+
     int lastSavedIt = 0;
 
     if (file.is_open()) {
@@ -482,20 +485,37 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
                     lastSavedIt = it_;
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
-                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %lf, %7d, %2d, %n",
-                                   &it_, &mu_, &sigg_, &sige_, &rat_, &m0_, &pisize_, &nchar);
-                    string pis = str.substr(nchar, str.length()-nchar);
-                    char   pic[pis.length()+1];
-                    strcpy(pic, pis.c_str());
-                    for (int i=0; i<pis.length(); ++i) {
-                        if (pic[i] == ',') pic[i] = ' ';
+                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %lf, %7d, %2d, %2d, %n",
+                                   &it_, &mu_, &siggSum_, &sige_, &rat_, &m0_, &pirows_, &picols_, &nchar);
+	
+             	    assert(pirows_ == ngrp_);
+                    assert(pi.rows() == pirows_);
+                    assert(pi.cols() == picols_);
+
+	
+		    string remain_s = str.substr(nchar, str.length() - nchar);
+                    char   remain_c[remain_s.length() + 1];
+                    strcpy(remain_c, remain_s.c_str());
+
+                    // remove commas
+                    for (int i=0; i < remain_s.length(); ++i) {
+                        if (remain_c[i] == ',') remain_c[i] = ' ';
                     }
-                    //cout << "pic = " << pic << endl;
-                    char* ppic = pic;
-                    for (int i=0; i<K; i++) {
-                        pipi[i] = strtod(ppic, &ppic);
+
+                    char* prc = remain_c;
+                    for (int i=0; i < numGroups; i++) {
+                        sigmaG[i] = strtod(prc, &prc);
+                        //printf("sigmaG[%d] = %20.15f\n", i, sigmaG[i]); 
+                    }              
+
+
+                    for (int i=0; i < pirows_; i++) {
+                        for (int j=0; j < picols_; j++) {
+                            pi(i, j) = strtod(prc, &prc);
+                        }
                     }
-                }
+ 
+		 }
             }
         }
     } else {
@@ -514,10 +534,7 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
     assert(lastSavedIt <= UINT_MAX);
     iteration_restart = lastSavedIt;
     mu		      = mu_;
-    sigmaG            = sigg_;
     sigmaE            = sige_;
-    for (int i=0; i<K; i++)
-        pi[i] = pipi[i];
 }
 
 

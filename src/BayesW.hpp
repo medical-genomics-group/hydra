@@ -40,7 +40,7 @@ struct pars{
 	double d;
 
 	/* Help variable for storing sqrt(2sigmaG)	 */
-	double sqrt_2sigmaG;
+	//double sqrt_2sigmaG;
 
 };
 
@@ -100,7 +100,9 @@ public:
 
 	// Component variables
 	MatrixXd pi_L;        // mixture probabilities
-	VectorXd marginal_likelihoods;      // likelihood for each mixture component
+	VectorXd marginal_likelihoods;      // likelihood for each mixture component (for specific group)
+        VectorXd marginal_likelihood_0;      // 0th likelihood for each group component
+
     int numGroups;
   VectorXi groups;
     // Linear model variables
