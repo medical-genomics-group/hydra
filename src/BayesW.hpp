@@ -20,8 +20,11 @@
 struct pars{
 	/* Common parameters for the densities */
 	VectorXd epsilon;			// epsilon per subject (before each sampling, need to remove the effect of the sampled parameter and then carry on
-	VectorXd mixture_classes; // Vector to store mixture component C_k values
-	int used_mixture; //Write the index of the mixture we decide to use
+
+	//Probably unnecessary to store mixture classes
+	//VectorXd mixture_classes; // Vector to store mixture component C_k values
+	//int used_mixture; //Write the index of the mixture we decide to use
+
 	/* Store the current variables */
 	double alpha;
 
@@ -47,9 +50,10 @@ struct pars{
 struct pars_beta_sparse{
 	/* Common parameters for the densities */
 
-	VectorXd mixture_classes; // Vector to store mixture component C_k values
-
-	int used_mixture; //Write the index of the mixture we decide to use
+	//VectorXd mixture_classes; // Vector to store mixture component C_k values
+	//int used_mixture; //Write the index of the mixture we decide to use
+	
+	double mixture_value; // Instead of storing the vector of mixtures and the corresponding index, we keep only the mixture value in the structure
 
 	/* Store the current variables */
 	double alpha, sigmaG;
@@ -90,7 +94,8 @@ public:
     const double    alpha_sigma  = 1;
     const double    beta_sigma   = 0.0001;
     const string 	quad_points = opt.quad_points;  // Number of Gaussian quadrature points
-    const int 		K = opt.S.size()+1;  //number of mixtures + 0 class
+    unsigned int 	K = opt.S.size()+1;  //number of mixtures + 0 class
+    unsigned int        km1 = opt.S.size();  //number of mixtures 
     const size_t       LENBUF_gamma  = 3500; //Not more than 160 "fixed effects can be used at the moment 
 
 	// The ARS structures
@@ -125,8 +130,8 @@ private:
         void init(unsigned int individualCount, unsigned int Mtot, unsigned int fixedCount);
 	void init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot, const uint fixtot,
                                  const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart);
-	void marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n, double vi_sum, double vi_2,double vi_1, double vi_0,double mean, double sd, double mean_sd_ratio);
-	double gauss_hermite_adaptive_integral(int k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio);
+	void marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n, double vi_sum, double vi_2,double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio, unsigned int group_index);
+	double gauss_hermite_adaptive_integral(double C_k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio);
 	double partial_sum(const double* __restrict__ vec, const uint*   __restrict__ IX, const size_t  NXS, const size_t NXL);
 
 //	VectorXd getSnpData(unsigned int marker) const;

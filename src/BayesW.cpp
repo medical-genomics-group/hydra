@@ -151,7 +151,7 @@ inline double beta_dens(double x, void *norm_data)
 
 	y = -p.alpha * x * p.sum_failure -
         exp(p.alpha*x*p.mean_sd_ratio)* (p.vi_0 + p.vi_1 * exp(-p.alpha*x/p.sd) + p.vi_2 * exp(-2*p.alpha*x/p.sd))
-        -x * x / (2 * p.mixture_classes(p.used_mixture) * p.sigmaG) ;
+        -x * x / (2 * p.mixture_value * p.sigmaG) ;
 	return y;
 };
 
@@ -171,11 +171,11 @@ inline double gh_integrand_adaptive(double s,double alpha, double dj, double sqr
 
 //Calculate the value of the integral using Adaptive Gauss-Hermite quadrature
 //Let's assume that mu is always 0 for speed
-double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0,
+double BayesW::gauss_hermite_adaptive_integral(double C_k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0,
                                                double mean, double sd, double mean_sd_ratio){
 
 	double temp = 0;
-	double sqrt_2ck_sigma = sqrt(2*used_data.mixture_classes(k)*used_data_beta.sigmaG);
+	double sqrt_2ck_sigma = sqrt(2* C_k * used_data_beta.sigmaG);
 
 	if(n == "3"){
 		double x1,x2;
@@ -714,13 +714,13 @@ double BayesW::gauss_hermite_adaptive_integral(int k, double sigma, string n, do
 
 //Pass the vector post_marginals of marginal likelihoods by reference
 void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n,
-                                          double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio){
+                                          double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio, unsigned int group_index){
 	double exp_sum = (vi_1 * (1 - 2 * mean) + 4 * (1-mean) * vi_2 + vi_sum * mean * mean) /(sd*sd) ;
 
-	for(int i=0; i < used_data_beta.mixture_classes.size(); i++){
+	for(int i=0; i < km1; i++){
 		//Calculate the sigma for the adaptive G-H
-		double sigma = 1.0/sqrt(1 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG * used_data_beta.mixture_classes(i) * exp_sum);
-		post_marginals(i+1) = prior_prob(i+1) * gauss_hermite_adaptive_integral(i, sigma, n, vi_sum,  vi_2,  vi_1,  vi_0,
+		double sigma = 1.0/sqrt(1 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG * cVa(group_index,i) * exp_sum);
+		post_marginals(i+1) = prior_prob(i+1) * gauss_hermite_adaptive_integral(cVa(group_index,i), sigma, n, vi_sum,  vi_2,  vi_1,  vi_0,  //(i+1) because 0th is already pre-calculated
                                                                                 mean, sd, mean_sd_ratio);
 	}
 }
@@ -749,41 +749,39 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	used_data.epsilon.resize(individualCount);
 	used_data_alpha.epsilon.resize(individualCount);
 
-	// Init the working variables
-	const int km1 = K - 1;
-
 	//Init the group variables
 	 data.groups.resize(Mtot);
 	 data.groups.setZero();
-	 const int Kt   = cva.size() + 1;
+	 const int Kt   = cva.size() + 1;			//Temporary K
 	 const int Ktm1 = Kt - 1; 
 
-    	 data.mS.resize(Mtot, Kt);
-    	 data.mS.col(0).array() = 0.0;
+    	 data.mS.resize(Mtot, Ktm1);
 
 	 for (int i=0; i<Mtot; i++)
-	   data.mS.row(i).segment(1, Ktm1) = cva;
-
+	   data.mS.row(i) = cva;
+	
 	 if (opt.groupIndexFile != "" && opt.groupMixtureFile != "") {
 	   data.readGroupFile(opt.groupIndexFile);
 	   data.readmSFile(opt.groupMixtureFile);
 	 }
 
-	 data.mS.resize(Mtot, Kt);
-	 data.mS.col(0).array() = 0.0;
 	 printf("numGroups = %d, data.groups.size() = %lu, Mtot = %d\n", data.numGroups, data.groups.size(), Mtot);
 
          numGroups = data.numGroups;
-
+    	 K  = int(data.mS.cols()) + 1;  //Mixtures + 0th component. 
+  	 km1 = K - 1;		    //Just mixtures
          sigmaG.resize(numGroups);
          sigmaG.setZero();
 
 	 assert(data.groups.size() == Mtot);
 	 groups     = data.groups;
-	 cVa.resize(numGroups, K);                   // component-specific variance
-	 cVaI.resize(numGroups, K);                  // inverse of the component variances
+	 cVa.resize(numGroups, km1);    // component-specific variance
 
-
+	 //Populate cVa. We store only km1 values for mixtures
+    	 for (int i=0; i < numGroups; i++) {
+        	cVa.row(i) = data.mS.row(i).segment(0,km1);
+    	 }
+	
         // Component variables
         pi_L.resize(numGroups,K);                        // prior mixture probabilities
         marginal_likelihoods = VectorXd(K);  // likelihood for each mixture component
@@ -801,7 +799,6 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	marginal_likelihoods.setOnes();   //Initialize with just ones
         marginal_likelihood_0.setOnes();
 
-
 	Beta.setZero();
 	gamma.setZero();
 
@@ -812,14 +809,13 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	mu = y.mean();       // mean or intercept
 	// Initialize the variables in structures
 	//Save variance classes
-	used_data.mixture_classes.resize(km1);
-	used_data_beta.mixture_classes.resize(km1);  //The future solution
+	//used_data.mixture_classes.resize(km1);
+	//used_data_beta.mixture_classes.resize(km1);  //The future solution
 
-
-	for(int i=0;i<(km1);i++){
-		used_data.mixture_classes(i) = opt.S[i];   //Save the mixture data (C_k)
-		used_data_beta.mixture_classes(i) = opt.S[i];
-	}
+	//for(int i = 0 ; i < km1; i++){
+	//	used_data.mixture_classes(i) = opt.S[i];   //Save the mixture data (C_k)
+	//	used_data_beta.mixture_classes(i) = opt.S[i];
+	//}
 
 	//Store the vector of failures only in the structure used for sampling alpha
 	used_data_alpha.failure_vector = data.fail.cast<double>();
@@ -915,7 +911,6 @@ int BayesW::runMpiGibbs_bW() {
     //#endif
 
 	const unsigned int numFixedEffects(data.numFixedEffects);
-	const int km1 = K - 1;
 
     char   buff[LENBUF];
     char   buff_gamma[LENBUF_gamma]; 
@@ -974,7 +969,6 @@ int BayesW::runMpiGibbs_bW() {
     components.setZero();
 
     std::vector<int>    markerI;
-    VectorXi            sum_cass(K);        // To store the sum of v elements over all ranks
 
     markerI_restart.resize(M);
     std::fill(markerI_restart.begin(), markerI_restart.end(), 0);
@@ -1042,6 +1036,9 @@ int BayesW::runMpiGibbs_bW() {
         init(Ntot - data.numNAs, Mtot,numFixedEffects);
     }
     cass.resize(numGroups,K); //rows are groups columns are mixtures
+    VectorXi sum_cass(K); // To store the sum of cass elements over all ranks
+
+
 
    // Build global repartition of markers over the groups
     VectorXi MtotGrp(numGroups);
@@ -1361,6 +1358,7 @@ int BayesW::runMpiGibbs_bW() {
         errorCheck(err); // If there is error, stop the program
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         mu = xsamp[0];   // Save the sampled value
+
         //Update after sampling
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
             epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
@@ -1399,7 +1397,7 @@ int BayesW::runMpiGibbs_bW() {
 
                 for(int k = 0; k < Ntot; k++){
                     (used_data.epsilon)[k] = epsilon[k] + used_data.X_j[k] * gamma_old;// we adjust the residual with the respect to the previous gamma value
-        		}
+        	}
                 // Sample using ARS
                 err = arms(xinit,ninit,&xl,&xr, gamma_dens,&used_data,&convex,
                            npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
@@ -1449,12 +1447,12 @@ int BayesW::runMpiGibbs_bW() {
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         used_data.alpha = xsamp[0];
         used_data_beta.alpha = xsamp[0];
-        
+
         MPI_Barrier(MPI_COMM_WORLD);
 
 
         // Calculate the vector of exponent of the adjusted residuals
-        for(int i=0; i<Ntot; ++i){
+        for(int i = 0; i < Ntot; ++i){
             vi[i] = exp(used_data.alpha * epsilon[i] - EuMasc);
         }
 
@@ -1488,7 +1486,7 @@ int BayesW::runMpiGibbs_bW() {
                 marker  = markerI[j];
                 beta =  Beta(marker);
 
-		int cur_group = groups[MrankS[rank] + marker];
+		unsigned int cur_group = groups[MrankS[rank] + marker];
                 /////////////////////////////////////////////////////////
                 //Replace the sampleBeta function with the inside of the function        
                 double vi_sum = 0.0;
@@ -1527,7 +1525,6 @@ int BayesW::runMpiGibbs_bW() {
 
                 }
 
-
                 double vi_0 = vi_sum - vi_1 - vi_2;
 
                 /* Calculate the mixture probability */
@@ -1536,7 +1533,7 @@ int BayesW::runMpiGibbs_bW() {
                 // Calculate the (ratios of) marginal likelihoods
                 used_data_beta.sum_failure = sum_failure[marker];
                 marginal_likelihood_vec_calc(pi_L.row(cur_group) , marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
-                                             mave[marker],mstd[marker], mave[marker]/mstd[marker]);
+                                             mave[marker],mstd[marker], mave[marker]/mstd[marker], cur_group);
 
                 // Calculate the probability that marker is 0
                 double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
@@ -1557,15 +1554,16 @@ int BayesW::runMpiGibbs_bW() {
                             used_data_beta.mean = mave[marker];
                             used_data_beta.sd = mstd[marker];
                             used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
-                            used_data_beta.used_mixture = k-1;
+                            //used_data_beta.used_mixture = k-1;
+			    used_data_beta.mixture_value = cVa(cur_group, k-1); //k-1 because cVa stores only non-zero in bW
 
                             used_data_beta.vi_0 = vi_0;
                             used_data_beta.vi_1 = vi_1;
                             used_data_beta.vi_2 = vi_2;
 
-                            double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_classes(k-1));
-
-                            // ARS parameters
+                           // double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_classes(k-1));
+                            double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_value); // Need to think is this safe enough if we have groups
+		 	    // ARS parameters
                             neval = 0;
                             xsamp[0] = 0;
                             convex = 1.0;
@@ -1594,7 +1592,7 @@ int BayesW::runMpiGibbs_bW() {
                         }
                         break;
                     } else {
-                        if((k+1) == (K-1)){
+                        if((k+1) == km1){
                             acum = 1; // In the end probability will be 1
                         }else{
                             acum += marginal_likelihoods(k+1)/marginal_likelihoods.sum();
