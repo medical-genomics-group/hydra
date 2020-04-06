@@ -794,7 +794,6 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	pi_L.setConstant(1.0/Mtot);
 	pi_L.col(0).array() = 0.99;
 	pi_L.col(1).array() = 1 - pi_L.col(0).array() - (km1 - 1)/Mtot;
-	//pi_L.segment(1,km1).setConstant((1-pi_L(0))/km1);
 
 	marginal_likelihoods.setOnes();   //Initialize with just ones
         marginal_likelihood_0.setOnes();
@@ -809,13 +808,6 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	mu = y.mean();       // mean or intercept
 	// Initialize the variables in structures
 	//Save variance classes
-	//used_data.mixture_classes.resize(km1);
-	//used_data_beta.mixture_classes.resize(km1);  //The future solution
-
-	//for(int i = 0 ; i < km1; i++){
-	//	used_data.mixture_classes(i) = opt.S[i];   //Save the mixture data (C_k)
-	//	used_data_beta.mixture_classes(i) = opt.S[i];
-	//}
 
 	//Store the vector of failures only in the structure used for sampling alpha
 	used_data_alpha.failure_vector = data.fail.cast<double>();
@@ -1036,9 +1028,7 @@ int BayesW::runMpiGibbs_bW() {
         init(Ntot - data.numNAs, Mtot,numFixedEffects);
     }
     cass.resize(numGroups,K); //rows are groups columns are mixtures
-    VectorXi sum_cass(K); // To store the sum of cass elements over all ranks
-
-
+    MatrixXi sum_cass(numGroups,K);  // To store the sum of cass elements over all ranks
 
    // Build global repartition of markers over the groups
     VectorXi MtotGrp(numGroups);
@@ -1351,6 +1341,7 @@ int BayesW::runMpiGibbs_bW() {
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
             (used_data.epsilon)[mu_ind] = epsilon[mu_ind] + mu;// we add to epsilon =Y+mu-X*beta
         }
+
         // Use ARS to sample mu (with density mu_dens, using parameters from used_data)
         err = arms(xinit,ninit,&xl,&xr,mu_dens,&used_data,&convex,
                    npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval);
@@ -1358,7 +1349,6 @@ int BayesW::runMpiGibbs_bW() {
         errorCheck(err); // If there is error, stop the program
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         mu = xsamp[0];   // Save the sampled value
-
         //Update after sampling
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
             epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
@@ -1460,7 +1450,7 @@ int BayesW::runMpiGibbs_bW() {
             std::shuffle(markerI.begin(), markerI.end(), dist.rng);
         }
         m0.array() = 0;
-        cass.setZero();
+	cass.setZero();
 
         for (int i=0; i<Ntot; ++i) tmpEps[i] = epsilon[i];
 
@@ -1494,7 +1484,6 @@ int BayesW::runMpiGibbs_bW() {
                 double vi_2 = 0.0;
 
                 used_data_beta.sigmaG = sigmaG[cur_group];
-	//	used_data.sqrt_2sigmaG = sqrt(2*used_data_beta.sigmaG);
 
 		marginal_likelihoods(0) = marginal_likelihood_0(cur_group);  //Each group has now different marginal likelihood at 0
 
@@ -1872,6 +1861,7 @@ int BayesW::runMpiGibbs_bW() {
             beta_squaredNorm = sum_beta_squaredNorm;
         }
         if (rank == 0) {
+
             printf("\nINFO   : global cass on iteration %d:\n", iteration);
             for (int i=0; i<numGroups; i++) {
                 printf("         Mtot[%3d] = %8d  | cass:", i, MtotGrp[i]);
@@ -1901,7 +1891,6 @@ int BayesW::runMpiGibbs_bW() {
 	for(int gg =0; gg < numGroups; gg++){
             	VectorXi dirin = cass.row(gg).array() + 1;  //For now use +1 as prior
             	pi_L.row(gg) = dist.dirichlet_rng(dirin);
-		//pi_L.row(gg) = dist.dirichlet_rng(VectorXi(cass.array() + 1));
 
 	}
 

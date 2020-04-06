@@ -42,16 +42,10 @@ struct pars{
 	/* Number of events (sum of failure indicators) */
 	double d;
 
-	/* Help variable for storing sqrt(2sigmaG)	 */
-	//double sqrt_2sigmaG;
-
 };
 
 struct pars_beta_sparse{
 	/* Common parameters for the densities */
-
-	//VectorXd mixture_classes; // Vector to store mixture component C_k values
-	//int used_mixture; //Write the index of the mixture we decide to use
 	
 	double mixture_value; // Instead of storing the vector of mixtures and the corresponding index, we keep only the mixture value in the structure
 
