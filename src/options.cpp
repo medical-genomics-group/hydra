@@ -279,29 +279,31 @@ void Options::inputOptions(const int argc, const char* argv[]){
     options_s = ss.str();
     //cout << ss.str() << endl;
 
-    //EO: check output directory exists or can be created
-    int ldir = mcmcOutDir.length();
-    if (ldir == 0)
-        throw "--mcmc-out-dir CL option has to be set!";
-
-    int lnam = mcmcOutNam.length();
-    if (lnam == 0)
-        throw "--mcmc-out-nam CL option has to be set!";
-
-    struct stat buffer;
-    if (stat (mcmcOutDir.c_str(), &buffer) != 0) {
-        if (system(("mkdir -p " + mcmcOutDir).c_str()) != 0)
-            throw "could not create output directory --mcmc-out-dir " + mcmcOutDir;
+    if ( !bedToSparse ) {
+        
+        //EO: check output directory exists or can be created
+        int ldir = mcmcOutDir.length();
+        if (ldir == 0)
+            throw "--mcmc-out-dir CL option has to be set!";
+        
+        int lnam = mcmcOutNam.length();
+        if (lnam == 0)
+            throw "--mcmc-out-nam CL option has to be set!";
+        
+        struct stat buffer;
+        if (stat (mcmcOutDir.c_str(), &buffer) != 0) {
+            if (system(("mkdir -p " + mcmcOutDir).c_str()) != 0)
+                throw "could not create output directory --mcmc-out-dir " + mcmcOutDir;
+        }
+        
+        string dir_tar = mcmcOutDir + "/tarballs";
+        if (stat (dir_tar.c_str(), &buffer) != 0) {
+            if (system(("mkdir -p " + dir_tar).c_str()) != 0)
+                throw "could not create tarballs subdirectory " + dir_tar;
+        }
+        
+        mcmcOut = mcmcOutDir + "/" + mcmcOutNam;
     }
-    
-    string dir_tar = mcmcOutDir + "/tarballs";
-    if (stat (dir_tar.c_str(), &buffer) != 0) {
-        if (system(("mkdir -p " + dir_tar).c_str()) != 0)
-            throw "could not create tarballs subdirectory " + dir_tar;
-    }
-    
-    mcmcOut = mcmcOutDir + "/" + mcmcOutNam;
-
 
     //EO: sparseDir and sparseBsn must be either both set or unset
     //------------------------------------------------------------
