@@ -943,12 +943,14 @@ int BayesRRm::runMpiGibbs() {
         }
     }
 
+
     // Set Ntot and Mtot
     //
     uint Ntot       = set_Ntot(rank);
     const uint Mtot = set_Mtot(rank);
     if (rank == 0)
         printf("INFO   : Full dataset includes Mtot=%d markers and Ntot=%d individuals.\n", Mtot, Ntot);
+
 
     // Handle marker groups
     //
@@ -959,9 +961,9 @@ int BayesRRm::runMpiGibbs() {
     const int Ktm1 = Kt - 1; 
     data.mS.resize(Mtot, Kt);
     data.mS.col(0).array() = 0.0;
+
     for (int i=0; i<Mtot; i++)
         data.mS.row(i).segment(1, Ktm1) = cva;
-
 
     if (opt.groupIndexFile != "" && opt.groupMixtureFile != "") {
         data.readGroupFile(opt.groupIndexFile);
@@ -2747,7 +2749,7 @@ string BayesRRm::mpi_get_sparse_output_filebase(const int rank) {
 
 uint BayesRRm::set_Ntot(const int rank) {
 
-    uint Ntot = opt.numberIndividuals; //data.numInds;
+    uint Ntot = opt.numberIndividuals;
 
     if (Ntot == 0) {
         printf("FATAL  : opt.numberIndividuals is zero! Set it via --number-individuals in call.");
@@ -2762,9 +2764,10 @@ uint BayesRRm::set_Ntot(const int rank) {
     return Ntot;
 }
 
+
 uint BayesRRm::set_Mtot(const int rank) {
 
-    uint Mtot = opt.numberMarkers;     //data.numSnps;
+    uint Mtot = opt.numberMarkers;
 
     if (Mtot == 0) throw("FATAL  : opt.numberMarkers is zero! Set it via --number-markers in call.");
 

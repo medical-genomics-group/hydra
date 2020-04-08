@@ -56,8 +56,6 @@ int main(int argc, const char * argv[]) {
                 analysis.checkRamUsage();
             }
 
-
-            //EO@@@ } else if ((opt.bayesType == "bayesMPI" && opt.analysisType == "RAM") || opt.mpiBayesGroups) {
         } else if ((opt.bayesType == "bayesMPI" || opt.bayesType == "bayesWMPI") && opt.analysisType == "RAM") {
 
 
@@ -83,7 +81,7 @@ int main(int argc, const char * argv[]) {
                     } else {
                         if (opt.bayesType == "bayesWMPI") {
                             data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
-                        }else{
+                        } else {
                             data.readPhenotypeFile(opt.phenotypeFile);
                         }
                     }
