@@ -3,15 +3,13 @@
 # To be run within a SLURM allocation (salloc)
 
 module purge
-module load intel intel-mpi intel-mkl boost eigen zlib
+module load intel intel-mpi intel-mkl boost eigen
 module list
 
 EXE=./src/mpi_gibbs
 
 # COMPILATION
 cd ./src
-echo REMOVE THAT ONE
-touch main.cpp 
 B='-B'
 B=''
 make $B -f Makefile || exit 1;
@@ -24,7 +22,7 @@ sparsedir=""
 sparsebsn=""
 phen=""
 
-DS=2
+DS=3
 
 if [ $DS == 0 ]; then 
     datadir=./test/data
@@ -44,13 +42,20 @@ elif [ $DS == 2 ]; then
     phen=$dataset
     sparsedir=$datadir
     sparsebsn=${dataset}_uint_test
+elif [ $DS == 3 ]; then
+    datadir=/scratch/orliac/test_B2S/
+    dataset=ukb_imp_v3_UKB_EST_oct19_unrelated_chr22
+    phen=ukb_imp_v3_UKB_EST_oct19_BMI_wNA_unrelated_148covadjusted_w35520NA
+    phen=BMI_noNA.phen
+    sparsedir=$datadir
+    sparsebsn=${dataset}_test2
 fi
 
 echo datadir: $datadir
 
 N=1
-TPN=30
-BPR=5
+TPN=10
+BPR=1
 
 echo
 echo Convert BED to SPARSE
