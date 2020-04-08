@@ -1,4 +1,6 @@
-# BayesRRcmd
+# hydra
+
+-- BELOW IS OLD STUFF
 
 Software for performing Bayesian penalized regression for complex trait analysis.
 
