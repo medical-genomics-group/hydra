@@ -36,7 +36,6 @@ CXXFLAGS += -L/usr/lib64
 #INCLUDE  += -I$(HOME)/inc/Boost-1.71.0
 INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
-#INCLUDE += -I../tbb/include
 
 LIBS     = -lz 
 #LIBS    += -lomp

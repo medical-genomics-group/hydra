@@ -8,7 +8,6 @@
 #ifndef USE_MPI
 #include "BayesRRmz.hpp"
 #endif
-//#include "tbb/task_scheduler_init.h"
 #ifdef USE_MPI
 #include <mpi.h>
 #endif

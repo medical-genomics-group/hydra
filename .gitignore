@@ -1,9 +1,5 @@
-/Debug/
 *.o
 *.d
-CMakeLists.txt.user
-gctb
-brr
 *.ppbed
 *.sqnorm
 *.csv
@@ -11,9 +7,6 @@ brr
 *.out
 *.err
 *.optrpt
-/MR_ADV/
 slurm-*.out
 bayesOutput_??.*
-/test/
 src/mpi_gibbs*
-tbb

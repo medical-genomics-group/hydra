@@ -1,5 +1,11 @@
 # hydra
 
+### Clone the project
+```
+git clone 
+```
+
+
 -- BELOW IS OLD STUFF
 
 Software for performing Bayesian penalized regression for complex trait analysis.
@@ -28,8 +34,6 @@ sudo apt-get install libeigen3-dev libboost-all-dev zlib1g-dev cmake ninja-build
 
 ```
 
-Additionally you will need to download Threading Building Blocks (TBB) software (see below in section 2.)
-
 ### 2. Clone or download
 
 Clone
@@ -53,16 +57,6 @@ if you cloned BayesRRcmd:
 cd BayesRRcmd
 git submodule init
 git submodule update
-```
-
-if you downloaded BayesRRcmd:
-
-```
-cd BayesRRcmd
-wget https://github.com/01org/tbb/archive/tbb_2019.zip
-unzip tbb_2019.zip
-mv tbb-tbb_2019/* tbb
-rm -r tbb-tbb_2019 tbb_2019.zip
 ```
 
 ### 3. Compile
