@@ -43,8 +43,6 @@ public:
     unsigned chainLength;
     unsigned burnin;
     unsigned seed;
-    unsigned numThread;
-    int numThreadSpawned         = 0;    // Default to 0, let TBB do its thing
     unsigned thin;                       // save every this th sampled value in MCMC
     unsigned save;                       // sampling rate of the epsilon vector
     vector<double> S;                    // variance components
@@ -92,8 +90,6 @@ public:
         chainLength             = 10000;
         burnin                  = 5000;
         seed                    = static_cast<unsigned int>(std::time(0));
-        numThread               = 1;
-        numThreadSpawned        = 0;
         thin                    = 5;
         save                    = 10;
         S.resize(3);

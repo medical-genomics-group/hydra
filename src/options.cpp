@@ -255,14 +255,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             dPriorsFile = argv[++i];
             ss << "--dPriorsFile" << argv[i] << "\n";
         }
-        else if (!strcmp(argv[i], "--thread")) {
-            numThread = atoi(argv[++i]);
-            ss << "--thread " << argv[i] << "\n";
-        }
-        else if (!strcmp(argv[i], "--thread-spawned")) {
-            numThreadSpawned = atoi(argv[++i]);
-            ss << "--thread-spawned " << argv[i] << "\n";
-        }
         else if(!strcmp(argv[i], "--covariates")) {
             covariates = true;
             covariatesFile = argv[++i];
@@ -364,8 +356,6 @@ void Options::readFile(const string &file){  // input options from file
             for (unsigned j=0; j<strvec.size(); ++j) {
                 S[j] = stof(strvec[j]);
             }
-        } else if (key == "numThread") {
-            numThread = stoi(value);
         } else if (key.substr(0,2) == "//" ||
                 key.substr(0,1) == "#") {
             continue;
