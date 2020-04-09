@@ -2081,23 +2081,6 @@ void Data::read_dirichlet_priors(const string& file){
     }
 }
 
-/* Computes prediction for each individual from pre-computed effect estimates
- * pre  : binary PLINK files and .bet files have been read and processed
- * post : NxI prediction matrix is stored in pred member variable
- */
-void Data::predict_from_betas(string &betFile, string &bedFile, string &bimFile, uint iterations) {
-    // perform file reads to populate all necessary member variables
-    readBimFile(bimFile);
-    readBedFile_noMPI(bedFile);
-    load_data_from_bet_file(betFile, iterations);
-    // perform prediction
-    pred.resize(Z_common.rows(), predBet.cols());
-    for (uint i = 0; i < predBet.cols(); i++) {
-        pred.col(i) = (Z_common * predBet.col(i)).rowwise().sum();
-    }
-    // TODO: write prediction matrix to disk
-}
-
 /* Construct an MxI matrix of effect estimates, retaining only SNPs that
  * are present in an auxiliary PLINK file.
  * pre  : binary PLINK files have been read
