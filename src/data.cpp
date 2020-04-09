@@ -1421,6 +1421,93 @@ void Data::readBimFile(const string &bimFile) {
 #endif
 }
 
+void Data::readBedFile_noMPI(const string &bedFile){
+    unsigned i = 0, j = 0, k = 0;
+
+    if (numSnps == 0) throw ("Error: No SNP is retained for analysis.");
+    if (numInds == 0) throw ("Error: No individual is retained for analysis.");
+
+    Z.resize(numInds, numSnps);
+    ZPZdiag.resize(numSnps);
+    snp2pq.resize(numSnps);
+
+    // Read bed file
+    char ch[1];
+    bitset<8> b;
+    unsigned allele1=0, allele2=0;
+    ifstream BIT(bedFile.c_str(), ios::binary);
+    if (!BIT) throw ("Error: can not open the file [" + bedFile + "] to read.");
+    cout << "Reading PLINK BED file from [" + bedFile + "] in SNP-major format ..." << endl;
+    for (i = 0; i < 3; i++) BIT.read(ch, 1); // skip the first three bytes
+    SnpInfo *snpInfo = NULL;
+    unsigned snp = 0, ind = 0;
+    unsigned nmiss = 0;
+    float mean = 0.0;
+    // Read genotype in SNP-major mode, 00: homozygote AA; 11: homozygote BB; 10: hetezygote; 01: missing
+    for (j = 0, snp = 0; j < numSnps; j++) {
+        snpInfo = snpInfoVec[j];
+        mean = 0.0;
+        nmiss = 0;
+        // SNP is not included, advance by 4 bytes
+        if (!snpInfo->included) {
+            for (i = 0; i < numInds; i += 4) BIT.read(ch, 1);
+            continue;
+        }
+        for (i = 0, ind = 0; i < numInds;) {
+            BIT.read(ch, 1);
+            if (!BIT) throw ("Error: problem with the BED file ... has the FAM/BIM file been changed?");
+            b = ch[0];
+            k = 0;
+            // AH: iterate over genotypes, until all inds have been described
+            while (k < 7 && i < numInds) {
+                if (!indInfoVec[i]->kept) k += 2;
+                else {
+                    allele1 = (!b[k++]);
+                    allele2 = (!b[k++]);
+                    if (allele1 == 0 && allele2 == 1) {  // missing genotype
+                        Z(ind++, snp) = -9;
+                        ++nmiss;
+                    } else {
+                        mean += Z(i, snp) = allele1 + allele2;
+                    }
+                }
+                i++;
+            }
+        }
+        // fill missing values with the mean
+        float sum = mean;
+        mean /= float(numInds-nmiss);
+
+        if (nmiss) {
+            for (i=0; i<numInds; ++i) {
+                if (Z(i,snp) == -9) Z(i,snp) = mean;
+            }
+        }
+
+        // compute allele frequency
+        snpInfo->af = 0.5f*mean;
+        snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
+
+        // standardize genotypes
+        float sqn = Z.col(j).squaredNorm() - numInds * mean * mean;
+        Z.col(j).array() -= mean;
+        float std_ = 1.f / (sqrt(sqn / float(numInds)));
+
+        Z.col(j).array() *= std_;
+
+        ZPZdiag[j] = sqn;
+
+        if (++snp == numSnps) break;
+    }
+    BIT.clear();
+    BIT.close();
+    // standardize genotypes
+    for (i=0; i<numSnps; ++i) {
+        Z.col(i).array() -= Z.col(i).mean();
+        ZPZdiag[i] = Z.col(i).squaredNorm();
+    }
+    cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
+}
 
 void Data::center_and_scale(double* __restrict__ vec, int* __restrict__ mask, const uint N, const uint nas) {
 
@@ -1993,3 +2080,102 @@ void Data::read_dirichlet_priors(const string& file){
         cout << "Dirichlet parameters read from file" << endl;
     }
 }
+
+/* Computes prediction for each individual from pre-computed effect estimates
+ * pre  : binary PLINK files and .bet files have been read and processed
+ * post : NxI prediction matrix is stored in pred member variable
+ */
+void Data::predict_from_betas(string &betFile, string &bedFile, string &bimFile, uint iterations) {
+    // perform file reads to populate all necessary member variables
+    readBimFile(bimFile);
+    readBedFile_noMPI(bedFile);
+    load_data_from_bet_file(betFile, iterations);
+    // perform prediction
+    pred.resize(Z_common.rows(), predBet.cols());
+    for (uint i = 0; i < predBet.cols(); i++) {
+        pred.col(i) = (Z_common * predBet.col(i)).rowwise().sum();
+    }
+    // TODO: write prediction matrix to disk
+}
+
+/* Construct an MxI matrix of effect estimates, retaining only SNPs that
+ * are present in an auxiliary PLINK file.
+ * pre  : binary PLINK files have been read
+ * post : predBet contains effect estimates for the set of common SNPs
+ */
+void Data::load_data_from_bet_file(const string &file, uint iterations) {
+    get_bed_snp_names();    // get SNP names as string for matching common SNPs
+    get_common_snps(file);  // match SNP IDs between .bed and .bet files
+
+    ifstream in(file);
+    Gadget::Tokenizer tok;
+    predBet.resize(commonSnps.size(), iterations);
+    string line, snp;
+    uint iter   = 0;
+    uint snpInd = 0;
+    while (getline(in, line)) {
+        tok.getTokens(line, " ");
+        if (stoi(tok[0]) > iter) { // check if iteration number has increased
+            iter = stoi(tok[0]);
+            snpInd = 0;
+        }
+        snp  = "rs" + tok[1];
+        // TODO: replace linear search with hash-based check
+        if (std::find(commonSnps.begin(), commonSnps.end(), snp) != commonSnps.end()) {
+            predBet(snpInd, iter) = stod(tok[2]);
+            snpInd++;
+        }
+    }
+    in.clear();
+    in.close();
+}
+
+/* Iterate through .bet file and find the subset of SNPs common between this and
+ * a reference .bed file.
+ * pre  : .bed file has been read
+ * post : Z matrix is subset to contain only common SNP columns
+ */
+void Data::get_common_snps(const string& file) {
+    ifstream in(file);
+    Gadget::Tokenizer tok;
+    string line;
+    getline(in, line); // read first line
+    tok.getTokens(line, " ");
+    uint firstIter = stoi(tok[0]); // first element is iteration number
+    // read through an entire iteration to get common SNPs
+    string snp;
+    uint snpInd = 0;
+    vector<uint> snpInds;
+    while (true) {
+        getline(in, line);
+        tok.getTokens(line, " ");
+        if (stoi(tok[0]) != firstIter) break;
+        snp = "rs" + tok[1]; // TODO: is prepending "rs" necessary?
+        if (std::find(bedSnps.begin(), bedSnps.end(), snp) != bedSnps.end()) {
+            commonSnps.push_back(snp);
+            snpInds.push_back(snpInd);
+        }
+        snpInd++;
+    }
+    // AH: naively loop over matrix to extract columns by index -- convenience
+    // function to extract elements directly via vector added in Eigen 3.3.9:
+    // http://eigen.tuxfamily.org/dox-devel/TopicCustomizing_NullaryExpr.html
+    Z_common.resize(Z.rows(), snpInds.size());
+    for (uint j = 0; j < snpInds.size(); j++) {
+        Z_common.col(j) = Z.col(snpInds[j]);
+    }
+    in.clear();
+    in.close();
+}
+
+/* Convenience function to get SNP names for a .bed file from snpInfoVec.
+ * pre  : .bed file and associated .bim file have been read
+ * post : bedSnps vector contains all SNP names in "rsID" format
+ */
+void Data::get_bed_snp_names() {
+    for (uint i = 0; i < snpInfoVec.size(); i++) {
+        // TODO: prepend rs to SNP ID if not already present
+        bedSnps.push_back(snpInfoVec.at(i)->ID.c_str());
+    }
+}
+

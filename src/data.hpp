@@ -105,11 +105,18 @@ public:
     MatrixXd priors;         // group priors v0, s0
     MatrixXd dPriors;        // group priors of dirichlet distribution
 
+    // AH: data structures for prediction function
+    MatrixXd Z_common;          // NxM submatrix of cols in Z matching commonSnps
+    MatrixXd predBet;           // MxI matrix of betas for prediction
+    MatrixXd pred;              // NxI matrix of predictions
+    vector<string> bedSnps;     // SNPs read from .bim file
+    vector<string> commonSnps;  // SNPs in both .bim and .bet files
+
     VectorXd fail;           // Failure indicator
 
     //EO MRG
-    //VectorXf ZPZdiag;        // Z'Z diagonal
-    //VectorXf snp2pq;         // 2pq of SNPs
+    VectorXf ZPZdiag;        // Z'Z diagonal
+    VectorXf snp2pq;         // 2pq of SNPs
     //VectorXf se;             // se from GWAS summary data
     //VectorXf tss;            // total ss (ypy) for every SNP
     //VectorXf b;              // beta from GWAS summary data
@@ -318,6 +325,8 @@ public:
     void readFamFile(const string &famFile);
 
     void readBimFile(const string &bimFile);
+    // AH: for prediction function before sparse data implementation
+    void readBedFile_noMPI(const string &bedFile);
 
     void readPhenotypeFile(const string &phenFile);
     void readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest);
@@ -347,6 +356,12 @@ public:
     void readFailureFile(const string &failureFile);
     void read_group_priors(const string& file);
     void read_dirichlet_priors(const string& file);
+
+    // AH: prediction functions
+    void load_data_from_bet_file(const string &file, uint iterations);
+    void get_bed_snp_names();
+    void get_common_snps(const string &file);
+    void predict_from_betas(string &betFile, string &bedFile, string &bimFile, uint iterations);
 };
 
 #endif /* data_hpp */
