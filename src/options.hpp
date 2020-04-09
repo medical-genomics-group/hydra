@@ -69,6 +69,10 @@ public:
 
     string markerBlocksFile;
     string bedFile;
+    string bimFile;
+    string famFile;
+    string betFile;
+    uint   betIterations;
     string mcmcOutDir  = "";
     string mcmcOutNam  = "default_output_name";
     string mcmcOut     = "default_output_name";
@@ -79,6 +83,7 @@ public:
     bool   covariates  = false;    // for extra covatiates.
     bool   compress    = false;
     bool   deltaUpdate = true;     // Use the delta epsilon to pass the message in mpi
+    bool   predict     = false;
 
     // Use BED representation over SPARSE if fraction of non-zero elements (fnz)
     // is greater than this threshold:
@@ -102,6 +107,10 @@ public:
         phenotypeFile           = "";
         markerBlocksFile        = "";
         bedFile                 = "";
+        bimFile                 = "";
+        famFile                 = "";
+        betFile                 = "";
+        betIterations           = 0;
         sparseDir               = "";
         sparseBsn               = "";
         optionFile				= "";

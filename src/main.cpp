@@ -5,6 +5,7 @@
 #include "BayesRRm_mt.h"
 #include "data.hpp"
 #include "options.hpp"
+#include "linpred.hpp"
 #ifndef USE_MPI
 #include "BayesRRmz.hpp"
 #endif
@@ -167,6 +168,16 @@ int main(int argc, const char * argv[]) {
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs();
             }
+        // AH: prediction
+        } else if (opt.predict) {
+            // configure data object
+            data.readBimFile(opt.bimFile);
+            data.readFamFile(opt.famFile);
+            data.readBedFile_noMPI(opt.bedFile);
+            data.load_data_from_bet_file(opt.betFile, opt.betIterations);
+            // perform prediction
+            LinPred predictor(data, opt);
+            predictor.predict_genetic_values();
         }
         else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);

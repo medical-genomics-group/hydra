@@ -171,7 +171,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
         }
         else if (!strcmp(argv[i], "--mcmc-out-name")) {
             mcmcOutNam = argv[++i];
-            ss << "--mcmc-out-nam " << argv[i] << "\n";
+            ss << "--mcmc-out-name " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--shuf-mark")) {    //EO
             shuffleMarkers = atoi(argv[++i]);
@@ -261,6 +261,30 @@ void Options::inputOptions(const int argc, const char* argv[]){
             //cout << "covariatesFile = " << covariatesFile << endl;
             ss << "--covariates " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--predict")) {
+            predict = true;
+            ss << "--predict" << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--bed-file")) {
+            bedFile = argv[++i];
+            ss << "--bed-file" << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--bim-file")) {
+            bimFile = argv[++i];
+            ss << "--bim-file " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--fam-file")) {
+            famFile = argv[++i];
+            ss << "--fam-file " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--bet-file")) {
+            betFile = argv[++i];
+            ss << "--bet-file " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--bet-iterations")) {
+            betIterations = stoi(argv[++i]);
+            ss << "--bet-iterations " << argv[i] << "\n";
+        }
         else {
             stringstream errmsg;
             errmsg << "\nError: invalid option \"" << argv[i] << "\".\n";
@@ -280,7 +304,7 @@ void Options::inputOptions(const int argc, const char* argv[]){
         
         int lnam = mcmcOutNam.length();
         if (lnam == 0)
-            throw "--mcmc-out-nam CL option has to be set!";
+            throw "--mcmc-out-name CL option has to be set!";
         
         struct stat buffer;
         if (stat (mcmcOutDir.c_str(), &buffer) != 0) {
