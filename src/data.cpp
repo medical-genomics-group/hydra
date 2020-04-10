@@ -453,7 +453,6 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
 
 // SO: Currently basically the copy of the previous version.
 //     Consider using adding reading mu for bR so the same function could be used
-//EO@@@ needs to be adapted for groups
 void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
                                      VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
 
@@ -464,7 +463,7 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
     string csv = mcmcOut + ".csv";
     std::ifstream file(csv);
    
-    int it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0, ngrp_ = -1;
+    int it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0;
     double mu_, sige_, rat_, siggSum_;
 
     VectorXd sigg_(numGroups);
@@ -480,13 +479,11 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
                     lastSavedIt = it_;
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
-                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %lf, %7d, %2d, %2d, %n",
+                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %lf, %7d, %7d, %2d, %n",
                                    &it_, &mu_, &siggSum_, &sige_, &rat_, &m0_, &pirows_, &picols_, &nchar);
 	
-             	    assert(pirows_ == ngrp_);
                     assert(pi.rows() == pirows_);
                     assert(pi.cols() == picols_);
-
 	
 		    string remain_s = str.substr(nchar, str.length() - nchar);
                     char   remain_c[remain_s.length() + 1];
