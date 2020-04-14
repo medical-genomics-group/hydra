@@ -107,20 +107,6 @@ class BayesRRm
 
     bool   isDebugEnabled() const { return showDebug; }    
 
-    void   offset_vector_f64(double* __restrict__ vec, const double offset, const int N);
-
-    void   set_vector_f64(double* __restrict__ vec, const double val, const int N);
-
-    void   sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2, const int N);
-
-    void   sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N);
-
-    double sum_vector_elements_f64_base(const double* __restrict__ vec, const int N);
-
-    double sum_vector_elements_f64(const double* __restrict__ vec, const int N);
-
-    void   copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N);
-
     void   sparse_add(double*       __restrict__ vec,
                       const double               val,
                       const uint*   __restrict__ IX, const size_t NXS, const size_t NXL);
@@ -133,15 +119,6 @@ class BayesRRm
                          const double  mu,
                          const double  sig_inv,
                          const int     N);
-
-    double sparse_dotprod(const double* __restrict__ vin1,
-                          const uint*   __restrict__ I1,      const size_t N1S,  const size_t N1L,
-                          const uint*   __restrict__ I2,      const size_t N2S,  const size_t N2L,
-                          const uint*   __restrict__ IM,      const size_t NMS,  const size_t NML,
-                          const double               mu, 
-                          const double               sig_inv,
-                          const int                  N,
-                          const int                  marker);
 
     int runGibbs();
 

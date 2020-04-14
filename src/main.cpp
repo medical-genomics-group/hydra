@@ -56,8 +56,20 @@ int main(int argc, const char * argv[]) {
             }
 
         } else if ((opt.bayesType == "bayesMPI" || opt.bayesType == "bayesWMPI") && opt.analysisType == "RAM") {
+                       
+            data.SetDatasetProperties(opt.phenotypeFiles.size(), opt.numberIndividuals);
 
+            data.phen_masks = (unsigned char*) _mm_malloc(data.n_bytes_all_masks, 64);
+            check_malloc(data.phen_masks, __LINE__, __FILE__);
+            memset(data.phen_masks, 0b11111111, data.n_bytes_all_masks);
 
+            data.phen_data = (double*) _mm_malloc(data.n_bytes_all_phens, 64);
+            check_malloc(data.phen_data, __LINE__, __FILE__);
+
+            data.phen_nas = (uint*) _mm_malloc(data.n_phen, 64);
+            check_malloc(data.phen_nas, __LINE__, __FILE__);
+            for (int i=0; i<data.n_phen; i++) data.phen_nas[i] = 0;
+            
             // Reading from BED file
             // ---------------------
             if (opt.readFromBedFile && !opt.readFromSparseFiles) {
@@ -67,21 +79,36 @@ int main(int argc, const char * argv[]) {
 
                 //EO: no usable for now
                 if (opt.multi_phen) {
+
                     throw("EO: multi-trait disabled for now.");
-                    data.readPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals, data.phenosData);
+                    data.readPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals, data.phenosData);                    
+
                 } else {
+
                     // Read in covariates file if passed
                     if (opt.covariates) {
+
                         if (opt.bayesType == "bayesWMPI") {
                             data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
                         } else {
                             data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
                         }
+
                     } else {
+
                         if (opt.bayesType == "bayesWMPI") {
                             data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
                         } else {
-                            data.readPhenotypeFile(opt.phenotypeFile);
+
+                            if (opt.new_na) {
+                                cout << "READING PHENOTYE FILE WITH NEW METHOD" << endl;
+                                data.ReadPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals,
+                                                        data.phen_data,
+                                                        data.phen_masks,
+                                                        data.phen_nas);
+                            } else {
+                                data.readPhenotypeFile(opt.phenotypeFile);
+                            }
                         }
                     }
                 }
@@ -92,23 +119,29 @@ int main(int argc, const char * argv[]) {
             else if (opt.readFromSparseFiles && !opt.readFromBedFile) {
 
                 if (opt.multi_phen) {
+
                     throw("EO: Disabled for now");
                     data.readPhenotypeFiles(opt.phenotypeFiles, opt.numberIndividuals, data.phenosData);
+
                 } else {
 
                     // Read in covariates file if passed
                     if (opt.covariates) {
+
                         if (opt.bayesType == "bayesWMPI") {
                             data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
                         } else {
                             data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
                         }
+
                     } else {
+
                         if (opt.bayesType == "bayesWMPI") {
                             data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
                         } else {
                             data.readPhenotypeFile(opt.phenotypeFiles[0], opt.numberIndividuals, data.y);
                         }
+
                     }
                 }
             }
@@ -167,6 +200,14 @@ int main(int argc, const char * argv[]) {
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs();
             }
+
+
+            
+            // Free memory holding NA information
+            //
+            _mm_free(data.phen_masks);
+            _mm_free(data.phen_data);
+            _mm_free(data.phen_nas);
         }
         else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);

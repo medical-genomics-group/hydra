@@ -36,7 +36,6 @@ public:
     int windSize;   // for window surrounding the SNP
     float af;       // allele frequency
     bool included;  // flag for inclusion in panel
-    bool isQTL;     // for simulation
 
     SnpInfo(const int idx, const string &id, const string &allele1, const string &allele2,
             const int chr, const float gpos, const int ppos)
@@ -46,7 +45,6 @@ public:
         windSize  = 0;
         af = -1;
         included = true;
-        isQTL = false;
     };
 
     void resetWindow(void) {windStart = -1; windSize = 0;};
@@ -99,6 +97,22 @@ public:
     MatrixXi phenosNanMasks; // masks for NAs in phenotypes phenos
     VectorXi phenosNanNum;   // number of NAs in phenotypes phenos
 
+
+    uint n_phen;
+    uint n_ind;
+    //uint n_ind_m8;
+
+    uint n_char_per_mask;
+    uint n_dp_per_phen;
+    uint n_bytes_per_mask;
+    uint n_bytes_all_masks;
+    uint n_bytes_per_phen; 
+    uint n_bytes_all_phens;
+
+    unsigned char* phen_masks;  // bitmasks for NAs in phenotypes
+    double*        phen_data;   // phenotype data
+    uint*          phen_nas;    // number of NAs in phenotypes
+
     // marion : vector for annotation file and matrix for mS
     VectorXi groups;     	 // groups
     MatrixXd mS;			 // mixtures in groups
@@ -106,14 +120,6 @@ public:
     MatrixXd dPriors;        // group priors of dirichlet distribution
 
     VectorXd fail;           // Failure indicator
-
-    //EO MRG
-    //VectorXf ZPZdiag;        // Z'Z diagonal
-    //VectorXf snp2pq;         // 2pq of SNPs
-    //VectorXf se;             // se from GWAS summary data
-    //VectorXf tss;            // total ss (ypy) for every SNP
-    //VectorXf b;              // beta from GWAS summary data
-    //VectorXf n;              // sample size for each SNP in GWAS
 
     vector<SnpInfo*> snpInfoVec;
     vector<IndInfo*> indInfoVec;
@@ -131,6 +137,14 @@ public:
     vector<int>  blocksStarts;
     vector<int>  blocksEnds;
     uint         numBlocks = 0;
+
+
+    void SetDatasetProperties(const int n_phen_, const int n_ind_);
+
+    void ReadPhenotypeFiles(const vector<string> &phen_files, const int n_ind, double* phen_data, unsigned char* phen_bitmasks, uint* phen_nas);
+    void ReadPhenotypeFile(const string &phen_file, const int n_ind, double* phen_data, unsigned char* bitmask, uint& nas);
+
+    void CenterAndScalePhenotypes();
 
 
 #ifdef USE_MPI
@@ -318,6 +332,7 @@ public:
     void readFamFile(const string &famFile);
 
     void readBimFile(const string &bimFile);
+
 
     void readPhenotypeFile(const string &phenFile);
     void readPhenotypeFile(const string &phenFile, const int numberIndividuals, VectorXd& dest);

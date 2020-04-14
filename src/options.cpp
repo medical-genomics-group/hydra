@@ -18,6 +18,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             ss << "--bayes " << argv[i] << "\n";
         }
 #ifdef USE_MPI
+        else if (!strcmp(argv[i], "--new-na")) {
+            new_na = true;
+            ss << "--new-na " << "\n";
+        }
         else if (!strcmp(argv[i], "--restart")) {
             restart = true;
             ss << "--restart " << "\n";

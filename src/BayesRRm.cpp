@@ -28,6 +28,8 @@
 #include "mpi_utils.hpp"
 #endif
 #include <omp.h>
+#include "sparse.h"
+#include "dense.h"
 
 
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
@@ -50,199 +52,6 @@ BayesRRm::~BayesRRm()
 {
 }
 
-
-void BayesRRm::offset_vector_f64(double* __restrict__ vec, const double offset, const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec,   64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        vec[i] += offset;
-    }
-}
-
-
-void BayesRRm::set_vector_f64(double* __restrict__ vec, const double val, const int N) {
-
-    const int N8 = (N/8) * 8;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume(N8%8==0);
-#endif
-    //#pragma unroll(8)
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N8; i++) {
-        vec[i] = val;
-    }
-
-    for (int i=N8; i<N; ++i) {
-        vec[i] = val;
-    }
-}
-
-
-/*
-  inline void copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
-
-  const int N8 = (N/8) * 8;
-
-  __assume_aligned(dest,   64);
-  __assume_aligned(source, 64);
-  __assume(N8%8==0);
-
-  #pragma unroll(8)
-  for (int i=0; i<N8; i++) {
-  dest[i] = source[i];
-  }
-
-  for (int i=N8; i<N; ++i) {
-  dest[i] = source[i];
-  }
-  }
-*/
-
-void BayesRRm::copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(dest,   64);
-    __assume_aligned(source, 64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        dest[i] = source[i];
-    }
-}
-
-
-double BayesRRm::sum_vector_elements_f64_base(const double* __restrict__ vec, const int N) {
-
-    const int N8 = (N/8) * 8;
-    double sum = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume(N8%8==0);
-#endif
-#pragma unroll(8)
-    for (int i=0; i<N8; i++) {
-        sum += vec[i];
-    }
-
-    for (int i=N8; i<N; ++i) {
-        sum += vec[i];
-    }
-
-    return sum;
-}
-
-
-double BayesRRm::sum_vector_elements_f64(const double* __restrict__ vec, const int N) {
-
-    double sum = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-#endif
-    //#pragma unroll
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+: sum)
-#endif
-    for (int i=0; i<N; i++) {
-        sum += vec[i];
-    }
-
-    return sum;
-}
-
-
-void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
-                               const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(in2, 64);
-    __assume_aligned(out, 64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        out[i] = in1[i] + in2[i];
-    }
-}
-
-/*
-  inline void sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
-  const int N) {
-
-  const int N8 = (N/8) * 8;
-
-  __assume_aligned(in1, 64);
-  __assume_aligned(in2, 64);
-  __assume_aligned(out, 64);
-  __assume(N8%8==0);
-
-  //#pragma unroll(8)
-  #pragma omp parallel for
-  for (int i=0; i<N8; i++) {
-  out[i] = in1[i] + in2[i];
-  }
-
-  for (int i=N8; i<N; ++i) {
-  out[i] = in1[i] + in2[i];
-  }
-  }
-*/
-
-void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N) {
-
-    const int N8 = (N/8) * 8;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(out, 64);
-    __assume(N8%8==0);
-#endif
-    //#pragma unroll(8)
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N8; i++) {
-        out[i] += in1[i];
-    }
-
-    for (int i=N8; i<N; ++i) {
-        out[i] += in1[i];
-    }
-}
-
-
-inline void sum_vectors_f64_ref(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
-                                const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(in2, 64);
-    __assume_aligned(out, 64);
-#endif
-    for (int i=0; i<N; ++i) {
-        out[i] = in1[i] + in2[i];
-    }
-}
-
-
-inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, const double* __restrict__ vin2, const double dMULT, const int N) {
-
-    if   (dMULT == 0.0) {
-        for (int i=0; i<N; i++) {
-            vout[i] = vin1[i];
-        }
-    } else {
-        for (int i=0; i<N; i++) {
-            vout[i] = vin1[i] + dMULT * vin2[i];
-        }
-    }
-}
 
 
 inline void sparse_set(double*       __restrict__ vec,
@@ -315,65 +124,6 @@ void BayesRRm::sparse_scaadd(double*     __restrict__ vout,
     }
 }
 
-
-inline double partial_sparse_dotprod(const double* __restrict__ vec,
-                                     const uint*   __restrict__ IX,
-                                     const size_t               NXS,
-                                     const size_t               NXL,
-                                     const double               fac) {
-
-    //double t1 = -mysecond();
-    //for (int ii=0; ii<1024; ii++) {
-    //}
-    //t1 += mysecond();
-    //printf("kerold 1 BW = %g\n", double(N1L)*sizeof(double) / 1024. / 1024. / t1);
-
-    double dp = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+: dp)
-#endif
-    for (size_t i=NXS; i<NXS+NXL; i++) {
-        dp += vec[ IX[i] ] * fac;
-    }
-
-    //printf("partial %lu -> %lu with fac = %20.15f\n", NXS, NXS+NXL, fac);
-
-    return dp;
-}
-
-
-double BayesRRm::sparse_dotprod(const double* __restrict__ vin1,
-                                const uint*   __restrict__ I1,      const size_t N1S,  const size_t N1L,
-                                const uint*   __restrict__ I2,      const size_t N2S,  const size_t N2L,
-                                const uint*   __restrict__ IM,      const size_t NMS,  const size_t NML,
-                                const double               mu,
-                                const double               sig_inv,
-                                const int                  N,
-                                const int                  marker) {
-
-    double dp  = 0.0;
-    double syt = 0.0;
-
-    dp += partial_sparse_dotprod(vin1, I1, N1S, N1L, 1.0);
-
-    dp += partial_sparse_dotprod(vin1, I2, N2S, N2L, 2.0);
-
-    dp *= sig_inv;
-
-    syt += sum_vector_elements_f64(vin1, N);
-
-    syt += partial_sparse_dotprod(vin1, IM, NMS, NML, -1.0);
-
-    dp -= mu * sig_inv * syt;
-
-    return dp;
-}
-
-
 inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin, const double dMULT, const int N) {
 
     if (dMULT == 0.0) {
@@ -406,6 +156,7 @@ inline void center_and_scale(double* __restrict__ vec, const int N) {
     double mean = 0.0;
     for (int i=0; i<N; ++i)  mean += vec[i];
     mean /= N;
+    //printf("mean = %20.15f\n", mean);
 
     // Center
     for (int i=0; i<N; ++i)  vec[i] -= mean;
@@ -414,6 +165,7 @@ inline void center_and_scale(double* __restrict__ vec, const int N) {
     double sqn = 0.0;
     for (int i=0; i<N; ++i)  sqn += vec[i] * vec[i];
     sqn = sqrt(double(N-1) / sqn);
+    printf("sqn = %20.15f\n", sqn);
 
     // Scale
     for (int i=0; i<N; ++i)  vec[i] *= sqn;
@@ -934,7 +686,6 @@ int BayesRRm::runMpiGibbs() {
 
 #ifdef _OPENMP
 #pragma omp parallel
-#endif
     {
         if (rank == 0) {
             int nt = omp_get_num_threads();
@@ -942,7 +693,7 @@ int BayesRRm::runMpiGibbs() {
                 printf("INFO   : OMP parallel regions will use %d thread(s)\n", nt);
         }
     }
-
+#endif
 
     // Set Ntot and Mtot
     //
@@ -1353,10 +1104,10 @@ int BayesRRm::runMpiGibbs() {
 
     // Correct each marker for individuals with missing phenotype
     // ----------------------------------------------------------
-    if (rank == 0) 
-        printf("INFO   : BEFORE NA correction: Ntot = %d; snpLenByt = %zu [byte]; snpLenUint = %zu [uint]\n", Ntot, snpLenByt, snpLenUint);
+    if (data.numNAs > 0 && !opt.new_na) {
 
-    if (data.numNAs > 0) {
+        if (rank == 0) 
+            printf("INFO   : BEFORE NA correction: Ntot = %d; snpLenByt = %zu [byte]; snpLenUint = %zu [uint]\n", Ntot, snpLenByt, snpLenUint);
 
         double tna = MPI_Wtime();
 
@@ -1387,10 +1138,11 @@ int BayesRRm::runMpiGibbs() {
 
         // Length of a marker in [uint] in BED representation (1 ind is 2 bits, so 1 uint is 16 inds)
         snpLenUint = (Ntot % 16) ? Ntot / 16 + 1 : Ntot / 16;
+
+        if (rank == 0) 
+            printf("INFO   : AFTER  NA correction: Ntot = %d; snpLenByt = %zu [byte]; snpLenUint = %zu [uint]\n", Ntot, snpLenByt, snpLenUint);
     }
 
-    if (rank == 0) 
-        printf("INFO   : AFTER  NA correction: Ntot = %d; snpLenByt = %zu [byte]; snpLenUint = %zu [uint]\n", Ntot, snpLenByt, snpLenUint);
     fflush(stdout);
 
     // Compute dalloc increment from NA adjusted structures
@@ -1441,6 +1193,7 @@ int BayesRRm::runMpiGibbs() {
     const auto st3 = std::chrono::high_resolution_clock::now();
 
     double   *y, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum; //, *previt_eps;
+    cout << "Ntot = " << Ntot << endl;
     const size_t NDB = size_t(Ntot) * sizeof(double);
     y          = (double*)_mm_malloc(NDB, 64);  check_malloc(y,          __LINE__, __FILE__);
     epsilon    = (double*)_mm_malloc(NDB, 64);  check_malloc(epsilon,    __LINE__, __FILE__);
@@ -1477,9 +1230,14 @@ int BayesRRm::runMpiGibbs() {
 
 
     // Copy, center and scale phenotype observations
-    for (int i=0; i<Ntot; ++i) y[i] = data.y(i);
-    center_and_scale(y, Ntot);
-
+    //
+    if (opt.new_na) {
+        //data.CenterAndScalePhenotypes();
+    } else {
+        for (int i=0; i<Ntot; ++i) y[i] = data.y(i);
+        //center_and_scale(y, Ntot);
+    }
+    
 
     // In case of restart we reset epsilon to last dumped state (sigmaE as well, see init_from_restart)
     if (opt.restart) {
@@ -1487,18 +1245,31 @@ int BayesRRm::runMpiGibbs() {
         markerI = markerI_restart;
         mu      = mu_restart;
     } else {
-        for (int i=0; i<Ntot; ++i)  epsilon[i] = y[i];
+
         sigmaE = 0.0;
-        for (int i=0; i<Ntot; ++i)  sigmaE += epsilon[i] * epsilon[i];
-        //printf("<sigmaE = %15.13f\n", sigmaE);
-        sigmaE = sigmaE / dN * 0.5;
+
+        if (opt.new_na) {
+            //TODO(EO: adapt for MT)
+            for (int i=0; i<Ntot; ++i)  epsilon[i] = data.phen_data[i];
+            sigmaE = SquaredNormAvx(data.n_ind, data.phen_masks, &epsilon[0]);            
+            sigmaE = sigmaE / (double)(data.n_ind - data.phen_nas[0]) * 0.5; // MT
+            sigmaE = 0.5;
+            cout << "TODEL!!!!!!!!!!!!!!!!" << endl;
+        } else {
+            for (int i=0; i<Ntot; ++i)  epsilon[i] = y[i];
+            for (int i=0; i<Ntot; ++i)  sigmaE += epsilon[i] * epsilon[i];
+            sigmaE = sigmaE / dN * 0.5;
+            sigmaE = 0.5;
+            cout << "TODEL!!!!!!!!!!!!!!!!" << endl;
+
+        }
 
         //EO: no need to broacast here, sigmaE is the same over all tasks as we start from phenotype data
         //EO: broadcast sigmaE from rank 0 to all the others
         //check_mpi(MPI_Bcast(&sigmaE, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
     }
-    //printf("sigmaE = %20.15f\n", sigmaE);
-    //printf("mu = %20.15f\n", mu);
+    printf("sigmaE = %20.15f\n", sigmaE);
+    printf("mu = %20.15f\n", mu);
 
     adaV.setOnes();
     if (opt.restart) {
@@ -1577,9 +1348,19 @@ int BayesRRm::runMpiGibbs() {
 
         for (int i=0; i<Ntot; ++i) epsilon[i] += mu;
 
-        double epssum  = 0.0;
-        for (int i=0; i<Ntot; ++i) epssum += epsilon[i];
-        //printf("epssum = %20.15f with Ntot=%d elements\n", epssum, Ntot);
+        cout << Ntot << " vs " << data.n_ind << endl;
+
+        double epssum = 0.0;
+        if (opt.new_na) {
+            epssum          = SumVectorElementsAvx(data.n_ind, &data.phen_masks[0], epsilon);
+            double epssum_  = SumVectorElements(data.n_ind, &data.phen_masks[0], epsilon);
+            double epssum__ = sum_vector_elements_f64(epsilon, Ntot);
+            printf("avx = %20.15f, sum = %20.15f vs %20.15f\n", epssum, epssum_, epssum__);
+        } else {
+            epssum = sum_vector_elements_f64(epsilon, Ntot);
+        }
+        //for (int i=0; i<Ntot; ++i) epssum += epsilon[i];
+        printf("epssum = %20.15f with Ntot=%d elements\n", epssum, Ntot);
 
         // update mu
         mu = dist.norm_rng(epssum / dN, sigmaE / dN);
@@ -1664,15 +1445,30 @@ int BayesRRm::runMpiGibbs() {
                                              mave[marker],    mstd[marker], Ntot, marker);
                     } else {
 
-                        num = sparse_dotprod(epsilon,
-                                             I1, N1S[marker], N1L[marker],
-                                             I2, N2S[marker], N2L[marker],
-                                             IM, NMS[marker], NML[marker],
-                                             mave[marker],    mstd[marker], Ntot, marker);
+                        if (opt.new_na) {
+
+                            num = sparse_dotprod_new(epsilon,
+                                                     I1, N1S[marker], N1L[marker],
+                                                     I2, N2S[marker], N2L[marker],
+                                                     IM, NMS[marker], NML[marker],
+                                                     mave[marker],    mstd[marker],
+                                                     Ntot, marker,
+                                                     &data.phen_masks[0]);                            
+
+
+                        } else {
+                            
+                            num = sparse_dotprod(epsilon,
+                                                 I1, N1S[marker], N1L[marker],
+                                                 I2, N2S[marker], N2L[marker],
+                                                 IM, NMS[marker], NML[marker],
+                                                 mave[marker],    mstd[marker],
+                                                 Ntot, marker);
+                        }
                     }
 
-                    //printf("it %2d, rank %2d, m %3d: num = %22.15f  USEBED=%d\n", iteration, rank, marker, num, USEBED[marker]);
-                    //continue;
+                    printf("it %2d, rank %2d, m %3d: num = %22.15f  USEBED=%d\n", iteration, rank, marker, num, USEBED[marker]);
+                    continue;
 
                     num += beta * double(Ntot - 1);
                     //printf("it %d, rank %d, mark %d: num = %22.15f, %20.15f, %20.15f\n", iteration, rank, marker, num, mave[marker], mstd[marker]);

@@ -33,6 +33,8 @@
 #include <omp.h>
 #include "BayesW_arms.h"
 #include <math.h>
+#include "sparse.h"
+#include "dense.h"
 
 /* Pre-calculate used constants */
 #define PI 3.14159265359

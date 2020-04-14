@@ -1,3 +1,4 @@
+#include <cfloat>
 #include "data.hpp"
 #include <Eigen/Eigen>
 #include <sys/mman.h>
@@ -12,9 +13,49 @@
 #include <mpi.h>
 #include "mpi_utils.hpp"
 #endif
+#include <immintrin.h>
+#include "dense.h"
 
 Data::Data() {
+
 }
+
+
+// Compute some invariant properties of the dataset
+//  Note: Round to the byte for bitmask
+//        Round to 64 bytes for phen data so that each phenotype is
+//          properly aligned in memory for vectorized operations
+//
+void Data::SetDatasetProperties(const int n_phen_, const int n_ind_) {
+
+    n_phen = n_phen_;
+    n_ind  = n_ind_;
+    
+    n_char_per_mask = n_ind % 8 == 0 ? n_ind / 8 : n_ind / 8 + 1;
+    n_dp_per_phen   = n_ind % 8 == 0 ? n_ind     : ((int)(n_ind / 8) + 1) * 8;
+    
+    n_bytes_per_mask  = n_char_per_mask * sizeof(char);
+    n_bytes_per_phen  = n_dp_per_phen   * sizeof(double);
+
+    n_bytes_all_masks = n_bytes_per_mask * n_phen;
+    n_bytes_all_phens = n_bytes_per_phen * n_phen;
+    
+    cout << "n_bytes_all_masks " << n_bytes_all_masks << endl;
+    cout << "n_bytes_all_phens " << n_bytes_all_phens << endl;
+
+}
+
+void Data::CenterAndScalePhenotypes() {
+    
+    for (int i=0; i<n_phen; i++) {
+        int i_m = i * n_char_per_mask;
+        int i_d = i * n_dp_per_phen;
+        CenterAndScaleAvx(n_ind, phen_nas[i], &phen_masks[i_m], &phen_data[i_d]);
+        // EO: don't call the two in a raw when testing, or expect 0.0!
+        //CenterAndScale(n_ind, &phen_masks[i_m], &phen_data[i_d]);
+    }
+}
+
 
 #ifdef USE_MPI
 
@@ -453,6 +494,7 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
 
 // SO: Currently basically the copy of the previous version.
 //     Consider using adding reading mu for bR so the same function could be used
+//EO@@@ needs to be adapted for groups
 void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
                                      VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
 
@@ -463,7 +505,7 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
     string csv = mcmcOut + ".csv";
     std::ifstream file(csv);
    
-    int it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0;
+    int it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0, ngrp_ = -1;
     double mu_, sige_, rat_, siggSum_;
 
     VectorXd sigg_(numGroups);
@@ -479,11 +521,13 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
                     lastSavedIt = it_;
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
-                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %lf, %7d, %7d, %2d, %n",
+                    nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %lf, %7d, %2d, %2d, %n",
                                    &it_, &mu_, &siggSum_, &sige_, &rat_, &m0_, &pirows_, &picols_, &nchar);
 	
+             	    assert(pirows_ == ngrp_);
                     assert(pi.rows() == pirows_);
                     assert(pi.cols() == picols_);
+
 	
 		    string remain_s = str.substr(nchar, str.length() - nchar);
                     char   remain_c[remain_s.length() + 1];
@@ -1455,6 +1499,67 @@ void Data::center_and_scale(double* __restrict__ vec, int* __restrict__ mask, co
 }
 
 
+// Generic function to read phenotype files and set bitmasks for NA
+// ->  
+// ->
+//   
+void Data::ReadPhenotypeFiles(const vector<string> &phen_files, const int n_ind, double* phen_data, unsigned char* phen_masks, uint* phen_nas) {
+
+    const int n_phen   = phen_files.size();
+    const int n_ind_m8 = n_ind % 8 == 0 ? n_ind / 8 : n_ind / 8 + 1;
+    
+    uint nas = 0;
+
+    for (int i=0; i<n_phen; i++) {
+
+        printf("INFO   : reading phen file %2d (%s), data starting at %7d and mask at %6d (n_ind = %d)\n",
+               i, phen_files[i].c_str(), i * n_ind_m8 * 8, i * n_ind, n_ind);
+
+        ReadPhenotypeFile(phen_files[i], n_ind, &phen_data[i * n_ind_m8 * 8], &phen_masks[i * n_ind_m8], phen_nas[i]);
+
+        printf("       : got %3d NAs on phenotype %d\n", phen_nas[i], i);
+    }
+}
+
+
+void Data::ReadPhenotypeFile(const string &phenFile, const int n_ind, double* data, unsigned char* bitmask, uint &nas) {
+
+    ifstream in(phenFile.c_str());
+    if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
+
+    uint iline = 0, nonas = 0;
+
+    Gadget::Tokenizer colData;
+
+    string inputStr;
+    string sep(" \t");
+
+    while (getline(in,inputStr)) {
+
+        colData.getTokens(inputStr, sep);
+
+        if (colData[1+1] != "NA") {
+            data[ iline ] = double( atof(colData[1+1].c_str()) );
+            nonas += 1;
+        } else {
+            data[ iline ] = DBL_MAX;
+            bitmask[iline / 8] &= ~(1 << iline % 8);            
+            nas += 1;
+            //bitset<8> b = bitmask[iline / 8];
+            //cout << "NA on line " << iline << " byte " << b << endl;
+        }
+        iline += 1;
+    }
+
+    in.close();
+
+    assert(nonas + nas == n_ind);
+    assert(iline == n_ind);
+}
+
+
+
+
 // EO: overloaded function to be used when processing sparse data
 //     In such case we do not read from fam file before
 // --------------------------------------------------------------
@@ -1490,13 +1595,14 @@ void Data::readPhenotypeFiles(const vector<string> &phenFiles, const int numberI
         center_and_scale(phen.data(), mask.data(), ninds, nas);
 
         for (int j=0; j<ninds; j++) {
-            phenosData(i, j)   = phen(j);
+            phenosData(i, j)     = phen(j);
             phenosNanMasks(i, j) = mask(j);
         }
 
         phenosNanNum(i) = nas;
     }
 }
+
 
 void Data::readPhenotypeFileAndSetNanMask(const string &phenFile, const int numberIndividuals, VectorXd& dest, VectorXi& mask, uint& nas) {
 
@@ -1530,6 +1636,7 @@ void Data::readPhenotypeFileAndSetNanMask(const string &phenFile, const int numb
     assert(line == numInds);
     //printf("nonas = %d, nas = %d\n", nonas, nas);
 }
+
 
 //EO: combined reading of a .phen and .cov files
 //    Assume .cov and .phen to be consistent with .fam and .bed!

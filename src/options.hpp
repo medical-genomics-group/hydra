@@ -25,6 +25,7 @@ public:
     //bool     mpiBayesGroups    = false;
     string   groupIndexFile    = "";
     string   groupMixtureFile  = "";
+    bool     new_na              = false;
     bool     restart             = false;
     bool     sparseSync          = false;
     bool     bedSync             = false;
