@@ -8,16 +8,17 @@ EXE ?= mpi_gibbs
 
 CXX       = mpiicpc
 
-#CXXFLAGS  = -O0
-CXXFLAGS = -Ofast
+CXXFLAGS  = -O0
+#EOCXXFLAGS = -Ofast
 CXXFLAGS += -g
 CXXFLAGS += -std=c++17
-CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
+#EOCXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 #CXXFLAGS += -xCORE-AVX2
 #CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
 CXXFLAGS += -D USE_MPI
 #CXXFLAGS += -D EIGEN_DONT_VECTORIZE
-CXXFLAGS += -qopenmp
+#EOCXXFLAGS += -qopenmp
+
 #CXXFLAGS += -qopt-report=2
 #CXXFLAGS += -qopt-report-phase=loop,vec
 #CXXFLAGS += -qopt-report-file=stdout
@@ -29,8 +30,9 @@ CXXFLAGS += -L/usr/lib64
 ##CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 
 #EO: enable the following for a strict comparison with Eigen
-#CXXFLAGS += -fp-model precise 
+CXXFLAGS += -fp-model precise 
 #CXXFLAGS += -fp-model source
+#CXXFLAGS += -fp-model extended
 
 #INCLUDE   = -I$(HOME)/inc/Eigen-3.3.7
 #INCLUDE  += -I$(HOME)/inc/Boost-1.71.0
@@ -46,7 +48,7 @@ LIBS     = -lz
 
 #SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 #//EO@@@ remove multi-trait version for now
-SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
+SOURCES = main.cpp sparse.cpp dense.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
