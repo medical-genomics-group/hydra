@@ -285,6 +285,14 @@ void Options::inputOptions(const int argc, const char* argv[]){
             betIterations = stoi(argv[++i]);
             ss << "--bet-iterations " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--pred-out-dir")) {
+            predOutDir = argv[++i];
+            ss << "--pred-out-dir " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--pred-out-name")) {
+            predOutName = argv[++i];
+            ss << "--pred-out-name " << argv[i] << "\n";
+        }
         else {
             stringstream errmsg;
             errmsg << "\nError: invalid option \"" << argv[i] << "\".\n";

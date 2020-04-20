@@ -84,6 +84,8 @@ public:
     bool   compress    = false;
     bool   deltaUpdate = true;     // Use the delta epsilon to pass the message in mpi
     bool   predict     = false;
+    string predOutDir  = "";
+    string predOutName = "";
 
     // Use BED representation over SPARSE if fraction of non-zero elements (fnz)
     // is greater than this threshold:

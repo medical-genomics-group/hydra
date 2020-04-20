@@ -8,5 +8,8 @@ class LinPred {
 
         LinPred(Data &data, Options &opt);
 
-        void predict_genetic_values();
+        void predict_genetic_values(string outfile);
+
+private:
+    Eigen::IOFormat csvFormat;
 };

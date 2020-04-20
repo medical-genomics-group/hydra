@@ -177,7 +177,7 @@ int main(int argc, const char * argv[]) {
             data.load_data_from_bet_file(opt.betFile, opt.betIterations);
             // perform prediction
             LinPred predictor(data, opt);
-            predictor.predict_genetic_values();
+            predictor.predict_genetic_values(opt.predOutDir + "/" + opt.predOutName);
         }
         else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);
