@@ -883,12 +883,12 @@ void Data::load_data_from_mixed_representations(const string bedfp_noext,   cons
     MPI_Offset bedoff;
     MPI_Status status;
 
-    string bedfp = bedfp_noext + ".bed";
+    //string bedfp = bedfp_noext + ".bed";
     string si1fp = sparseOut   + ".si1";
     string si2fp = sparseOut   + ".si2";
     string simfp = sparseOut   + ".sim";
 
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh),  __LINE__, __FILE__);
+    //check_mpi(MPI_File_open(MPI_COMM_WORLD, bedfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &bedfh),  __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, si1fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si1fh),  __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, si2fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &si2fh),  __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, simfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &simfh),  __LINE__, __FILE__);
@@ -914,8 +914,8 @@ void Data::load_data_from_mixed_representations(const string bedfp_noext,   cons
 
             if (1 == 0) {
 
-                bedoff = size_t(3) + (size_t(MrankS[rank]) + i) * size_t(snpLenByt) * sizeof(char);
-                check_mpi(MPI_File_read_at(bedfh, bedoff, &I1[N1S[i]], snpLenByt, MPI_CHAR, &status), __LINE__, __FILE__);
+                //bedoff = size_t(3) + (size_t(MrankS[rank]) + i) * size_t(snpLenByt) * sizeof(char);
+                //check_mpi(MPI_File_read_at(bedfh, bedoff, &I1[N1S[i]], snpLenByt, MPI_CHAR, &status), __LINE__, __FILE__);
 
             } else {
 
@@ -986,7 +986,7 @@ void Data::load_data_from_mixed_representations(const string bedfp_noext,   cons
     //MPI_Barrier(MPI_COMM_WORLD);
 
     // Close BED and SPARSE files
-    check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
+    //check_mpi(MPI_File_close(&bedfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&si1fh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&si2fh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&simfh), __LINE__, __FILE__);
@@ -1162,11 +1162,56 @@ void Data::sparse_data_fill_indices(const char* rawdata,
 
     size_t i1 = 0, i2 = 0, im = 0;
     size_t N1 = 0, N2 = 0, NM = 0;
+    
+    
+    /*
+    if (NC == 1) {
 
+        for (int ii=0; ii<NB; ++ii) {
+            for (int iii=0; iii<4; ++iii) {
+                tmpi[ii*4 + iii] = (rawdata[ii] >> 2*iii) & 0b11;
+            }
+        }
+        
+        for (int ii=0; ii<numInds-NA; ++ii) {
+            if (tmpi[ii] == 1) {
+                //tmpi[ii] = -1;
+                IM[im++] = ii;
+            } else {
+
+                tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
+
+                if (tmpi[ii] == 1) {
+                    I1[i1++] = ii;
+                } else if (tmpi[ii] == 2) {
+                    I2[i2++] = ii;
+                }
+            }
+        }
+
+        
+        //const uint iimax = numInds - NA;
+        //
+        //for (uint ii=0; ii<iimax; ++ii) {
+        //    if (tmpi[ii] == 1) {
+        //        I1[i1++] = ii;
+        //    }
+        //    //else if (tmpi[ii] < 0) {
+        //    //    IM[im++] = ii;
+        //    //}
+        //    else if (tmpi[ii] == 2) {
+        //        I2[i2++] = ii;
+        //    }
+        //}
+
+    } else {
+
+    */
+      
     for (int i=0; i<NC; ++i) {
-
+        
         char* locraw = (char*)&rawdata[size_t(i) * size_t(NB)];
-
+        
         for (int ii=0; ii<NB; ++ii) {
             for (int iii=0; iii<4; ++iii) {
                 tmpi[ii*4 + iii] = (locraw[ii] >> 2*iii) & 0b11;
@@ -1180,7 +1225,7 @@ void Data::sparse_data_fill_indices(const char* rawdata,
                 tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
             }
         }
-
+        
         size_t n0 = 0, n1 = 0, n2 = 0, nm = 0;
         
         for (uint ii=0; ii<numInds-NA; ++ii) {
@@ -1202,14 +1247,14 @@ void Data::sparse_data_fill_indices(const char* rawdata,
                 }
             }
         }
-
+        
         assert(nm + n0 + n1 + n2 == numInds - NA);
-
+        
         N1S[i] = N1;  N1L[i] = n1;  N1 += n1;
         N2S[i] = N2;  N2L[i] = n2;  N2 += n2;
         NMS[i] = NM;  NML[i] = nm;  NM += nm;
     }
-
+    //}
     _mm_free(tmpi);
 }
 

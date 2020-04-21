@@ -17,12 +17,14 @@ module list
 
 
 # COMPILATION
-EXE=./src/mpi_gibbs
 cd ./src
 B='-B'
 B=''
+export EXE=hydra
 make $B -f Makefile || exit 1;
 cd ..
+
+EXE=./src/$EXE
 
 if [ ! -f $EXE ]; then
     echo Fatal: binary $EXE not found!
@@ -31,7 +33,7 @@ fi
 
 S="1.0,0.1"
 
-DS=2
+DS=5
 
 if [ $DS == 0 ]; then
     datadir=./test/data
@@ -53,11 +55,12 @@ elif [ $DS == 2 ]; then
     datadir=/scratch/orliac/testN500K
     dataset=testN500K
     phen=${dataset}_NA
+    phen=${dataset}
     sparsedir=$datadir
     sparsebsn=${dataset}_uint
     NUMINDS=500000
     NUMSNPS=1270420
-    NUMSNPS=3000
+    NUMSNPS=60000
 elif [ $DS == 3 ]; then
     sparsedir=/scratch/orliac/UKBgen/
     sparsebsn=epfl_test_data_sparse
@@ -71,8 +74,17 @@ elif [ $DS == 4 ]; then
     dataset=test_nm
     phen=test_m
     NUMINDS=20000
-    NUMSNPS=50000
+    NUMSNPS=100000
     S="0.00001,0.0001,0.001,0.01"
+elif [ $DS == 5 ]; then
+    datadir=/scratch/orliac/ukb_sparse
+    dataset=ukb_imp_v3_UKB_EST_oct19_unrelated
+    phen=height_noNA
+    sparsedir=$datadir
+    sparsebsn=$dataset
+    NUMINDS=382466
+    NUMSNPS=8430446
+    NUMSNPS=100000
 fi
 
 
@@ -87,26 +99,27 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=3
+CL=30
 SEED=10
-SR=1
-SM=0
+SR=5
+SM=1
+FNZ=0.060
 THIN=1
 SAVE=100
 TOCONV_T=$((($CL - 1) / $THIN))
 echo TOCONV_T $TOCONV_T
 N=1
-TPN=9
+TPN=6
 
-CPT=4 # CPUs per task
+CPT=6 # CPUs per task
 export OMP_NUM_THREADS=$CPT
 export KMP_AFFINITY=verbose
 export KMP_AFFINITY=noverbose
 
 # Select what to run
-run_bed_sync_dp=1;      run_sparse_sync_dp=1;      run_mixed_sync_dp=1;
-run_bed_sync_sparse=1;  run_sparse_sync_sparse=1;  run_mixed_sync_sparse=1;
-run_bed_sync_bed=1;     run_sparse_sync_bed=1;     run_mixed_sync_bed=1;
+run_bed_sync_dp=0;      run_sparse_sync_dp=0;      run_mixed_sync_dp=0;
+run_bed_sync_sparse=0;  run_sparse_sync_sparse=0;  run_mixed_sync_sparse=1;
+run_bed_sync_bed=0;     run_sparse_sync_bed=0;     run_mixed_sync_bed=0;
 
 
 COV="--covariates $datadir/scaled_covariates.csv"
@@ -183,21 +196,61 @@ fi
 if [ $run_mixed_sync_dp == 1 ]; then
     echo; echo; echo "@@@ MIXED + DP @@@"; echo
     sol2=mixed_sync_dp
-    cmd="srun -N $N --ntasks-per-node=$TPN --cpus-per-task=$CPT  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE  --mcmc-out-dir $outdir --mcmc-out-name $sol2 --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --bfile $datadir/$dataset --sparse-dir $sparsedir  --sparse-basename $sparsebsn --threshold-fnz 0.06 $COV $BLK"
+    cmd="srun -N $N --ntasks-per-node=$TPN --cpus-per-task=$CPT  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE  --mcmc-out-dir $outdir --mcmc-out-name $sol2 --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --bfile $datadir/$dataset --sparse-dir $sparsedir  --sparse-basename $sparsebsn --threshold-fnz $FNZ $COV $BLK"
     echo $cmd; echo
     $cmd || exit 1
 fi
 
+
+AMPLIFIER=0;  ampdir=/scratch/orliac/tmp_vtune_profile;
+ADVISOR=0;    advdir=/scratch/orliac/tmp_advis_profile;
+
 if [ $run_mixed_sync_sparse == 1 ]; then
     echo; echo; echo "@@@ MIXED + SPARSE @@@"; echo
     sol2=mixed_sync_sparse
-    ampdir=/scratch/orliac/tmp_vtune_profile
-    rm -r $ampdir
-    amp="srun -N $N --ntasks-per-node=$TPN --cpus-per-task=$CPT amplxe-cl –c hotspots –r $ampdir -data-limit=1000 -- "
-    #cmd="$amp  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE  --mcmc-out-dir $outdir --mcmc-out-name $sol2 --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --bfile $datadir/$dataset --sparse-dir $sparsedir  --sparse-basename $sparsebsn --threshold-fnz 0.06 --sparse-sync $COV $BLK"
-    cmd="srun -N $N --ntasks-per-node=$TPN --cpus-per-task=$CPT  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE  --mcmc-out-dir $outdir --mcmc-out-name $sol2 --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --bfile $datadir/$dataset --sparse-dir $sparsedir  --sparse-basename $sparsebsn --threshold-fnz 0.06 --sparse-sync $COV $BLK"
-    echo $cmd; echo
-    $cmd || exit 1
+
+     CMD="$EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE  --mcmc-out-dir $outdir --mcmc-out-name $sol2 --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --bfile $datadir/$dataset --sparse-dir $sparsedir  --sparse-basename $sparsebsn --threshold-fnz $FNZ --sparse-sync $COV $BLK"
+
+     PRE="srun -N $N --ntasks-per-node=$TPN --cpus-per-task=$CPT "
+
+    if [ $AMPLIFIER == 1 ]; then
+        echo "@@@ AMPLIFIER"
+        [ -d $ampdir ] && rm -r $ampdir/*
+        cmd_prefix=$PRE" amplxe-cl –c hotspots –r $ampdir -data-limit=1000 -- "
+
+        cmd=$cmd_prefix$CMD
+        echo $cmd; echo
+        $cmd || exit 1
+
+        amplxe-gui $ampdir/tmp_vtune_profile.amplxeproj &
+
+    elif [ $ADVISOR == 1 ]; then
+        echo "@@@ ADVISOR"
+        source ~/load_Intel_Advisor.sh
+        [ -d $advdir ] && rm -r $advdir/*
+
+        cmd_prefix="advixe-cl -v -collect survey           --project-dir=$advdir -no-auto-finalize -data-limit=0 --search-dir all:=./src -- "
+        cmd=$PRE$cmd_prefix$CMD
+        echo $cmd; echo
+        $cmd || exit 1
+
+        cmd_prefix="advixe-cl -v -collect tripcounts -flop --project-dir=$advdir -no-auto-finalize -data-limit=0 --search-dir all:=./src -- "
+        cmd=$PRE$cmd_prefix$CMD
+        echo $cmd; echo
+        $cmd || exit 1
+        
+        #cmd_prefix="advixe-cl --collect=roofline          --project-dir=$advdir  --no-auto-finalize                  --search-dir all:=./src -- "
+        #cmd=$PRE$cmd_prefix$CMD
+        #echo $cmd; echo
+        #$cmd || exit 1
+
+        echo "advixe-gui $advdir/tmp_advis_profile.advixeproj &"
+
+    else
+        cmd=$PRE$CMD
+        echo $cmd; echo
+        $cmd || exit 1
+    fi
 fi
 
 if [ $run_mixed_sync_bed == 1 ]; then
@@ -211,7 +264,7 @@ if [ $run_mixed_sync_bed == 1 ]; then
     #$cmd || exit 1
 
     sol2=mixed_sync_bed
-    cmd="srun -N $N --ntasks-per-node=$TPN --cpus-per-task=$CPT  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE  --mcmc-out-dir $outdir --mcmc-out-name $sol2 --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --bfile $datadir/$dataset --sparse-dir $sparsedir  --sparse-basename $sparsebsn --threshold-fnz 0.06 --bed-sync $COV $BLK"
+    cmd="srun -N $N --ntasks-per-node=$TPN --cpus-per-task=$CPT  $EXE --number-individuals $NUMINDS --number-markers $NUMSNPS --mpibayes bayesMPI --pheno $sparsedir/${phen}.phen --chain-length $CL --thin $THIN --save $SAVE  --mcmc-out-dir $outdir --mcmc-out-name $sol2 --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --bfile $datadir/$dataset --sparse-dir $sparsedir  --sparse-basename $sparsebsn --threshold-fnz $FNZ --bed-sync $COV $BLK"
     echo $cmd; echo
     $cmd || exit 1
 fi

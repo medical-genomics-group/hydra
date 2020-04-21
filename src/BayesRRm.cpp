@@ -28,7 +28,7 @@
 #include "mpi_utils.hpp"
 #endif
 #include <omp.h>
-
+#include "dotp_lut.h"
 
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
     : data(data)
@@ -49,6 +49,10 @@ BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
 BayesRRm::~BayesRRm()
 {
 }
+
+#pragma omp declare reduction \
+    (addpd4:__m256d:omp_out+=omp_in) \
+    initializer(omp_priv=_mm256_setzero_pd())
 
 
 void BayesRRm::offset_vector_f64(double* __restrict__ vec, const double offset, const int N) {
@@ -337,8 +341,10 @@ inline double partial_sparse_dotprod(const double* __restrict__ vec,
 #pragma omp parallel for reduction(+: dp)
 #endif
     for (size_t i=NXS; i<NXS+NXL; i++) {
-        dp += vec[ IX[i] ] * fac;
+        dp += vec[ IX[i] ];
     }
+
+    dp *= fac;
 
     //printf("partial %lu -> %lu with fac = %20.15f\n", NXS, NXS+NXL, fac);
 
@@ -356,19 +362,34 @@ double BayesRRm::sparse_dotprod(const double* __restrict__ vin1,
                                 const int                  marker) {
 
     double dp  = 0.0;
-    double syt = 0.0;
 
     dp += partial_sparse_dotprod(vin1, I1, N1S, N1L, 1.0);
+    //printf("dp 1 = %20.15f\n", dp);
 
     dp += partial_sparse_dotprod(vin1, I2, N2S, N2L, 2.0);
+    //double dp2 = partial_sparse_dotprod(vin1, I2, N2S, N2L, 2.0);
+    //printf("dp 2 = %20.15f\n", dp2);
+    //printf("dp12 = %20.15f\n", dp);
+
+    //dp += dp2;
+    //printf("dp1 + dp2 = %20.15f\n", dp);
+
+    //printf("sig_inv = %20.15f\n", sig_inv);
+
+    //dp *= sig_inv;
+    //printf("dp / sig = %20.15f\n", dp);
+
+    double syt = sum_vector_elements_f64(vin1, N);
+    //printf("syt = %20.15f\n", syt);
+
+    double dsyt = partial_sparse_dotprod(vin1, IM, NMS, NML, 1.0);
+    //printf("dsyt = %20.15f\n", dsyt);
+
+    syt -= dsyt;
+
+    dp -= (mu * syt);
 
     dp *= sig_inv;
-
-    syt += sum_vector_elements_f64(vin1, N);
-
-    syt += partial_sparse_dotprod(vin1, IM, NMS, NML, -1.0);
-
-    dp -= mu * sig_inv * syt;
 
     return dp;
 }
@@ -1629,16 +1650,18 @@ int BayesRRm::runMpiGibbs() {
 
             // Sparse indices storage for BED markers needing expansion to SPARSE at processing time
             //
-            uint *XI1 = NULL, *XI2 = NULL, *XIM = NULL;
+            //uint *XI1 = NULL, *XI2 = NULL, *XIM = NULL;
 
             if (j < M) {
 
-                marker = markerI[j];
-                beta   = Beta(marker);
+                marker  = markerI[j];
 
+                beta    = Beta(marker);
 
                 sigE_G  = sigmaE / sigmaG[groups[MrankS[rank] + marker]];
+
                 sigG_E  = sigmaG[groups[MrankS[rank] + marker]] / sigmaE;
+
                 i_2sigE = 1.0 / (2.0 * sigmaE);
                 
 
@@ -1651,43 +1674,287 @@ int BayesRRm::runMpiGibbs() {
                         //printf("it %d, rank %d, m %d: denom[%d] = %20.15f, cvai = %20.15f\n", iteration, rank, marker, i-1, denom(i-1), cVaI(groups[MrankS[rank] + marker], i));
                     }
 
-                    double num = 0.0;
-
+                    double num  = 0.0;
+                    double nums = 0.0; //, num_ = 0.0, num__ = 0.0;
+ 
                     if (USEBED[marker]) {
 
-                        // Allocate from sizes determined earlier on
-                        //
-                        XI1 = (uint*)_mm_malloc(N1L[marker] * sizeof(uint), 64);  check_malloc(XI1, __LINE__, __FILE__);
-                        XI2 = (uint*)_mm_malloc(N2L[marker] * sizeof(uint), 64);  check_malloc(XI2, __LINE__, __FILE__);
-                        XIM = (uint*)_mm_malloc(NML[marker] * sizeof(uint), 64);  check_malloc(XIM, __LINE__, __FILE__);
-                       
-                        size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
-                        size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
                         
+                        //// Allocate from sizes determined earlier on
+                        //
+                        //XI1 = (uint*)_mm_malloc(N1L[marker] * sizeof(uint), 64);  check_malloc(XI1, __LINE__, __FILE__);
+                        //XI2 = (uint*)_mm_malloc(N2L[marker] * sizeof(uint), 64);  check_malloc(XI2, __LINE__, __FILE__);
+                        //XIM = (uint*)_mm_malloc(NML[marker] * sizeof(uint), 64);  check_malloc(XIM, __LINE__, __FILE__);
+                        //
+                        //size_t fake_n1s = 0, fake_n2s = 0, fake_nms = 0;
+                        //size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
+                        //
                         //EO: bed data already ajusted for NAs
-                        data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[marker]]), 1, snpLenByt, data.numNAs,
-                                                      &fake_n1s, &fake_n1l, XI1,
-                                                      &fake_n2s, &fake_n2l, XI2,
-                                                      &fake_nms, &fake_nml, XIM);
-                        //printf("??? %lu %lu %lu\n", fake_n1l, fake_n2l, fake_nml);
+                        //data.sparse_data_fill_indices(reinterpret_cast<char*>(&I1[N1S[marker]]), 1, snpLenByt, data.numNAs,
+                        //                              &fake_n1s, &fake_n1l, XI1,
+                        //                              &fake_n2s, &fake_n2l, XI2,
+                        //                              &fake_nms, &fake_nml, XIM);
+                        ////printf("??? %lu %lu %lu\n", fake_n1l, fake_n2l, fake_nml);
+                        //
+                        ////set_vector_f64(epsilon, 1.0, Ntot);
+                        ////cout << "1: " << N1L[marker] << ", 2: " << N2L[marker] << ", M: " << NML[marker] << endl;
+                        //
+                        //num = sparse_dotprod(epsilon,
+                        //                     XI1, 0, N1L[marker],
+                        //                     XI2, 0, N2L[marker],
+                        //                     XIM, 0, NML[marker],
+                        //                     mave[marker],    mstd[marker], Ntot, marker);
+                        
+                        
+                        const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&I1[N1S[marker]]);                            
+                            
+                        //const int dp_version = 1;  // Replicates sparse_dotprod
+                        //const int dp_version = 2;  // Should be faster than 1
+                        const int dp_version = 3;  // Should be faster than 2
+                        
+                        if (dp_version == 1) {
+                            throw("need to adapt if Ntot%4 != 0");
+                            exit(1);
+                            double c1  = 0.0, c2 = 0.0;
+                            double dp1 = 0.0, dp2 = 0.0, dpm  = 0.0;
+                            
+                            double syt = sum_vector_elements_f64(epsilon, Ntot);
+                            
+                            for (int ii=0; ii<snpLenByt; ++ii) {
+                                for (int iii=0; iii<4; ++iii) {                                    
+                                    c1 = dotp_lut_a[rawdata[ii] * 4 + iii];
+                                    c2 = dotp_lut_b[rawdata[ii] * 4 + iii];
+                                    if (ii*4 + iii < Ntot) {
+                                        if (c1 == 1.0) dp1 +=       epsilon[ii * 4 + iii];
+                                        if (c1 == 2.0) dp2 += 2.0 * epsilon[ii * 4 + iii];
+                                        dpm  += (1.0 - c2) * epsilon[ii * 4 + iii];
+                                    }
+                                }
+                            }
+                            
+                            syt -= dpm;
+                            num  = dp1 + dp2;
+                            num -= mave[marker] * syt;
+                            num *= mstd[marker];
+                            
+                            //printf("dotprod v1 = %25.15f\n", num);
+                            
+                        } else if (dp_version == 2) {
+                            throw("need to adapt if Ntot%4 != 0");
+                            exit(1);
+                            double c1 = 0.0, c2 = 0.0, dp12 = 0.0, dpm = 0.0;
+                            
+                            double syt = sum_vector_elements_f64(epsilon, Ntot);
+                            
+                            for (int ii=0; ii<snpLenByt; ++ii) {
+                                for (int iii=0; iii<4; ++iii) {                                    
+                                    c1 = dotp_lut_a[rawdata[ii] * 4 + iii];
+                                    c2 = dotp_lut_b[rawdata[ii] * 4 + iii];
+                                    if (ii*4 + iii < Ntot) {
+                                        dp12 += c1         * epsilon[ii * 4 + iii];
+                                        dpm  += (1.0 - c2) * epsilon[ii * 4 + iii];
+                                    }
+                                }
+                            }
+                            
+                            syt -= dpm;
+                            num  = dp12;
+                            num -= mave[marker] * syt;
+                            num *= mstd[marker];
+                            
+                            //printf("dotprod v2 = %25.15f\n", num);
+                            
+                        } else if (dp_version == 3) {
+                            
+                            double s1 = 0.0, s2 = 0.0;
+                            double c1 = 0.0, c2 = 0.0;
 
-                        num = sparse_dotprod(epsilon,
-                                             XI1, 0, N1L[marker],
-                                             XI2, 0, N2L[marker],
-                                             XIM, 0, NML[marker],
-                                             mave[marker],    mstd[marker], Ntot, marker);
+                            // main + remainder to avoid a test on idx < Ntot 
+                            const int fullb = Ntot / 4;
+                            int idx = 0;
+
+                            // main
+
+                            __m256d vsum1 = _mm256_setzero_pd();
+                            __m256d vsum2 = _mm256_setzero_pd();
+
+#ifdef _OPENMP
+                            //#pragma omp parallel for reduction(+:s1,s2)
+#pragma omp parallel for reduction(addpd4:vsum1,vsum2)
+#endif                              
+                            for (int ii=0; ii<fullb; ++ii) {
+
+                                __m256d p4c1  = _mm256_loadu_pd(&(dotp_lut_a[rawdata[ii] * 4]));
+                                __m256d p4c2  = _mm256_loadu_pd(&(dotp_lut_b[rawdata[ii] * 4]));
+                                __m256d p4eps = _mm256_loadu_pd(&(epsilon[ii * 4]));
+
+                                __m256d p4sum = _mm256_mul_pd(p4c2, p4eps);
+                                
+                                vsum2 = _mm256_add_pd(vsum2, p4sum);
+
+                                p4sum = _mm256_mul_pd(p4sum, p4c1);                                
+                                vsum1 = _mm256_add_pd(vsum1, p4sum);
+                                /*
+                                for (int iii=0; iii<4; iii++) {
+                                    idx = rawdata[ii] * 4 + iii;
+                                    c1  = dotp_lut_a[idx];
+                                    c2  = dotp_lut_b[idx];
+                                    s1 += c1 * (c2 * epsilon[ii * 4 + iii]);
+                                    s2 +=      (c2 * epsilon[ii * 4 + iii]);
+                                }
+                                */
+                            }
+
+                            double s1_ = vsum1[0] + vsum1[1] + vsum1[2] + vsum1[3];
+                            double s2_ = vsum2[0] + vsum2[1] + vsum2[2] + vsum2[3];
+      
+                            // remainder
+                            if (Ntot % 4 != 0) {
+                                //cout << "REMAINDER" << endl;
+                                int ii = fullb;
+                                for (int iii = 0; iii < Ntot - fullb * 4; iii++) {
+                                    idx = rawdata[ii] * 4 + iii;
+                                    c1  = dotp_lut_a[idx];
+                                    c2  = dotp_lut_b[idx];
+                                    //s1 += c1 * (c2 * epsilon[ii * 4 + iii]);
+                                    //s2 +=      (c2 * epsilon[ii * 4 + iii]);
+                                    s1_ += c1 * (c2 * epsilon[ii * 4 + iii]);
+                                    s2_ +=      (c2 * epsilon[ii * 4 + iii]);
+                                }
+                            }
+
+                            /*
+                            for (int ii=0; ii<snpLenByt; ++ii) {
+                                
+                                for (int iii=0; iii<4; ++iii) {
+                                    
+                                    c1 = dotp_lut_a[rawdata[ii] * 4 + iii];
+                                    c2 = dotp_lut_b[rawdata[ii] * 4 + iii];
+                                    //cout << iii << ": c1 = " << c1 << ", c2 = " << c2 << endl;
+                                    
+                                    //TODO(EO: avoid this loop, add remainder)
+                                    if (ii*4 + iii < Ntot) {                                            
+                                        s1   += c1 * (c2 * epsilon[ii * 4 + iii]);
+                                        s2   +=      (c2 * epsilon[ii * 4 + iii]);
+                                    }
+                                }
+                            }
+                                    */
+                            //num = mstd[marker] * (s1 - mave[marker] * s2);
+
+                            //if (j < 20) {
+                            double numv = mstd[marker] * (s1_ - mave[marker] * s2_); 
+                                //printf("dotprod v3 = %25.15f vs vectorized = %25.15f\n", num, numv);
+                                //}
+                            num = numv;
+
+                        } else {
+                            
+                            throw("just for the record");
+                            exit(1);
+                            
+                            //int n0 = 0, n1 = 0, n2 = 0, nm = 0;
+                            //int n = 0;
+                            double c1 = 0.0, c2 = 0.0;
+                            
+                            for (int ii=0; ii<snpLenByt; ++ii) {                                    
+                                for (int iii=0; iii<4; ++iii) {
+                                    c1 = dotp_lut_a[rawdata[ii] * 4 + iii];
+                                    c2 = dotp_lut_b[rawdata[ii] * 4 + iii];
+                                    //if (ii*4 + iii < Ntot) {                                        
+                                    //    if      (c1 == 0.0 && c2 == 1.0) { n0 += 1; }
+                                    //    else if (c1 == 1.0 && c2 == 1.0) { n1 += 1; }
+                                    //    else if (c1 == 2.0 && c2 == 1.0) { n2 += 1; }
+                                    //    else if (c1 == 0.0 && c2 == 0.0) { nm += 1; }
+                                    //    else { printf("FATAL.\n"); exit(1); } 
+                                    //}
+                                    
+                                    //if (ii*4 + iii < Ntot) {
+                                    //    //num_ += (c1 - mave[marker]) * c2 * epsilon[ii * 4 + iii];
+                                    //    num_ += c1 * epsilon[ii * 4 + iii];
+                                    //    //cout << ii * 4 + iii << " - " << rawdata[ii] * 4 + iii << endl;
+                                    //}
+                                    
+                                    //if (ii*4 + iii < Ntot) {
+                                    //    n += 1;
+                                    //    num__ += c1 * epsilon[ii * 4 + iii] * mstd[marker];
+                                    //    //cout << ii * 4 + iii << " - " << rawdata[ii] * 4 + iii << endl;
+                                    //}
+                                }
+                            }
+                            
+                            //printf("num_ = %20.15f\n", num_);
+                            //num_ *= mstd[marker];
+                        }
+                        
+                        //exit(0);
+                        
+                        /*
+                        const double coef0 = (0.0 - mave[marker]) * mstd[marker];
+                        const double coef1 = (1.0 - mave[marker]) * mstd[marker];
+                        const double coef2 = (2.0 - mave[marker]) * mstd[marker];
+                        
+                        int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(int8_t), 64);
+                        check_malloc(tmpi, __LINE__, __FILE__);
+                        
+                        for (int ii=0; ii<NB; ++ii) {
+                            for (int iii=0; iii<4; ++iii) {
+                                tmpi[ii*4 + iii] = (rawdata[ii] >> 2*iii) & 0b11;
+                            }
+                        }
+                        
+                        if ( 1 == 0) { //EO: much slower
+                            const int iimax = data.numInds-data.numNAs;
+                            
+                            for (int ii=0; ii<iimax; ++ii) {
+                                if      (tmpi[ii] == 3) { num += coef0 * epsilon[ii]; }  // 0b11 -> 0
+                                else if (tmpi[ii] == 2) { num += coef1 * epsilon[ii]; }  // 0b10 -> 1
+                                else                    { num += coef2 * epsilon[ii]; }  // 0b00 -> 2
+                                //else                 { }  // 0b01 -> M             
+                            }
+                            
+                        } else { 
+                            
+                            const int iimax = data.numInds-data.numNAs;
+                            
+                            for (int ii=0; ii<iimax; ++ii) {
+                                if (tmpi[ii] == 1) {
+                                    tmpi[ii] = -1;
+                                } else {
+                                    tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
+                                }
+                            }
+                            
+                            for (int ii=0; ii<iimax; ++ii) {
+                                
+                                if (tmpi[ii] == 0) {
+                                    num += coef0 * epsilon[ii];
+                                } else if (tmpi[ii] == 1) {
+                                    num += coef1 * epsilon[ii];
+                                } else if (tmpi[ii] == 2) {
+                                    num += coef2 * epsilon[ii];
+                                }
+                                
+                                //num += dotp_lut_mu[ii%8] * epsilon[ii] * dotp_lut_sig[ii%4];
+                            }
+                        }
+                        _mm_free(tmpi);
+                        */
+
                     } else {
-
+                        
                         num = sparse_dotprod(epsilon,
                                              I1, N1S[marker], N1L[marker],
                                              I2, N2S[marker], N2L[marker],
                                              IM, NMS[marker], NML[marker],
                                              mave[marker],    mstd[marker], Ntot, marker);
                     }
-
-                    //printf("it %2d, rank %2d, m %3d: num = %22.15f  USEBED=%d\n", iteration, rank, marker, num, USEBED[marker]);
+                    
+                    //if (j < 10)
+                    //    printf("it %2d, rank %2d, m %3d: num = %22.15f  USEBED=%d\n", iteration, rank, marker, num, USEBED[marker]);
+                    
                     //continue;
-
+                    
                     num += beta * double(Ntot - 1);
                     //printf("it %d, rank %d, mark %d: num = %22.15f, %20.15f, %20.15f\n", iteration, rank, marker, num, mave[marker], mstd[marker]);
 
@@ -1722,7 +1989,10 @@ int BayesRRm::runMpiGibbs() {
                     } else{
                         acum = 1.0 / ((logL.array()-logL[0]).exp().sum());
                     }
-                    //printf("acum = %15.10f, p = %15.10f\n", acum, p);
+                    //printf("acum = %20.15f, p = %20.15f\n", acum, p);
+
+                    //continue;
+
 
                     //TODO Store marker acum for later dump to file
                     Acum(marker) = acum;
@@ -1751,10 +2021,12 @@ int BayesRRm::runMpiGibbs() {
                             }
                         }
                     }
+
                 } else { // end of adapative if daniel
                     Beta(marker) = 0.0;
                     Acum(marker) = 1.0; // probability of beta being 0 equals 1.0
                 }
+
                 //printf("After acum = %15.10f\n", acum);
                 //printf("it %d, task %3d, marker %5d: @SO_FAR_SO_GOOD@\n", iteration, rank, marker);
                 //continue;
@@ -1762,7 +2034,10 @@ int BayesRRm::runMpiGibbs() {
                 betaOld   = beta;
                 beta      = Beta(marker);
                 deltaBeta = betaOld - beta;
-                //printf("deltaBeta = %15.10f\n", deltaBeta);
+                //printf("deltaBeta = %20.15f\n", deltaBeta);
+                
+                //continue;
+                
 
                 // Compute delta epsilon
                 if (deltaBeta != 0.0) {
@@ -1777,12 +2052,66 @@ int BayesRRm::runMpiGibbs() {
                     } else {
 
                         if (USEBED[marker]) {
-                            sparse_scaadd(deltaEps, deltaBeta, 
-                                          XI1, 0,           N1L[marker],
-                                          XI2, 0,           N2L[marker],
-                                          XIM, 0,           NML[marker],
-                                          mave[marker], mstd[marker], Ntot);
+
+                            //if (1 == 0) {
+                            //    sparse_scaadd(deltaEps, deltaBeta, 
+                            //                  XI1, 0,           N1L[marker],
+                            //                  XI2, 0,           N2L[marker],
+                            //                  XIM, 0,           NML[marker],
+                            //                  mave[marker], mstd[marker], Ntot);
+                            //} else {
+                                
+                            const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&I1[N1S[marker]]);
+                            
+                            double c1 = 0.0, c2 = 0.0;
+                            
+                            const double sigdb = mstd[marker] * deltaBeta;
+
+
+                            // main + remainder to avoid a test on idx < Ntot 
+                            const int fullb = Ntot / 4;
+                            int idx = 0;
+
+                            // main
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif                               
+                            for (int ii=0; ii<fullb; ++ii) {
+                                for (int iii=0; iii<4; iii++) {
+                                    idx = rawdata[ii] * 4 + iii;
+                                    c1 = dotp_lut_a[idx];
+                                    c2 = dotp_lut_b[idx];
+                                    deltaEps[ii * 4 + iii]  = (c1 - mave[marker]) * c2 * sigdb;
+                                }
+                            }
+                                    
+                            // remainder
+                            if (Ntot % 4 != 0) {
+                                int ii = fullb;
+                                for (int iii = 0; iii < Ntot - fullb * 4; iii++) {
+                                    idx = rawdata[ii] * 4 + iii;
+                                    c1 = dotp_lut_a[idx];
+                                    c2 = dotp_lut_b[idx];
+                                    deltaEps[ii * 4 + iii]  = (c1 - mave[marker]) * c2 * sigdb;
+                                }
+                            }
+                             
+                            /*
+                            for (int ii=0; ii<snpLenByt; ++ii) {
+                                
+                                for (int iii=0; iii<4; ++iii) {
+                                    
+                                    c1 = dotp_lut_a[rawdata[ii] * 4 + iii];
+                                    c2 = dotp_lut_b[rawdata[ii] * 4 + iii];
+                                    
+                                    if (ii*4 + iii < Ntot)
+                                        deltaEps[ii * 4 + iii]  = (c1 - mave[marker]) * c2 * sigdb;
+                                }
+                            }
+                            */
+
                         } else {
+                            
                             sparse_scaadd(deltaEps, deltaBeta, 
                                           I1,  N1S[marker], N1L[marker],
                                           I2,  N2S[marker], N2L[marker],
@@ -1808,16 +2137,21 @@ int BayesRRm::runMpiGibbs() {
             task_sum_abs_deltabeta += fabs(deltaBeta);
 
 
-            _mm_free(XI1);  XI1 = NULL;
-            _mm_free(XI2);  XI2 = NULL;
-            _mm_free(XIM);  XIM = NULL;
+            //_mm_free(XI1);  XI1 = NULL;
+            //_mm_free(XI2);  XI2 = NULL;
+            //_mm_free(XIM);  XIM = NULL;
+
+            
+            //continue;
 
 
             // Check whether we have a non-zero beta somewhere
             //
             if (nranks > 1 && (sinceLastSync >= opt.syncRate || j == lmax-1)) {
 
+                //EO: watch out this one for the time reported in sync stats
                 //MPI_Barrier(MPI_COMM_WORLD);
+                
                 double tb = MPI_Wtime();
                 
                 check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta, &cumSumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -1836,6 +2170,7 @@ int BayesRRm::runMpiGibbs() {
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
             //fflush(stdout);
 
+            //continue;
 
             if ( (sinceLastSync >= opt.syncRate || j == lmax-1) && cumSumDeltaBetas != 0.0) {
 
@@ -2017,7 +2352,11 @@ int BayesRRm::runMpiGibbs() {
                         // Compute total number of elements to be sent by each task
                         uint task_size = 0;
                         for (int i=0; i<task_m2s; i++) {
-                            task_size += (N1L[ mark2sync[i] ] + N2L[ mark2sync[i] ] + NML[ mark2sync[i] ] + 3);
+                            if (USEBED[mark2sync[i]]) {
+                                task_size += snpLenUint + 3;
+                            } else {
+                                task_size += (N1L[ mark2sync[i] ] + N2L[ mark2sync[i] ] + NML[ mark2sync[i] ] + 3);
+                            }
                             task_stat[2 * i + 0] = mave[ mark2sync[i] ];
                             task_stat[2 * i + 1] = mstd[ mark2sync[i] ] * dbet2sync[i];
                             //printf("Task %3d, m2s %d/%d: 1: %8lu, 2: %8lu, m: %8lu, info: 3); stats are (%15.10f, %15.10f)\n", rank, i, task_m2s, N1L[ mark2sync[i] ], N2L[ mark2sync[i] ], NML[ mark2sync[i] ], task_stat[2 * i + 0], task_stat[2 * i + 1]);
@@ -2055,18 +2394,28 @@ int BayesRRm::runMpiGibbs() {
                         check_malloc(task_dat, __LINE__, __FILE__);
 
                         int loc = 0;
+
                         for (int i=0; i<task_m2s; i++) {
 
                             int m2si = mark2sync[i];
 
-                            task_dat[loc] = N1L[m2si];  loc += 1;
-                            task_dat[loc] = N2L[m2si];  loc += 1;
-                            task_dat[loc] = NML[m2si];  loc += 1;
+                            //task_dat[loc++] = N1L[m2si];
+                            //task_dat[loc++] = N2L[m2si];
+                            //task_dat[loc++] = NML[m2si];
                             
                             if (USEBED[m2si]) {
 
-                                //EO TODO: keep sparse expansion from earlier on inbetween syncronization
+                                task_dat[loc++] = snpLenUint;  // bed data "as is" stored in uint
+                                task_dat[loc++] = UINT_MAX;    // switch to detect a bed stored marker
+                                task_dat[loc++] = 0;
 
+                                const uint* rawdata = reinterpret_cast<uint*>(&I1[N1S[m2si]]);
+
+                                for (int ii=0; ii<snpLenUint; ii++) {
+                                    task_dat[loc++] = rawdata[ii];
+                                }
+
+                                /*
                                 uint* XI1 = (uint*)_mm_malloc(N1L[m2si] * sizeof(uint), 64);  check_malloc(XI1, __LINE__, __FILE__);
                                 uint* XI2 = (uint*)_mm_malloc(N2L[m2si] * sizeof(uint), 64);  check_malloc(XI2, __LINE__, __FILE__);
                                 uint* XIM = (uint*)_mm_malloc(NML[m2si] * sizeof(uint), 64);  check_malloc(XIM, __LINE__, __FILE__);
@@ -2094,20 +2443,121 @@ int BayesRRm::runMpiGibbs() {
                                 _mm_free(XI2);  XI2 = NULL;
                                 _mm_free(XIM);  XIM = NULL;
 
+                                */
+
+                                /*
+                                const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&I1[N1S[m2si]]);
+                                //int n0 = 0, n1 = 0, n2 = 0, nm = 0;
+                                
+                                //EO: indices of 1s, then 2s, then Ms for each marker, one after the other.
+
+                                double c1 = 0.0, c2 = 0.0;
+                                uint idx = 0;
+                                uint loc1 = loc;
+                                uint loc2 = loc + N1L[m2si];
+                                uint locm = loc + N1L[m2si] + N2L[m2si];
+
+                                const uint8_t z3 = 0b11;
+
+                                // main + remainder to avoid a test on idx < Ntot 
+                                const int fullb = Ntot / 4;
+                                uint8_t b;
+                                
+                                // main
+                                for (int ii=0; ii<fullb; ++ii) {  
+                                    b = rawdata[ii];
+                                    for (int iii = 0; iii < 4; iii++) {
+                                        idx = ii * 4 + iii;
+                                        uint8_t bz3 = (b & z3);
+                                        if      (bz3 == 0b11) {                         }  // 0: do nothing
+                                        else if (bz3 == 0b10) { task_dat[loc1++] = idx; }  // 1: store it
+                                        else if (bz3 == 0b00) { task_dat[loc2++] = idx; }  // 2: store it
+                                        else if (bz3 == 0b01) { task_dat[locm++] = idx; }  // M: store it
+                                        b >>= 2;
+                                    }
+                                }
+                                
+                                // remainder
+                                if (Ntot % 4 != 0) {
+                                    b = rawdata[fullb];
+                                    for (int iii = 0; iii < Ntot - fullb * 4; iii++) {
+                                        idx = fullb * 4 + iii;
+                                        uint8_t bz3 = (b & z3);
+                                        if      (bz3 == 0b11) {                         }  // 0: do nothing
+                                        else if (bz3 == 0b10) { task_dat[loc1++] = idx; }  // 1: store it
+                                        else if (bz3 == 0b00) { task_dat[loc2++] = idx; }  // 2: store it
+                                        else if (bz3 == 0b01) { task_dat[locm++] = idx; }  // M: store it
+                                        b >>= 2;
+                                    }
+                                }
+                                */
+                                
+
+                                /*
+                                for (int ii=0; ii<snpLenByt; ++ii) {                                    
+                                    
+                                    uint8_t b = rawdata[ii];
+                                        
+                                    for (int iii=0; iii<4; ++iii) {
+                                        
+                                        idx = ii * 4 + iii;
+                                        
+                                        uint8_t bz3 = (b & z3);
+                                            
+                                        if      (bz3 == 0b11) {                         }  // 0: do nothing
+                                        else if (bz3 == 0b10) { task_dat[loc1++] = idx; }  // 1: store it
+                                        else if (bz3 == 0b00) { task_dat[loc2++] = idx; }  // 2: store it
+                                        else if (bz3 == 0b01) { task_dat[locm++] = idx; }  // M: store it
+                                        
+                                        b >>= 2;
+                                            
+                                            
+                                        //c1 = dotp_lut_a[rawdata[ii] * 4 + iii];
+                                        //c2 = dotp_lut_b[rawdata[ii] * 4 + iii];
+                                        //
+                                        //idx = ii * 4 + iii;
+                                        //
+                                        //if (idx < Ntot) {
+                                        //
+                                        //    if (c1 == 0.0 && c2 == 0.0) {
+                                        //        task_dat[locm++] = idx;
+                                        //    } else if (c1 == 1.0) {
+                                        //        task_dat[loc1++] = idx;
+                                        //    } else if (c1 == 2.0) {
+                                        //        task_dat[loc2++] = idx;
+                                        //    }
+                                        //} 
+                                    }
+                                }
+                                */
+
+                                //loc += N1L[m2si] + N2L[m2si] + NML[m2si];
+
+
                             } else {
 
+                                task_dat[loc++] = N1L[m2si];
+                                task_dat[loc++] = N2L[m2si];
+                                task_dat[loc++] = NML[m2si];
+
+                                //cout << "1: " << loc << ", " << N1L[m2si] << endl;
                                 for (uint ii = 0; ii < N1L[m2si]; ii++) {
                                     task_dat[loc] = I1[ N1S[m2si] + ii ];  loc += 1;
-                                }                  
+                                }  
+                                //cout << "2: " << loc << ", " << N2L[m2si] << endl;                                                                
                                 for (uint ii = 0; ii < N2L[m2si]; ii++) {
                                     task_dat[loc] = I2[ N2S[m2si] + ii ];  loc += 1;
                                 }
+                                //cout << "M: " << loc << ", " << NML[m2si] << endl;
                                 for (uint ii = 0; ii < NML[m2si]; ii++) {
                                     task_dat[loc] = IM[ NMS[m2si] + ii ];  loc += 1;
                                 }
                             }
                         }
+                        //printf("loc vs task_size = %d vs %d\n", loc, task_size);
                         assert(loc == task_size);
+
+                        
 
                         // Allocate receive buffer for all the data
                         //if (rank == 0)
@@ -2118,6 +2568,7 @@ int BayesRRm::runMpiGibbs() {
                         check_mpi(MPI_Allgatherv(task_dat, task_size, MPI_UNSIGNED,
                                                  glob_dat, tasks_len, tasks_dis, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
                         _mm_free(task_dat);
+                        //cout << "glob_size = " << glob_size << endl;
 
                         double* glob_stats = (double*) _mm_malloc(size_t(glob_size * 2) * sizeof(double), 64);
                         check_malloc(glob_stats, __LINE__, __FILE__);
@@ -2126,9 +2577,14 @@ int BayesRRm::runMpiGibbs() {
                                                  glob_stats, stats_len, stats_dis, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__);
                         _mm_free(task_stat);
 
+
                         // Compute global delta epsilon deltaSum
+                        //
                         size_t loci = 0;
+                        double c1 = 0.0, c2 = 0.0;
+
                         for (int i=0; i<glob_m2s ; i++) {
+
                             //printf("m2s %d/%d (loci = %lu): %d, %d, %d\n", i, glob_m2s, loci, glob_dat[loci], glob_dat[loci + 1], glob_dat[loci + 2]);
                             double lambda0 = glob_stats[2 * i + 1] * (0.0 - glob_stats[2 * i]);
                             //printf("rank %d lambda0 = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", rank, lambda0, glob_stats[2 * i], glob_stats[2 * i + 1]);
@@ -2140,28 +2596,119 @@ int BayesRRm::runMpiGibbs() {
                                 offset_vector_f64(deltaSum, lambda0, Ntot);
                             }
 
-                            // M -> revert lambda 0 (so that equiv to add 0.0)
-                            size_t S = loci + (size_t) (3 + glob_dat[loci] + glob_dat[loci + 1]);
-                            size_t L = glob_dat[loci + 2];
-                            //cout << "task " << rank << " M: start = " << S << ", len = " << L <<  endl;
-                            sparse_add(deltaSum, -lambda0, glob_dat, S, L);
+                            if (glob_dat[loci + 1] == UINT_MAX) {
 
-                            // 1 -> add dbet * sig * ( 1.0 - mu)
-                            double lambda = glob_stats[2 * i + 1] * (1.0 - glob_stats[2 * i]);
-                            //printf("1: lambda = %15.10f, l-l0 = %15.10f\n", lambda, lambda - lambda0);
-                            S = loci + 3;
-                            L = glob_dat[loci];
-                            //cout << "1: start = " << S << ", len = " << L <<  endl;
-                            sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
+                                // Reset vector
+                                if (i == 0)  set_vector_f64(deltaSum, 0.0, Ntot);
 
-                            // 2 -> add dbet * sig * ( 2.0 - mu)
-                            lambda = glob_stats[2 * i + 1] * (2.0 - glob_stats[2 * i]);
-                            S = loci + 3 + glob_dat[loci];
-                            L = glob_dat[loci + 1];
-                            //cout << "2: start = " << S << ", len = " << L <<  endl;
-                            sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
+                                const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&glob_dat[loci + 3]);
 
-                            loci += 3 + glob_dat[loci] + glob_dat[loci + 1] + glob_dat[loci + 2];
+                                // main + remainder to avoid a test on idx < Ntot 
+                                const int fullb = Ntot / 4;
+                                int idx = 0;
+
+                                // main
+                                
+                                double mu_ = glob_stats[2 * i];
+                                double si_ = glob_stats[2 * i + 1];
+
+                                __m256d vmu_ = _mm256_set1_pd(mu_);
+                                __m256d vsi_ = _mm256_set1_pd(si_);
+                                
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif                                
+                                for (int ii=0; ii<fullb; ++ii) {
+                                
+                                    __m256d p4c1  = _mm256_loadu_pd(&(dotp_lut_a[rawdata[ii] * 4]));
+                                    __m256d p4c2  = _mm256_loadu_pd(&(dotp_lut_b[rawdata[ii] * 4]));
+                                    
+                                    p4c1 = _mm256_sub_pd(p4c1, vmu_);
+                                    p4c2 = _mm256_mul_pd(p4c2, vsi_);
+                                    p4c2 = _mm256_mul_pd(p4c2, p4c1);
+
+                                    __m256d p4dls = _mm256_loadu_pd(&(deltaSum[ii * 4])); 
+                                    
+                                    p4dls = _mm256_add_pd(p4dls, p4c2);
+
+                                    _mm256_store_pd(&(deltaSum[ii * 4]), p4dls);
+
+                                }
+
+                                /*
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+                                for (int ii=0; ii<fullb; ++ii) {
+                                    for (int iii=0; iii<4; iii++) {
+                                        //idx = rawdata[ii] * 4 + iii;
+                                        c1  = dotp_lut_a[rawdata[ii] * 4 + iii];
+                                        c2  = dotp_lut_b[rawdata[ii] * 4 + iii];
+                                        deltaSum[ii * 4 + iii] += (c1 - mu_) * c2 * si_;
+                                    }
+                                }
+
+                                */
+
+
+                                /*
+                                for (int ii=0; ii<fullb; ++ii) {
+                                    for (int iii=0; iii<4; iii++) {
+                                        idx = rawdata[ii] * 4 + iii;
+                                        c1  = dotp_lut_a[idx];
+                                        c2  = dotp_lut_b[idx];
+                                        deltaSum[ii * 4 + iii] += (c1 - mu_) * c2 * si_;
+                                    }
+                                }
+                                */
+
+                                // remainder
+                                if (Ntot % 4 != 0) {
+                                    int ii = fullb;
+                                    for (int iii = 0; iii < Ntot - fullb * 4; iii++) {
+                                        idx = rawdata[ii] * 4 + iii;
+                                        c1  = dotp_lut_a[idx];
+                                        c2  = dotp_lut_b[idx];
+                                        deltaSum[ii * 4 + iii] += (c1 - glob_stats[2 * i]) * c2 * glob_stats[2 * i + 1];
+                                    }
+                                }
+                                
+                                loci += 3 + glob_dat[loci];  // + 1 contains UINT_MAX to mark BED data
+
+                            } else {
+                                
+                                if (i == 0) {
+                                    set_vector_f64(deltaSum, lambda0, Ntot);
+                                } else {
+                                    offset_vector_f64(deltaSum, lambda0, Ntot);
+                                }
+
+
+                                // M -> revert lambda 0 (so that equiv to add 0.0)
+                                size_t S = loci + (size_t) (3 + glob_dat[loci] + glob_dat[loci + 1]);
+                                size_t L = glob_dat[loci + 2];
+                                //cout << "task " << rank << " M: start = " << S << ", len = " << L <<  endl;
+                                sparse_add(deltaSum, -lambda0, glob_dat, S, L);
+                                
+                                // 1 -> add dbet * sig * ( 1.0 - mu)
+                                double lambda = glob_stats[2 * i + 1] * (1.0 - glob_stats[2 * i]);
+                                //printf("1: lambda = %15.10f, l-l0 = %15.10f\n", lambda, lambda - lambda0);
+                                S = loci + 3;
+                                L = glob_dat[loci];
+                                //cout << "1: start = " << S << ", len = " << L <<  endl;
+                                sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
+                                
+                                // 2 -> add dbet * sig * ( 2.0 - mu)
+                                lambda = glob_stats[2 * i + 1] * (2.0 - glob_stats[2 * i]);
+                                S = loci + 3 + glob_dat[loci];
+                                L = glob_dat[loci + 1];
+                                //cout << "2: start = " << S << ", len = " << L <<  endl;
+                                sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
+
+                                loci += 3 + glob_dat[loci] + glob_dat[loci + 1] + glob_dat[loci + 2];
+                            }
+
                         }
 
                         _mm_free(glob_stats);
@@ -2186,7 +2733,8 @@ int BayesRRm::runMpiGibbs() {
 
                 } else { // case nranks == 1
 
-                    sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
+                    //cout << "COME HERE" << endl;
+                    sum_vectors_f64(epsilon, tmpEps, dEpsSum, Ntot);
                 }
 
                 double end_sync = MPI_Wtime();
@@ -2209,6 +2757,8 @@ int BayesRRm::runMpiGibbs() {
 
         //exit(0);
 
+        //continue;
+        
 
         // Update beta squared norm by group
         beta_squaredNorm.setZero();
@@ -2803,5 +3353,3 @@ uint BayesRRm::set_Mtot(const int rank) {
 
 
 #endif
-
-
