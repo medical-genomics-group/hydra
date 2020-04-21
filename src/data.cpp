@@ -1873,13 +1873,16 @@ void Data::readGroupFile(const string &groupFile) {
     if (rank == 0)
         cout << "Reading groups from [" + groupFile + "]." << endl;
 
-    std::istream_iterator<double> start(in), end;
-
+    //EO: should be int?
+    //std::istream_iterator<double> start(in), end;
+    std::istream_iterator<int> start(in), end;
+    cout << "groups.size() = " << groups.size() << endl;
+    
     std::vector<int> numbers(start, end);
 
     int* ptr =(int*)&numbers[0];
 
-    groups = Eigen::Map<Eigen::VectorXi>(ptr, numbers.size());
+    groups = Eigen::Map<Eigen::VectorXi>(ptr, groups.size());
 }
 
 
@@ -1891,30 +1894,29 @@ void Data::readmSFile(const string& mSfile){
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     ifstream in(mSfile);
+    if (!in) throw ("Error: can not open the mixture file [" + mSfile + "] to read. Use the --groupMixtureFile option!");
 
-    if(!in.is_open()){
-        cout<<"Error opening the file"<< endl;
-        return;
-    }
+    if (rank == 0)
+        cout << "Reading mixtures from [" + mSfile + "]." << endl;
 
-    else if(in.is_open()){
+    if (!in.is_open()) throw ("Error opening the file");
 
-        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
-
-        Gadget::Tokenizer strvec;
-        Gadget::Tokenizer strT;
-
-        strvec.getTokens(whole_text, ";");
-        strT.getTokens(strvec[0],",");
-        
-        mS=Eigen::MatrixXd(strvec.size(),strT.size());
-        numGroups=strvec.size();
-        //cout << "numGroups = " << numGroups << endl;
-        for (unsigned j=0; j<strvec.size(); ++j) {
-            strT.getTokens(strvec[j],",");
-            for(unsigned k=0; k<strT.size(); ++k)
-                mS(j,k) = stod(strT[k]);
-        }
+    string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+    
+    Gadget::Tokenizer strvec;
+    Gadget::Tokenizer strT;
+    
+    strvec.getTokens(whole_text, ";");
+    strT.getTokens(strvec[0],",");
+    
+    mS=Eigen::MatrixXd(strvec.size(),strT.size());
+    numGroups=strvec.size();
+    cout << "numGroups = " << numGroups << endl;
+    cout << "num lines = " << strT.size() << endl;
+    for (unsigned j=0; j<strvec.size(); ++j) {
+        strT.getTokens(strvec[j],",");
+        for(unsigned k=0; k<strT.size(); ++k)
+            mS(j,k) = stod(strT[k]);
     }
 
     if (rank == 0)
