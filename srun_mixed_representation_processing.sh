@@ -84,7 +84,7 @@ elif [ $DS == 5 ]; then
     sparsebsn=$dataset
     NUMINDS=382466
     NUMSNPS=8430446
-    NUMSNPS=100000
+    NUMSNPS=10000
 fi
 
 
@@ -99,7 +99,7 @@ echo "S         :" $S
 echo "======================================"
 echo
 
-CL=30
+CL=10
 SEED=10
 SR=5
 SM=1
@@ -118,7 +118,7 @@ export KMP_AFFINITY=noverbose
 
 # Select what to run
 run_bed_sync_dp=0;      run_sparse_sync_dp=0;      run_mixed_sync_dp=0;
-run_bed_sync_sparse=0;  run_sparse_sync_sparse=0;  run_mixed_sync_sparse=1;
+run_bed_sync_sparse=0;  run_sparse_sync_sparse=1;  run_mixed_sync_sparse=1;
 run_bed_sync_bed=0;     run_sparse_sync_bed=0;     run_mixed_sync_bed=0;
 
 
