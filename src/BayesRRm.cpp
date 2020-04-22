@@ -319,7 +319,6 @@ void BayesRRm::sparse_scaadd(double*     __restrict__ vout,
     }
 }
 
-
 inline double partial_sparse_dotprod(const double* __restrict__ vec,
                                      const uint*   __restrict__ IX,
                                      const size_t               NXS,
@@ -2589,13 +2588,6 @@ int BayesRRm::runMpiGibbs() {
                             double lambda0 = glob_stats[2 * i + 1] * (0.0 - glob_stats[2 * i]);
                             //printf("rank %d lambda0 = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", rank, lambda0, glob_stats[2 * i], glob_stats[2 * i + 1]);
 
-                            // Set all to 0 contribution
-                            if (i == 0) {
-                                set_vector_f64(deltaSum, lambda0, Ntot);
-                            } else {
-                                offset_vector_f64(deltaSum, lambda0, Ntot);
-                            }
-
                             if (glob_dat[loci + 1] == UINT_MAX) {
 
                                 // Reset vector
@@ -2683,7 +2675,6 @@ int BayesRRm::runMpiGibbs() {
                                 } else {
                                     offset_vector_f64(deltaSum, lambda0, Ntot);
                                 }
-
 
                                 // M -> revert lambda 0 (so that equiv to add 0.0)
                                 size_t S = loci + (size_t) (3 + glob_dat[loci] + glob_dat[loci + 1]);
