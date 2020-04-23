@@ -54,15 +54,14 @@ void LinPred::predict_genetic_values(string outfile) {
     // perform multiplication
     for (uint i = 0; i < block_rows_a; i++) {
         for (uint j = 0; j < block_cols_b; j++) {
-            for (uint k = 0; k < M; k++) {
-                buff_c[i + j * block_rows_a] += buff_a[i*M + k] * buff_b[k*M + j];
+            for (uint k = 0; k < M; k++) 
+                buff_c[i + block_rows_a * j] += buff_a[i + block_rows_a * k] * buff_b[j * block_cols_b + k];
             }
         }
     }
     // gather results
     float *c = NULL;
     if (rank == 0) {
-        // TODO: initialise result vector
         c = (float *) malloc(sizeof(float) * N * I);
     }
     MPI_Gather(buff_c, block_rows_a * block_cols_b, MPI_FLOAT, c,
