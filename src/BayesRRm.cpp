@@ -952,23 +952,39 @@ int BayesRRm::runMpiGibbs() {
         printf("INFO   : Full dataset includes Mtot=%d markers and Ntot=%d individuals.\n", Mtot, Ntot);
 
 
-    // Handle marker groups
-    //
-    data.groups.resize(Mtot);
-    data.groups.setZero();
+    // Handle marker groups: by default we assume a single group with all markers belonging
+    // to it. In this case -S option is used for the mixture. Otherwise, we expect a group file
+    // covering all markers with a group mixture file covering all groups.
+    // Warning: passed mixture shall not contain the 0.0 value, it is added by default.
 
-    const int Kt   = cva.size() + 1;
-    const int Ktm1 = Kt - 1; 
-    data.mS.resize(Mtot, Kt);
-    data.mS.col(0).array() = 0.0;
-
-    for (int i=0; i<Mtot; i++)
-        data.mS.row(i).segment(1, Ktm1) = cva;
-
+    // First, load the mixture components (adding 0.0 as first element/column)
     if (opt.groupIndexFile != "" && opt.groupMixtureFile != "") {
         data.readGroupFile(opt.groupIndexFile);
         data.readmSFile(opt.groupMixtureFile);
+    } else {
+        // Define one group for all markers (group 0)
+        data.groups.resize(Mtot);
+        data.groups.setZero();
+        assert(data.numGroups == 1);
+        data.mS.resize(data.numGroups, cva.size() + 1);
+        data.mS(0, 0) = 0.0;
+        for (int i=0; i<cva.size(); i++) {
+            if (cva(i) <= 0.0)
+                throw("FATAL  : mixture value can only be strictly positive");
+            data.mS(0, i + 1) = cva(i);
+        }
     }
+    assert(data.numGroups == data.mS.rows());
+
+    // Display for control
+    if (rank == 0)  data.printGroupMixtureComponents();
+
+    
+    // data.mS contains all mixture components, 0.0 included
+    const unsigned int  K   = int(data.mS.cols());
+    const unsigned int  km1 = K - 1;
+
+    const int numGroups = data.numGroups;
 
     // Length of a marker in [byte] in BED representation (1 ind is 2 bits, so 1 byte is 4 inds)
     size_t snpLenByt  = (Ntot %  4) ? Ntot /  4 + 1 : Ntot /  4;
@@ -998,12 +1014,10 @@ int BayesRRm::runMpiGibbs() {
     int IrankS[nranks], IrankL[nranks];
     mpi_define_blocks_of_markers(Ntot - data.numNAs, IrankS, IrankL, nranks);
 
-    const unsigned int  K   = int(data.mS.cols()) + 1;
-    const unsigned int  km1 = K - 1;
-    const int numGroups = data.numGroups;
     if (rank == 0)
         printf("INFO   : numGroups = %d, data.groups.size() = %lu, Mtot = %d\n", data.numGroups, data.groups.size(), Mtot);
     assert(data.groups.size() == Mtot);
+
     VectorXi groups     = data.groups;
     cVa.resize(numGroups, K);                   // component-specific variance
     cVaI.resize(numGroups, K);                  // inverse of the component variances
@@ -1012,7 +1026,7 @@ int BayesRRm::runMpiGibbs() {
     VectorXd            muk(K);                 // mean of k-th component marker effect size
     VectorXd            denom(K-1);             // temporal variable for computing the inflation of the effect variance for a given non-zero component
     VectorXi            m0(numGroups);          // non-zero elements per group
-    cass.resize(numGroups,K);      // variable storing the component assignment per group; EO RENAMING was v
+    cass.resize(numGroups,K);                   // variable storing the component assignment per group; EO RENAMING was v
     MatrixXi            sum_cass(numGroups,K);  // To store the sum of v elements over all ranks per group;         was sum_v
     VectorXd            Acum(M);
     VectorXb            adaV(M);                // Daniel adaptative scan Vector, ones will be sampled, 0 will be set to 0
@@ -1070,7 +1084,7 @@ int BayesRRm::runMpiGibbs() {
     mu         = 0.0;
 
     for (int i=0; i<numGroups; i++) {
-        cVa.row(i).segment(1,km1)     = data.mS.row(i).segment(0,km1);
+        cVa.row(i).segment(1,km1)     = data.mS.row(i).segment(1,km1);
         cVaI.row(i).segment(1,km1)    = cVa.row(i).segment(1,km1).cwiseInverse();
         priorPi.row(i).segment(1,km1) = priorPi(i,0) * cVa.row(i).segment(1,km1).array() / cVa.row(i).segment(1,km1).sum();
     }
