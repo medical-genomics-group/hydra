@@ -342,6 +342,7 @@ public:
     unsigned numGroups = 1;	// number of annotations
     void readGroupFile(const string &groupFile);
     void readmSFile(const string& mSfile);
+    void printGroupMixtureComponents();
     
     //bW var
     void readFailureFile(const string &failureFile);

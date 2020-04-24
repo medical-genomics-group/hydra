@@ -1871,9 +1871,11 @@ void Data::readGroupFile(const string &groupFile) {
     if (!in) throw ("Error: can not open the group file [" + groupFile + "] to read. Use the --groupIndexFile option!");
 
     if (rank == 0)
-        cout << "Reading groups from [" + groupFile + "]." << endl;
+        cout << "INFO   : Reading groups from [" + groupFile + "]." << endl;
 
-    std::istream_iterator<double> start(in), end;
+    //EO: should be int?
+    //std::istream_iterator<double> start(in), end;
+    std::istream_iterator<int> start(in), end;    
 
     std::vector<int> numbers(start, end);
 
@@ -1891,36 +1893,64 @@ void Data::readmSFile(const string& mSfile){
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     ifstream in(mSfile);
-
-    if(!in.is_open()){
-        cout<<"Error opening the file"<< endl;
-        return;
-    }
-
-    else if(in.is_open()){
-
-        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
-
-        Gadget::Tokenizer strvec;
-        Gadget::Tokenizer strT;
-
-        strvec.getTokens(whole_text, ";");
-        strT.getTokens(strvec[0],",");
-        
-        mS=Eigen::MatrixXd(strvec.size(),strT.size());
-        numGroups=strvec.size();
-        //cout << "numGroups = " << numGroups << endl;
-        for (unsigned j=0; j<strvec.size(); ++j) {
-            strT.getTokens(strvec[j],",");
-            for(unsigned k=0; k<strT.size(); ++k)
-                mS(j,k) = stod(strT[k]);
-        }
-    }
+    if (!in) throw ("Error: can not open the mixture file [" + mSfile + "] to read. Use the --groupMixtureFile option!");
 
     if (rank == 0)
-        cout << "Mixtures read from file" << endl;
+        cout << "INFO   : Reading mixtures from [" + mSfile + "]." << endl;
+
+    if (!in.is_open()) throw ("Error opening the file");
+
+    string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+    
+    Gadget::Tokenizer strvec;
+    Gadget::Tokenizer strT;
+    
+    strvec.getTokens(whole_text, ";"); // Size is number of groups
+    strT.getTokens(strvec[0], ",");    // Size is number of non-zero mixture components
+
+    const int n_groups = strvec.size();
+    const int n_mixt_c = strT.size();
+
+    numGroups = n_groups;
+
+    // Add a column for the 0.0
+    mS.resize(n_groups, n_mixt_c + 1);
+    mS.col(0).array() = 0.0;
+
+    for (unsigned j=0; j<n_groups; ++j) {
+
+        strT.getTokens(strvec[j], ",");
+
+        // Compare number of elements of each line to that of the first line
+        if (strT.size() != n_mixt_c)
+            throw("FATAL  : all group mixture should have the same number of components");
+
+        for(unsigned k=0; k<strT.size(); ++k) {
+            double mix = stod(strT[k]);
+            if (mix <= 0.0) throw("FATAL  : mixture value can only be strictly positive");
+
+            // Shit to col + 1, as col 0 is 0.0 by default
+            mS(j, k+1) = mix;
+        }
+    }
 }
 
+void Data::printGroupMixtureComponents() {
+    
+    printf("INFO   : group mixture component data.mS has size = [%lu, %lu]\n", mS.rows(), mS.cols());
+    printf("INFO   : data.mS = [");        
+    for (int i=0; i<numGroups; i++) {
+        if (i > 0) printf("                    ");
+        for (int ii=0; ii<(int)mS.cols(); ii++) {
+            printf("%6.5f", mS(i, ii));
+            if (ii < (int)mS.cols() - 1)  printf(", ");
+            else
+                if   (i < numGroups - 1)  printf(",");
+                else                      printf("];");                      
+        }
+        printf("\n");
+    }
+}
 
 /*
  * Reads priors v0, s0 for groups from file
