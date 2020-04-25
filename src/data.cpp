@@ -1162,51 +1162,6 @@ void Data::sparse_data_fill_indices(const char* rawdata,
 
     size_t i1 = 0, i2 = 0, im = 0;
     size_t N1 = 0, N2 = 0, NM = 0;
-    
-    
-    /*
-    if (NC == 1) {
-
-        for (int ii=0; ii<NB; ++ii) {
-            for (int iii=0; iii<4; ++iii) {
-                tmpi[ii*4 + iii] = (rawdata[ii] >> 2*iii) & 0b11;
-            }
-        }
-        
-        for (int ii=0; ii<numInds-NA; ++ii) {
-            if (tmpi[ii] == 1) {
-                //tmpi[ii] = -1;
-                IM[im++] = ii;
-            } else {
-
-                tmpi[ii] =  2 - ((tmpi[ii] & 0b1) + ((tmpi[ii] >> 1) & 0b1));
-
-                if (tmpi[ii] == 1) {
-                    I1[i1++] = ii;
-                } else if (tmpi[ii] == 2) {
-                    I2[i2++] = ii;
-                }
-            }
-        }
-
-        
-        //const uint iimax = numInds - NA;
-        //
-        //for (uint ii=0; ii<iimax; ++ii) {
-        //    if (tmpi[ii] == 1) {
-        //        I1[i1++] = ii;
-        //    }
-        //    //else if (tmpi[ii] < 0) {
-        //    //    IM[im++] = ii;
-        //    //}
-        //    else if (tmpi[ii] == 2) {
-        //        I2[i2++] = ii;
-        //    }
-        //}
-
-    } else {
-
-    */
       
     for (int i=0; i<NC; ++i) {
         
@@ -1254,7 +1209,7 @@ void Data::sparse_data_fill_indices(const char* rawdata,
         N2S[i] = N2;  N2L[i] = n2;  N2 += n2;
         NMS[i] = NM;  NML[i] = nm;  NM += nm;
     }
-    //}
+
     _mm_free(tmpi);
 }
 
@@ -1543,6 +1498,7 @@ void Data::readPhenotypeFiles(const vector<string> &phenFiles, const int numberI
     }
 }
 
+
 void Data::readPhenotypeFileAndSetNanMask(const string &phenFile, const int numberIndividuals, VectorXd& dest, VectorXi& mask, uint& nas) {
 
     numInds = numberIndividuals;
@@ -1575,6 +1531,7 @@ void Data::readPhenotypeFileAndSetNanMask(const string &phenFile, const int numb
     assert(line == numInds);
     //printf("nonas = %d, nas = %d\n", nonas, nas);
 }
+
 
 //EO: combined reading of a .phen and .cov files
 //    Assume .cov and .phen to be consistent with .fam and .bed!
@@ -1904,8 +1861,6 @@ void Data::readFailureFile(const string &failureFile){
 }
 
 
-//EO@@@
-//TODO Finish function to read the group file
 void Data::readGroupFile(const string &groupFile) {
 
     int rank;
@@ -1918,8 +1873,6 @@ void Data::readGroupFile(const string &groupFile) {
     if (rank == 0)
         cout << "INFO   : Reading groups from [" + groupFile + "]." << endl;
 
-    //EO: should be int?
-    //std::istream_iterator<double> start(in), end;
     std::istream_iterator<int> start(in), end;    
 
     std::vector<int> numbers(start, end);
@@ -1931,7 +1884,6 @@ void Data::readGroupFile(const string &groupFile) {
 
 
 // MP: read mS (mixtures) for each group
-//     save as Eigen Matrix
 void Data::readmSFile(const string& mSfile){
 
     int rank;
@@ -1979,6 +1931,7 @@ void Data::readmSFile(const string& mSfile){
         }
     }
 }
+
 
 void Data::printGroupMixtureComponents() {
     
