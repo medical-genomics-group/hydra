@@ -14,8 +14,8 @@ module load intel intel-mpi intel-mkl boost eigen
 module list
 
 
-NAM=mpi_gibbs_prof
-#NAM=mpi_gibbs_restart
+NAM=hydra
+
 PROJ=/home/orliac/DCSR/CTGG/BayesRRcmd
 EXE=$PROJ/src/$NAM
 

@@ -7,7 +7,7 @@ module list
 #export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
 #echo LD_LIBRARY_PATH = $LD_LIBRARY_PATH
 
-NAM=mpi_gibbs
+NAM=hydra
 
 cd ./src
 

@@ -22,7 +22,7 @@ if [ 1  == 1 ]; then
     icc components_converter.c -o components_converter
 fi    
 
-NAM=mpi_gibbs_NA
+NAM=hydra
 EXE=./src/$NAM
 
 # COMPILATION

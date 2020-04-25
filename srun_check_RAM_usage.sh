@@ -15,7 +15,7 @@ module purge
 module load intel intel-mpi intel-mkl boost eigen zlib
 module list
 
-NAM=mpi_gibbs_devel
+NAM=hydra
 
 EXE=./src/$NAM
 
