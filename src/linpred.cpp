@@ -28,6 +28,7 @@ void LinPred::predict_genetic_values(string outfile) {
     cout << "Matrix B:" << endl;
     for (uint i = 0; i < data.predBet.rows(); i++) {
         for (uint j = 0; j < data.predBet.cols(); j++) {
+            data.predBet(i, j) = (double) i * j;
             cout << data.predBet(i, j) << " ";
         }
     cout << std::endl;
@@ -83,7 +84,7 @@ void LinPred::predict_genetic_values(string outfile) {
     for (uint i = 0; i < block_rows_a; i++) {
         for (uint j = 0; j < block_cols_b; j++) {
             for (uint k = 0; k < M; k++) {
-                buff_c[i + block_rows_a * j] += buff_a[i + block_rows_a * k] * buff_b[j * block_cols_b + k];
+                buff_c[i + block_rows_a * j] += buff_a[i + block_rows_a * k] * buff_b[j * M + k];
             }
         }
     }
@@ -92,18 +93,23 @@ void LinPred::predict_genetic_values(string outfile) {
     if (rank == 0) {
         c = (double *) malloc(sizeof(double) * N * I);
     }
-    MPI_Gather(buff_c, block_rows_a * block_cols_b, MPI_FLOAT, c,
-                block_rows_a * block_cols_b, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    MPI_Gather(buff_c, block_rows_a * block_cols_b, MPI_DOUBLE, c,
+                block_rows_a * block_cols_b, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
     // TODO: map C back to a matrix directly
-    for (uint i = 0; i < N; i++) {
-        for (uint j = 0; j < I; j++) {
-            data.pred(i, j) = c[i*N + j];
+    if (rank == 0) {
+        for (uint i = 0; i < N; i++) {
+            for (uint j = 0; j < I; j++) {
+                data.pred(i, j) = c[i + j * N];
+            }
+        cout << endl;
         }
+    
+        // write prediction matrix to disk
+        // TODO: refactor to a writer function
+        ofstream file(outfile.c_str());
+        file << data.pred.format(csvFormat) << std::endl;
+        file.flush();
+        cout << "Predictions written to disk" << std::endl;
     }
-    // write prediction matrix to disk
-    // TODO: refactor to a writer function
-    ofstream file(outfile.c_str());
-    file << data.pred.format(csvFormat) << std::endl;
-    file.flush();
-    cout << "Predictions written to disk" << std::endl;
 }
