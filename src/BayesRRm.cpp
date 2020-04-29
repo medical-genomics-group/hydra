@@ -835,16 +835,29 @@ void BayesRRm::init_from_scratch() {
 
 void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot,
                                  const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart) {
-    
-    data.read_mcmc_output_csv_file(opt.mcmcOut, opt.save, K, sigmaG, sigmaE, estPi, iteration_restart);
+
+    int rank = 0;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if (rank == 0)
+        printf("RESTART: from files: %s.* files\n", opt.mcmcOut.c_str());
+
+    data.read_mcmc_output_csv_file(opt.mcmcOut, opt.save, K, sigmaG, sigmaE, estPi,
+                                   iteration_restart, first_saved_it_restart);
+    if (rank == 0) {
+        printf("RESTART: init_from_restart iteration_restart      = %d\n", iteration_restart);
+        printf("RESTART: init_from_restart first_saved_it_restart = %d\n", first_saved_it_restart);
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    data.read_mcmc_output_bet_file(opt.mcmcOut, Mtot, iteration_restart, opt.thin,
+    data.read_mcmc_output_bet_file(opt.mcmcOut,
+                                   Mtot, iteration_restart, first_saved_it_restart, opt.thin,
                                    MrankS, MrankL, use_xfiles_in_restart,
                                    Beta);
 
-    data.read_mcmc_output_cpn_file(opt.mcmcOut, Mtot, iteration_restart, opt.thin,
+    data.read_mcmc_output_cpn_file(opt.mcmcOut,
+                                   Mtot, iteration_restart, first_saved_it_restart, opt.thin,
                                    MrankS, MrankL, use_xfiles_in_restart,
                                    components);
 
@@ -854,7 +867,8 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
     data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_restart,
                                    markerI_restart);
 
-    data.read_mcmc_output_mus_file(opt.mcmcOut, iteration_restart, opt.thin,
+    data.read_mcmc_output_mus_file(opt.mcmcOut,
+                                   iteration_restart, first_saved_it_restart, opt.thin,
                                    mu_restart);
 
     if (opt.covariates) {
@@ -1058,6 +1072,7 @@ int BayesRRm::runMpiGibbs() {
     }
 
     estPi = priorPi;
+    //cout << "estPi after init " << estPi << endl;
 
     std::vector<unsigned int> xI(data.X.cols());
     std::iota(xI.begin(), xI.end(), 0);
@@ -1080,7 +1095,7 @@ int BayesRRm::runMpiGibbs() {
 
     sigmaG.resize(numGroups);
 
-    double sigmaE = 0.0;
+    sigmaE = 0.0;
 
     VectorXd dirc(K);
     dirc.array() = 1.0;
@@ -1098,6 +1113,7 @@ int BayesRRm::runMpiGibbs() {
     if (opt.restart) {
 
         init_from_restart(K, M, Mtot, Ntot - data.numNAs, MrankS, MrankL, use_xfiles_in_restart);
+        //cout << "estPi after restart " << estPi << endl;
 
         if (rank == 0)
             data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_restart, iteration_start);
@@ -1561,11 +1577,11 @@ int BayesRRm::runMpiGibbs() {
 
         double epssum  = 0.0;
         for (int i=0; i<Ntot; ++i) epssum += epsilon[i];
-        //printf("epssum = %20.15f with Ntot=%d elements\n", epssum, Ntot);
+        //printf("epssum = %20.15f with Ntot=%d elements on iteration = %d\n", epssum, Ntot, iteration);
 
         // update mu
         mu = dist.norm_rng(epssum / dN, sigmaE / dN);
-        //printf("it %d, rank %d: mu = %20.15f with dN = %10.1f\n", iteration, rank, mu, dN);
+        //printf("it %d, rank %d: mu = %20.15f with dN = %10.1f, sigmaE = %20.15f\n", iteration, rank, mu, dN, sigmaE);
 
         // We substract again now epsilon =Y-mu-X*beta
         for (int i=0; i<Ntot; ++i) epsilon[i] -= mu;
@@ -1717,8 +1733,7 @@ int BayesRRm::runMpiGibbs() {
                                              mave[marker],    mstd[marker], Ntot, marker);
                     }
                     
-                    //if (j < 10)
-                    //    printf("it %2d, rank %2d, m %3d: num = %22.15f  USEBED=%d\n", iteration, rank, marker, num, USEBED[marker]);
+                    //if (j < 10)  printf("it %2d, rank %2d, m %3d: num = %22.15f  USEBED=%d\n", iteration, rank, marker, num, USEBED[marker]);
                     
                     //continue;
                     
@@ -1733,7 +1748,7 @@ int BayesRRm::runMpiGibbs() {
                     //first component probabilities remain unchanged
                     for (int i=0; i<K; i++)
                         logL[i] = log(estPi(groups[MrankS[rank] + marker], i));
-                    //cout << "logL = " << endl << logL << endl;
+                    //if (marker == 0)  cout << "logL = " << endl << logL << endl;
 
                     // Update the log likelihood for each component
                     for (int i=1; i<1+km1; i++) {

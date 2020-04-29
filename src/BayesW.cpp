@@ -856,7 +856,8 @@ void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, cons
     init(Ntot,Mtot, fixtot);    
 
     //TODO @@@DT change this function to read the csv file from restart in groups 
-    data.read_mcmc_output_csv_file_bW(opt.mcmcOut, opt.save, K, mu, sigmaG, used_data.alpha, pi_L, iteration_restart);
+    data.read_mcmc_output_csv_file_bW(opt.mcmcOut, opt.save, K, mu, sigmaG, used_data.alpha, pi_L,
+                                      iteration_restart, first_saved_it_restart);
     
     // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
     srand(opt.seed + iteration_restart);
@@ -866,11 +867,13 @@ void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, cons
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    data.read_mcmc_output_bet_file(opt.mcmcOut, Mtot, iteration_restart, opt.thin,
+    data.read_mcmc_output_bet_file(opt.mcmcOut,
+                                   Mtot, iteration_restart, first_saved_it_restart, opt.thin,
                                    MrankS, MrankL, use_xfiles_in_restart,
                                    Beta);
 
-    data.read_mcmc_output_cpn_file(opt.mcmcOut, Mtot, iteration_restart, opt.thin,
+    data.read_mcmc_output_cpn_file(opt.mcmcOut,
+                                   Mtot, iteration_restart, first_saved_it_restart, opt.thin,
                                    MrankS, MrankL, use_xfiles_in_restart,
                                    components);
 
