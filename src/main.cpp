@@ -167,8 +167,8 @@ int main(int argc, const char * argv[]) {
                 BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs();
             }
-        }
-        else {
+
+        } else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);
         }
     } 

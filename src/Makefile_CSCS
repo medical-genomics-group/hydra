@@ -4,24 +4,24 @@
 # Date   : 22.01.2019
 #
 
-EXE ?= mpi_gibbs
+EXE      ?= hydra
 
 CXX       = CC
 
 #CXXFLAGS  = -O0
-CXXFLAGS = -Ofast
+CXXFLAGS   = -Ofast
 #CXXFLAGS  = -O1
-CXXFLAGS += -g
-CXXFLAGS += -std=c++17
-#CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
-#CXXFLAGS += -xCORE-AVX2
-#CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
-CXXFLAGS += -D USE_MPI
-#CXXFLAGS += -D EIGEN_DONT_VECTORIZE
-CXXFLAGS += -qopenmp
-#CXXFLAGS += -qopt-report=2
-#CXXFLAGS += -qopt-report-phase=loop,vec
-#CXXFLAGS += -qopt-report-file=stdout
+CXXFLAGS  += -g
+CXXFLAGS  += -std=c++17
+#CXXFLAGS  += -xCORE-AVX512 -qopt-zmm-usage=high
+#CXXFLAGS  += -xCORE-AVX2
+#CXXFLAGS  += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
+CXXFLAGS   += -D USE_MPI
+#CXXFLAGS  += -D EIGEN_DONT_VECTORIZE
+CXXFLAGS  += -qopenmp
+#CXXFLAGS  += -qopt-report=2
+#CXXFLAGS  += -qopt-report-phase=loop,vec
+#CXXFLAGS  += -qopt-report-file=stdout
 
 #EO: set this back when switching to production
 #    This will allow to fully use vectorization on both fidis and gacrux

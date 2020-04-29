@@ -19,7 +19,7 @@ $N = 500000;
 my $CL      = 5;        # Number of iterations (chain length)
 #my $SEED    = 1;           # Seed for RNG
 my $SM      = 1;           # Marker shuffling switch
-my $EXE     = "mpi_gibbs"; # Binary to run
+my $EXE     = "hydra"; # Binary to run
 
 die unless -d $DATADIR;
 die unless (-f $EXE && -e $EXE);

@@ -79,9 +79,6 @@ SM=1
 N=1
 TPN=1
 
-#echo EXE = $EXE
-#EXE=/home/orliac/DCSR/CTGG/BayesRRcmd/src/mpi_gibbs_20191217
-
 echo 
 echo
 echo "@@@ Official (sequential) solution (reading from BED file) @@@"
@@ -131,16 +128,3 @@ echo ---------------------------------------------------------------------------
 $cmd || exit 1
 #--marker-blocks-file $datadir/${dataset}.blk_1 
 #--covariates $datadir/scaled_covariates.csv
-
-echo
-echo
-echo "@@@ MPI 1-task solution reading from SPARSE files and sparse sync and alternate binary !!!@@@"
-echo
-sol=mpi1tsparse_sparseSync_alt
-EXE=./src/mpi_gibbs_20191217
-#SR=$(($SR - 2))
-cmd="srun -N $N --ntasks-per-node=$TPN $EXE --mpibayes bayesMPI --sparse-sync --bfile $datadir/$dataset --pheno $datadir/${phen}.phen --chain-length $CL --thin 1  --mcmc-out-dir $outdir --mcmc-out-name $sol --seed $SEED --shuf-mark $SM --sync-rate $SR --S $S --number-markers $NUMSNPS --number-individuals $NUMINDS --sparse-dir $sparsedir --sparse-basename $sparsebsn"
-echo ----------------------------------------------------------------------------------
-echo $cmd
-echo ----------------------------------------------------------------------------------
-$cmd || exit 1

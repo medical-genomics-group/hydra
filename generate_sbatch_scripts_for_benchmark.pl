@@ -59,7 +59,7 @@ my $THIN      = 10;
 my $SAVE      = 10;
 my $SM        = 1;          # Marker shuffling switch
 my $MEMGB     = 180;        # Helvetios
-my $EXE       = "/home/orliac/DCSR/CTGG/BayesRRcmd/src/mpi_gibbs";
+my $EXE       = "/home/orliac/DCSR/CTGG/BayesRRcmd/src/hydra";
 
 die unless -d $dir;
 die unless (-f $EXE && -e $EXE);

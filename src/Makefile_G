@@ -4,12 +4,12 @@
 # Date   : 22.01.2019
 #
 
-EXE ?= mpi_gibbs_G
+EXE      ?= hydra_G
 
 CXX       = mpic++
 
 #CXXFLAGS  = -O0
-CXXFLAGS = -Ofast
+CXXFLAGS  = -Ofast
 CXXFLAGS += -g
 CXXFLAGS += -std=c++17
 #CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high

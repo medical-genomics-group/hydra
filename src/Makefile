@@ -4,12 +4,12 @@
 # Date   : 22.01.2019
 #
 
-EXE ?= mpi_gibbs
+EXE      ?= hydra
 
 CXX       = mpiicpc
 
 #CXXFLAGS  = -O0
-CXXFLAGS = -Ofast
+CXXFLAGS  = -Ofast
 CXXFLAGS += -g
 CXXFLAGS += -std=c++17
 CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
@@ -31,6 +31,7 @@ CXXFLAGS += -L/usr/lib64
 #EO: enable the following for a strict comparison with Eigen
 #CXXFLAGS += -fp-model precise 
 #CXXFLAGS += -fp-model source
+#CXXFLAGS += -fp-model consistent
 
 #INCLUDE   = -I$(HOME)/inc/Eigen-3.3.7
 #INCLUDE  += -I$(HOME)/inc/Boost-1.71.0

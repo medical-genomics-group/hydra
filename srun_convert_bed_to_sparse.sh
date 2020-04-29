@@ -6,7 +6,7 @@ module purge
 module load intel intel-mpi intel-mkl boost eigen
 module list
 
-EXE=./src/mpi_gibbs
+EXE=./src/hydra
 
 # COMPILATION
 cd ./src

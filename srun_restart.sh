@@ -18,7 +18,7 @@ module list
 
 # COMPILATION
 # -----------
-NAM=mpi_gibbs_RESTART
+NAM=hydra
 EXE=./src/$NAM
 cd ./src
 B='-B'

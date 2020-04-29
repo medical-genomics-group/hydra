@@ -4,7 +4,7 @@
 # Date   : 22.01.2019
 #
 
-EXE       = mpi_gibbs
+EXE      ?= hydra 
 
 CXX       = mpic++
 
