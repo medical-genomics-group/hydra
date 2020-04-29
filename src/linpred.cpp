@@ -46,6 +46,7 @@ void LinPred::predict_genetic_values(string outfile) {
     MPI_Scatter(a, elem_per_proc_a, MPI_DOUBLE, buff_a,
                 elem_per_proc_a, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     // perform multiplication
+    //  TODO: parallelise loops
     for (uint i = 0; i < block_rows_a; i++) {
         for (uint j = 0; j < I; j++) {
             for (uint k = 0; k < M; k++) {
@@ -61,20 +62,14 @@ void LinPred::predict_genetic_values(string outfile) {
     MPI_Gather(buff_c, block_rows_a * I, MPI_DOUBLE, c,
                 block_rows_a * I, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Barrier(MPI_COMM_WORLD);
-    // TODO: map C back to a matrix directly with Eigen's Map
+    // map c array back to MatrixXd
     if (rank == 0) {
-        for (uint i = 0; i < N; i++) {
-            for (uint j = 0; j < I; j++) {
-                // c contains the result in row-major format
-                data.pred(i, j) = c[i * I + j];
-            }
-        }
-
-        // write prediction matrix to disk
-        // TODO: refactor to a writer function
-        ofstream file(outfile.c_str());
-        file << data.pred.format(csvFormat) << std::endl;
-        file.flush();
-        cout << "Predictions written to disk" << std::endl;
+        data.pred = Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(c, N, I);
     }
+    // write prediction matrix to disk
+    // TODO: refactor to a writer function
+    ofstream file(outfile.c_str());
+    file << data.pred.format(csvFormat) << std::endl;
+    file.flush();
+    cout << "Predictions written to disk" << std::endl;
 }
