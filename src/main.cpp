@@ -2,7 +2,7 @@
 #include <string>
 #include "BayesRRm.h"
 #include "BayesW.hpp"
-#include "BayesRRm_mt.h"
+// #include "BayesRRm_mt.h"
 #include "data.hpp"
 #include "options.hpp"
 #ifndef USE_MPI

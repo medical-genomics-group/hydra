@@ -1358,7 +1358,7 @@ int BayesW::runMpiGibbs_bW() {
         if(opt.covariates){
 
             double gamma_old = 0;
-            std::shuffle(xI.begin(), xI.end(), dist.rng);    
+            // std::shuffle(xI.begin(), xI.end(), dist.rng);    
     		//Use only rank 0 shuffling
             check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 	        MPI_Barrier(MPI_COMM_WORLD);
@@ -1447,7 +1447,7 @@ int BayesW::runMpiGibbs_bW() {
         }
 
         if (opt.shuffleMarkers) {
-            std::shuffle(markerI.begin(), markerI.end(), dist.rng);
+            // std::shuffle(markerI.begin(), markerI.end(), dist.rng);
         }
         m0.array() = 0;
 	cass.setZero();

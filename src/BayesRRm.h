@@ -7,7 +7,7 @@
 
 #ifndef SRC_BAYESRRM_H_
 #define SRC_BAYESRRM_H_
-
+#include "hydra.h"
 #include "data.hpp"
 #include "options.hpp"
 #include "distributions_boost.hpp"

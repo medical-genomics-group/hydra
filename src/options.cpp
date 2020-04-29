@@ -1,4 +1,5 @@
 #include "options.hpp"
+#include "hydra.h"
 #include <sys/stat.h>
 
 

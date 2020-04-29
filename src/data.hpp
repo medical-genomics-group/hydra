@@ -1,6 +1,6 @@
 #ifndef data_hpp
 #define data_hpp
-
+#include "hydra.h"
 #include <iostream>
 #include <stdio.h>
 #include <stdlib.h>

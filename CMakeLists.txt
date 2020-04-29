@@ -7,6 +7,12 @@ option(AVX512 "Enable more compiler optimizations" ON)
 option(NATIVE "Enable more compiler optimizations" OFF)
 
 
+add_definitions("-DNEWTONIAN")
+
+
+
+
+
 set(CMAKE_CXX_STANDARD 17)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -D USE_MPI")
 add_definitions("-DUSE_MPI")
@@ -20,13 +26,14 @@ message(STATUS "Run: ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} ${MPIEXEC_MAX_NUMPROCS} 
 include_directories(${MPI_INCLUDE_PATH})
 
 
-find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+find_package (Eigen3)
 
 SET(GCC_EIGEN_COMPILE_FLAGS "-Wno-deprecated-declarations -DEIGEN_NO_DEBUG -DEIGEN_UNROLLING_LIMIT=1000")
 
 find_package(Boost REQUIRED)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS})
+  add_definitions("-DBOOST_ALLOW_DEPRECATED_HEADERS")
 endif()
 
 
@@ -75,13 +82,6 @@ endif(ZLIB_FOUND)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_EIGEN_COMPILE_FLAGS}")
 
 
-include_directories(src)
-add_subdirectory(src)
-
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-
-
-
 
 if(ENABLE_UNIT_TESTS)
   
@@ -118,3 +118,17 @@ if(ENABLE_UNIT_TESTS)
 
     add_subdirectory(test)
 endif()
+
+include_directories(MultiTrait/Multi-trait/src/)
+add_subdirectory(MultiTrait/Multi-trait/)
+
+
+include_directories(src)
+add_subdirectory(src)
+
+Message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+
+
+
+
+
