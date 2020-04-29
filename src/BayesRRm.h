@@ -97,8 +97,9 @@ class BayesRRm
     double epsilonsum;
     double ytildesum;
 
-    uint iteration_restart = 0;
-    uint iteration_start   = 0;
+    uint iteration_restart      = 0;
+    uint iteration_start        = 0;
+    uint first_saved_it_restart = 0;
 
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();

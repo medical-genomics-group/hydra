@@ -209,7 +209,9 @@ void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, co
 
 //EO: Watch out the saving frequency of the betas (--thin)
 //    Each line contains simple the iteration (uint) and the value of mu (double)
-void Data::read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration_restart, const int thin, double& mu) {
+void Data::read_mcmc_output_mus_file(const string mcmcOut,
+                                     const uint  iteration_restart, const uint first_saved_it_restart, const int thin,
+                                     double& mu) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -227,6 +229,15 @@ void Data::read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration
     // 1. get and validate iteration number that we are about to read
     assert(iteration_restart%thin == 0);
     int n_thinned_saved = iteration_restart / thin;
+
+    //EO: in case of multiple restarts, we need to account for the fact that
+    //    the file does not start at iteration 0, but at the first saved iteration
+    //    from last restart
+    assert(first_saved_it_restart % thin == 0);
+    n_thinned_saved -= first_saved_it_restart / thin;
+    //cout << "n_thinned_saved ADJUSTED = " << n_thinned_saved << endl;
+
+
     musoff = size_t(n_thinned_saved) * (sizeof(uint) + sizeof(double));
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at_all(musfh, musoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
@@ -238,7 +249,7 @@ void Data::read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration
     // 2. read the value of mu
     musoff += sizeof(uint);
     check_mpi(MPI_File_read_at(musfh, musoff, &mu, 1, MPI_DOUBLE, &status), __LINE__, __FILE__);
-    //printf("reading back mu = %15.10f at iteration %d\n", mu, iteration_);
+    printf("reading back mu = %15.10f at iteration %d\n", mu, iteration_);
 
     check_mpi(MPI_File_close(&musfh), __LINE__, __FILE__);
 }
@@ -248,7 +259,7 @@ void Data::read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration
 
 //EO: Watch out the saving frequency of the betas (--thin)
 void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot, 
-                                     const uint  iteration_restart, const int thin,
+                                     const uint  iteration_restart, const uint first_saved_it_restart, const int thin,
                                      const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                      VectorXi& components) {
 
@@ -276,6 +287,13 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
     // 2. get and validate iteration number that we are about to read
     assert(iteration_restart%thin == 0);
     int n_thinned_saved = iteration_restart / thin;
+    
+    //EO: in case of multiple restarts, we need to account for the fact that
+    //    the file does not start at iteration 0, but at the first saved iteration
+    //    from last restart
+    assert(first_saved_it_restart % thin == 0);
+    n_thinned_saved -= first_saved_it_restart / thin;
+    //cout << "n_thinned_saved ADJUSTED = " << n_thinned_saved << endl;
 
     cpnoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(int));
     if (use_xfiles) cpnoff = sizeof(uint);
@@ -295,7 +313,7 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
         cpnoff = sizeof(uint) + sizeof(uint) + size_t(MrankS[rank]) * sizeof(int);
     }
     check_mpi(MPI_File_read_at_all(cpnfh, cpnoff, components.data(), MrankL[rank], MPI_INTEGER, &status), __LINE__, __FILE__);
-
+    //cout << "cpn = " << components << endl;
     //printf("reading back cpn: %d %d\n", components[0], components[MrankL[rank]-1]);
 
     check_mpi(MPI_File_close(&cpnfh), __LINE__, __FILE__);
@@ -303,9 +321,10 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
 
 
 //EO: Watch out the saving frequency of the betas (--thin)
-void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
-                                     const uint  iteration_restart, const int thin,
-                                     const int*   MrankS,  const int* MrankL, const bool use_xfiles,
+void Data::read_mcmc_output_bet_file(const string mcmcOut,           const uint Mtot,
+                                     const uint   iteration_restart, const uint first_saved_it_restart, const int thin,
+                                     const int*   MrankS,  const int* MrankL,
+                                     const bool   use_xfiles,
                                      VectorXd& Beta) {
 
     int nranks, rank;
@@ -331,8 +350,17 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
     }
 
     // 2. get and validate iteration number that we are about to read
-    assert(iteration_restart%thin == 0);
+    assert(iteration_restart % thin == 0);
     int n_thinned_saved = iteration_restart / thin;
+    //cout << "n_thinned_saved = " << n_thinned_saved << endl;
+
+    //EO: in case of multiple restarts, we need to account for the fact that
+    //    the file does not start at iteration 0, but at the first saved iteration
+    //    from last restart
+    assert(first_saved_it_restart % thin == 0);
+    n_thinned_saved -= first_saved_it_restart / thin;
+    //cout << "n_thinned_saved ADJUSTED = " << n_thinned_saved << endl;
+
 
     betoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(double));
     if (use_xfiles) betoff = sizeof(uint);
@@ -364,7 +392,8 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
 //EO: consider moving the csv output file from ASCII to BIN
 //
 void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                     VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
+                                     VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
+                                     uint& iteration_restart, uint& first_saved_it_restart) {
     
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -373,7 +402,7 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     string        csv = mcmcOut + ".csv";
     std::ifstream file(csv);
     int           it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0, ngrp_ = -1;
-    int           lastSavedIt = 0;
+    int           firstSavedIt = -1, lastSavedIt = 0, nSavedIt = 0;
     double        mu_, rat_, tmp;
     VectorXd      sigg_(numGroups);
     MatrixXd      pipi(numGroups,K);
@@ -391,6 +420,12 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
 
                 if (it_ % optSave == 0) {
 
+                    nSavedIt += 1;
+                    
+                    //EO: in case of multiple restarts, we need to know where
+                    //    we restarted from last time
+                    if (nSavedIt == 1)  firstSavedIt = it_;
+                    
                     lastSavedIt = it_;
 
                     char cstr[str.length()+1];
@@ -432,7 +467,7 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
 
                     for (int i=0; i<pirows_; i++) {
                         for (int j=0; j<picols_; j++) {
-                            pi(i, j) = strtod(prc, &prc);
+                            pi(i, j) = strtod(prc, &prc);                            
                         }
                     }
                 }
@@ -444,17 +479,27 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     }
     
     // Sanity checks
-    assert(lastSavedIt % optSave == 0);
-    assert(lastSavedIt >= 0);
-    assert(lastSavedIt <= UINT_MAX);
+    assert(lastSavedIt  %  optSave == 0);
+    assert(lastSavedIt  >= 0);
+    assert(lastSavedIt  <= UINT_MAX);
+    assert(firstSavedIt >= 0);
+    
 
-    iteration_restart = lastSavedIt;
+    iteration_restart      = lastSavedIt;  // Iteration to restart from
+    first_saved_it_restart = (uint)firstSavedIt; // First saved iteration in last restart
+
+    //if (rank == 0) {
+    //    printf("CHECK  : reading from mcmc output, iteratation_restart set to %d\n", iteration_restart);
+    //    cout << "pi = " << pi << endl;
+    //    printf("sigmaE = %20.15f\n", sigmaE);
+    //}
 }
 
 // SO: Currently basically the copy of the previous version.
 //     Consider using adding reading mu for bR so the same function could be used
 void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
-                                     VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart) {
+                                        VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, 
+                                        uint& iteration_restart, uint& first_saved_it_restart) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -485,7 +530,7 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
                     assert(pi.rows() == pirows_);
                     assert(pi.cols() == picols_);
 	
-		    string remain_s = str.substr(nchar, str.length() - nchar);
+                    string remain_s = str.substr(nchar, str.length() - nchar);
                     char   remain_c[remain_s.length() + 1];
                     strcpy(remain_c, remain_s.c_str());
 

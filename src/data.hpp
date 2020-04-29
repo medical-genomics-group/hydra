@@ -150,21 +150,23 @@ public:
                                    VectorXd&    epsilon);
 
     void read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
-                                   const uint   iteration_restart, const int thin,
+                                   const uint   iteration_restart, const uint first_saved_it_restart, const int thin,
                                    const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                    VectorXi&    components);
 
     void read_mcmc_output_bet_file(const string mcmcOut, const uint Mtot,
-                                   const uint   iteration_restart, const int thin,
+                                   const uint   iteration_restart, const uint first_saved_it_restart, const int thin,
                                    const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                    VectorXd&    Beta);
 
     void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                   VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart);
+                                   VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
+                                   uint& iteration_restart, uint& first_saved_it_restart);
 
     // Three functions tailored for bW output. Consider using same format in bR
     void read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
-                                     VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, uint& iteration_restart);
+                                      VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
+                                      uint& iteration_restart, uint& first_saved_it_restart);
 
     void read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave, const int gamma_length,
                                      VectorXd& gamma, uint& iteration_restart);
@@ -172,7 +174,8 @@ public:
     void read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
                                      std::vector<int>& markerI);
 
-    void read_mcmc_output_mus_file(const string mcmcOut, const uint  iteration_restart, const int thin,
+    void read_mcmc_output_mus_file(const string mcmcOut,
+                                   const uint  iteration_restart, const uint first_saved_it_restart, const int thin,
                                    double& mu);
 
     void load_data_from_bed_file(const string bedfp, const uint Ntot, const int M,
