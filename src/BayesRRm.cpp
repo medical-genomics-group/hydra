@@ -939,7 +939,6 @@ int BayesRRm::runMpiGibbs() {
 
     // First, load the mixture components (adding 0.0 as first element/column)
     if (opt.groupIndexFile != "" && opt.groupMixtureFile != "") {
-        printf("READING GROUP INDEX and MIXTURE files\n");
         data.readGroupFile(opt.groupIndexFile);
         data.readmSFile(opt.groupMixtureFile);
     } else {
