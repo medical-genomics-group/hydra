@@ -994,10 +994,6 @@ int BayesRRm::runMpiGibbs() {
     int IrankS[nranks], IrankL[nranks];
     mpi_define_blocks_of_markers(Ntot - data.numNAs, IrankS, IrankL, nranks);
 
-    if (rank == 0)
-        printf("INFO   : numGroups = %d, data.groups.size() = %lu, Mtot = %d\n", data.numGroups, data.groups.size(), Mtot);
-    assert(data.groups.size() == Mtot);
-
     VectorXi groups     = data.groups;
     cVa.resize(numGroups, K);                   // component-specific variance
     cVaI.resize(numGroups, K);                  // inverse of the component variances
@@ -1099,6 +1095,7 @@ int BayesRRm::runMpiGibbs() {
 
     VectorXd dirc(K);
     dirc.array() = 1.0;
+
 
     // Build global repartition of markers over the groups
     VectorXi MtotGrp(numGroups);
@@ -2382,8 +2379,16 @@ int BayesRRm::runMpiGibbs() {
         // Update global parameters
         // ------------------------
         for (int i=0; i<numGroups; i++) {
-            //printf("%d: m0 = %d - %d\n", i, MtotGrp[i], cass(i, 0));
+
+            // Skip empty groups
+            if (MtotGrp[i] == 0) {
+                sigmaG[i] = 0.0;
+                continue;
+            }
+            
+            //printf("%d: m0 = %d - %d, v0G = %20.15f\n", i, MtotGrp[i], cass(i, 0), v0G);
             m0[i]        = MtotGrp[i] - cass(i, 0);
+            
             // AH: naive check that v0G and s02G were supplied from file
             if (opt.priorsFile != "") {
                 v0G = data.priors(i, 0);
@@ -2394,7 +2399,8 @@ int BayesRRm::runMpiGibbs() {
                 // get vector of parameters for the current group
                 dirc = data.dPriors.row(i).transpose().array();
             }
-            sigmaG[i]    = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
+            sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
+            
             //we moved the pi update here to use the same loop
             VectorXd dirin = cass.row(i).transpose().array().cast<double>() + dirc.array();
             estPi.row(i) = dist.dirichlet_rng(dirin);
@@ -2404,6 +2410,7 @@ int BayesRRm::runMpiGibbs() {
         // Broadcast sigmaG of rank 0
         check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //printf("rank %d has sigmaG = %15.10f\n", rank, sigmaG);
+        //cout << "sigmaG = " << sigmaG << endl;
 
         // Check iteration
         //
