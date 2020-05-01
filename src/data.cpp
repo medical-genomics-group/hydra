@@ -30,7 +30,7 @@ void Data::print_restart_banner(const string mcmcOut, const uint iteration_resta
 }
 
 
-void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
+void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, const uint length, const uint iteration_to_restart_from,
                                      std::vector<int>& markerI)  {
     
     int nranks, rank;
@@ -47,8 +47,8 @@ void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, con
     MPI_Offset off = size_t(0);
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at(fh, off, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read mrk iteration: %d vs %d\n", iteration_restart, iteration_);
+    if (iteration_ != iteration_to_restart_from) {
+        printf("Mismatch between expected and read mrk iteration: %d vs %d\n", iteration_to_restart_from, iteration_);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -114,7 +114,7 @@ void Data::read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, 
 
 //EO: .gam files only contain a dump of last saved iteration (no history)
 //  : format is: iter, length, vector
-void Data::read_mcmc_output_gam_file(const string mcmcOut, const int gamma_length, const uint iteration_restart,
+void Data::read_mcmc_output_gam_file(const string mcmcOut, const int gamma_length, const uint iteration_to_restart_from,
                                      VectorXd& gamma) {
 
     int nranks, rank;
@@ -133,8 +133,8 @@ void Data::read_mcmc_output_gam_file(const string mcmcOut, const int gamma_lengt
     MPI_Offset gamoff = size_t(0);
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at_all(gamfh, gamoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read gamma iteration: %d vs %d\n", iteration_restart, iteration_);
+    if (iteration_ != iteration_to_restart_from) {
+        printf("Mismatch between expected and read gamma iteration: %d vs %d\n", iteration_to_restart_from, iteration_);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -160,15 +160,17 @@ void Data::read_mcmc_output_gam_file(const string mcmcOut, const int gamma_lengt
 
 //EO: .eps files only contain a dump of last saved iteration (no history)
 //
-void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, const uint iteration_restart,
-                                     VectorXd& epsilon) {
+void Data::read_mcmc_output_eps_file(const string mcmcOut,
+                                     const uint   Ntotc,
+                                     const uint   iteration_to_restart_from,
+                                     VectorXd&    epsilon) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     
     const string epsfp = mcmcOut + ".eps." + std::to_string(rank);
-    //const string epsfp = mcmcOut + ".eps";
+    //cout << "epsfp = " << epsfp << endl;
 
     MPI_Status status;
     
@@ -180,8 +182,8 @@ void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, co
     MPI_Offset epsoff = size_t(0);
     uint iteration_   = UINT_MAX;
     check_mpi(MPI_File_read_at_all(epsfh, epsoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read eps iteration: %d vs %d\n", iteration_restart, iteration_);
+    if (iteration_ != iteration_to_restart_from) {
+        printf("Mismatch between expected and read eps iteration: %d vs %d\n", iteration_to_restart_from, iteration_);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -208,16 +210,19 @@ void Data::read_mcmc_output_eps_file(const string mcmcOut,  const uint Ntotc, co
 
 
 //EO: Watch out the saving frequency of the betas (--thin)
-//    Each line contains simple the iteration (uint) and the value of mu (double)
+//    Each line contains simply the iteration (uint) and the value of mu (double)
 void Data::read_mcmc_output_mus_file(const string mcmcOut,
-                                     const uint  iteration_restart, const uint first_saved_it_restart, const int thin,
-                                     double& mu) {
+                                     const uint   iteration_to_restart_from,
+                                     const uint   first_thinned_iteration,
+                                     const int    opt_thin,
+                                     double&      mu) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     const string musfp = mcmcOut + ".mus." + std::to_string(rank);
+    //cout << "musfp = " << musfp << endl;
 
     MPI_Status status;
 
@@ -227,29 +232,25 @@ void Data::read_mcmc_output_mus_file(const string mcmcOut,
     MPI_Offset musoff = size_t(0);
 
     // 1. get and validate iteration number that we are about to read
-    assert(iteration_restart%thin == 0);
-    int n_thinned_saved = iteration_restart / thin;
+    int n_skip = iteration_to_restart_from - first_thinned_iteration;
+    assert(n_skip >= 0);
+    assert(n_skip % opt_thin == 0);
+    n_skip /= opt_thin;
+    //cout << "number of lines to skip  = " << n_skip << endl;
 
-    //EO: in case of multiple restarts, we need to account for the fact that
-    //    the file does not start at iteration 0, but at the first saved iteration
-    //    from last restart
-    assert(first_saved_it_restart % thin == 0);
-    n_thinned_saved -= first_saved_it_restart / thin;
-    //cout << "n_thinned_saved ADJUSTED = " << n_thinned_saved << endl;
-
-
-    musoff = size_t(n_thinned_saved) * (sizeof(uint) + sizeof(double));
+    musoff = size_t(n_skip) * (sizeof(uint) + sizeof(double));
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at_all(musfh, musoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read mus iteration: %d vs %d\n", iteration_restart, iteration_);
+    if (iteration_ != iteration_to_restart_from) {
+        printf("Mismatch between expected and read mus iteration: %d vs %d\n", iteration_to_restart_from, iteration_);
+        fflush(stdout);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     // 2. read the value of mu
     musoff += sizeof(uint);
     check_mpi(MPI_File_read_at(musfh, musoff, &mu, 1, MPI_DOUBLE, &status), __LINE__, __FILE__);
-    printf("reading back mu = %15.10f at iteration %d\n", mu, iteration_);
+    //printf("reading back mu = %15.10f at iteration %d\n", mu, iteration_);
 
     check_mpi(MPI_File_close(&musfh), __LINE__, __FILE__);
 }
@@ -257,11 +258,15 @@ void Data::read_mcmc_output_mus_file(const string mcmcOut,
 
 
 
-//EO: Watch out the saving frequency of the betas (--thin)
+//EO: .cpn, as per .bet contains full history with iteration saved at --opt.thin
+//
 void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot, 
-                                     const uint  iteration_restart, const uint first_saved_it_restart, const int thin,
-                                     const int*   MrankS,  const int* MrankL, const bool use_xfiles,
-                                     VectorXi& components) {
+                                     const uint   iteration_to_restart_from,
+                                     const uint   first_thinned_iteration,
+                                     const int    opt_thin,
+                                     const int*   MrankS,  const int* MrankL,
+                                     const bool   use_xfiles,
+                                     VectorXi&    components) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -269,6 +274,13 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
 
     string cpnfp = mcmcOut + ".cpn";
     if (use_xfiles) cpnfp = mcmcOut + ".xcpn";
+    if (rank == 0) {
+        if (use_xfiles) {
+            printf("RESTART: reading cpn info back from last iteration xfile %s\n", cpnfp.c_str());
+        } else {
+            printf("RESTART: reading cpn info back from full history file %s\n", cpnfp.c_str());
+        }
+    }
 
     MPI_Status status;
 
@@ -285,29 +297,26 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
     }
 
     // 2. get and validate iteration number that we are about to read
-    assert(iteration_restart%thin == 0);
-    int n_thinned_saved = iteration_restart / thin;
-    
-    //EO: in case of multiple restarts, we need to account for the fact that
-    //    the file does not start at iteration 0, but at the first saved iteration
-    //    from last restart
-    assert(first_saved_it_restart % thin == 0);
-    n_thinned_saved -= first_saved_it_restart / thin;
-    //cout << "n_thinned_saved ADJUSTED = " << n_thinned_saved << endl;
+    int n_skip = iteration_to_restart_from - first_thinned_iteration;
+    assert(n_skip >= 0);
+    assert(n_skip % opt_thin == 0);
+    n_skip /= opt_thin;
+    //cout << "number of lines to skip  = " << n_skip << endl;
 
-    cpnoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(int));
+    cpnoff = sizeof(uint) + size_t(n_skip) * (sizeof(uint) + size_t(Mtot_) * sizeof(int));
     if (use_xfiles) cpnoff = sizeof(uint);
 
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at_all(cpnfh, cpnoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read cpn iteration: %d vs %d\n", iteration_restart, iteration_);
+    if (iteration_ != iteration_to_restart_from) {
+        printf("Mismatch between expected and read cpn iteration: %d vs %d\n", iteration_to_restart_from, iteration_);
+        fflush(stdout);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     // 3. read the Mtot_ coefficients
     cpnoff = sizeof(uint) + sizeof(uint) 
-        + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(int))
+        + size_t(n_skip) * (sizeof(uint) + size_t(Mtot_) * sizeof(int))
         + size_t(MrankS[rank]) * sizeof(int);
     if (use_xfiles) {
         cpnoff = sizeof(uint) + sizeof(uint) + size_t(MrankS[rank]) * sizeof(int);
@@ -322,7 +331,9 @@ void Data::read_mcmc_output_cpn_file(const string mcmcOut, const uint Mtot,
 
 //EO: Watch out the saving frequency of the betas (--thin)
 void Data::read_mcmc_output_bet_file(const string mcmcOut,           const uint Mtot,
-                                     const uint   iteration_restart, const uint first_saved_it_restart, const int thin,
+                                     const uint   iteration_to_restart_from,
+                                     const uint   first_thinned_iteration,
+                                     const int    opt_thin,
                                      const int*   MrankS,  const int* MrankL,
                                      const bool   use_xfiles,
                                      VectorXd& Beta) {
@@ -333,6 +344,14 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut,           const uint 
 
     string betfp = mcmcOut + ".bet";
     if (use_xfiles) betfp = mcmcOut + ".xbet";
+
+    if (rank == 0) {
+        if (use_xfiles) {
+            printf("RESTART: reading bet info back from last iteration xfile %s\n", betfp.c_str());
+        } else {
+            printf("RESTART: reading bet info back from full history file %s\n", betfp.c_str());
+        }
+    }
 
     MPI_Status status;
 
@@ -350,31 +369,26 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut,           const uint 
     }
 
     // 2. get and validate iteration number that we are about to read
-    assert(iteration_restart % thin == 0);
-    int n_thinned_saved = iteration_restart / thin;
-    //cout << "n_thinned_saved = " << n_thinned_saved << endl;
+    int n_skip = iteration_to_restart_from - first_thinned_iteration;
+    assert(n_skip >= 0);
+    assert(n_skip % opt_thin == 0);
+    n_skip /= opt_thin;
+    //cout << "number of lines to skip  = " << n_skip << endl;
 
-    //EO: in case of multiple restarts, we need to account for the fact that
-    //    the file does not start at iteration 0, but at the first saved iteration
-    //    from last restart
-    assert(first_saved_it_restart % thin == 0);
-    n_thinned_saved -= first_saved_it_restart / thin;
-    //cout << "n_thinned_saved ADJUSTED = " << n_thinned_saved << endl;
-
-
-    betoff = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(double));
+    betoff = sizeof(uint) + size_t(n_skip) * (sizeof(uint) + size_t(Mtot_) * sizeof(double));
     if (use_xfiles) betoff = sizeof(uint);
 
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at_all(betfh, betoff, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read bet iteration: %d vs %d\n", iteration_restart, iteration_);
+    if (iteration_ != iteration_to_restart_from) {
+        printf("Mismatch between expected and read bet iteration: %d vs %d\n", iteration_to_restart_from, iteration_);
+        fflush(stdout);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
     // 3. read the Mtot_ coefficients
     betoff = sizeof(uint) + sizeof(uint) 
-        + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot_) * sizeof(double))
+        + size_t(n_skip) * (sizeof(uint) + size_t(Mtot_) * sizeof(double))
         + size_t(MrankS[rank]) * sizeof(double);
     if (use_xfiles) { 
         betoff =  sizeof(uint) + sizeof(uint) + size_t(MrankS[rank]) * sizeof(double);
@@ -391,9 +405,12 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut,           const uint 
 
 //EO: consider moving the csv output file from ASCII to BIN
 //
-void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                     VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
-                                     uint& iteration_restart, uint& first_saved_it_restart) {
+void Data::read_mcmc_output_csv_file(const string mcmcOut,
+                                     const uint optThin, const uint optSave,
+                                     const int K, VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
+                                     uint& iteration_to_restart_from,
+                                     uint& first_thinned_iteration,
+                                     uint& first_saved_iteration) {
     
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -402,7 +419,7 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
     string        csv = mcmcOut + ".csv";
     std::ifstream file(csv);
     int           it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0, ngrp_ = -1;
-    int           firstSavedIt = -1, lastSavedIt = 0, nSavedIt = 0;
+    int           nSavedIt = 0, nThinnedIt = 0;
     double        mu_, rat_, tmp;
     VectorXd      sigg_(numGroups);
     MatrixXd      pipi(numGroups,K);
@@ -416,7 +433,15 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
             if (str.length() > 0) {
 
                 int nread = sscanf(str.c_str(), "%5d, %4d", &it_, &ngrp_);
-                //printf("%5d | %4d with optSave = %d\n", it_, ngrp_, optSave);
+                //printf("it %5d | ngrp %4d with optSave = %d\n", it_, ngrp_, optSave);
+
+                assert(it_ % optThin == 0);
+                nThinnedIt += 1;
+                if (nThinnedIt == 1) {
+                    first_thinned_iteration = it_;
+                    printf("#######: iteration %d is first_thinned_iteration\n", first_thinned_iteration);
+                }
+
 
                 if (it_ % optSave == 0) {
 
@@ -424,9 +449,12 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
                     
                     //EO: in case of multiple restarts, we need to know where
                     //    we restarted from last time
-                    if (nSavedIt == 1)  firstSavedIt = it_;
+                    if (nSavedIt == 1) {
+                        first_saved_iteration = it_;
+                        printf("#######: iteration %d is first_saved_iteration\n", first_saved_iteration);
+                    }
                     
-                    lastSavedIt = it_;
+                    iteration_to_restart_from = it_;
 
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
@@ -477,23 +505,19 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, c
         printf("*FATAL*: failed to open csv file %s!\n", csv.c_str());
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    
-    // Sanity checks
-    assert(lastSavedIt  %  optSave == 0);
-    assert(lastSavedIt  >= 0);
-    assert(lastSavedIt  <= UINT_MAX);
-    assert(firstSavedIt >= 0);
-    
 
-    iteration_restart      = lastSavedIt;  // Iteration to restart from
-    first_saved_it_restart = (uint)firstSavedIt; // First saved iteration in last restart
-
-    //if (rank == 0) {
-    //    printf("CHECK  : reading from mcmc output, iteratation_restart set to %d\n", iteration_restart);
-    //    cout << "pi = " << pi << endl;
-    //    printf("sigmaE = %20.15f\n", sigmaE);
-    //}
+    //EO: if no saved iteration is found in the .csv file, we kill the process
+    if (nSavedIt == 0) {
+        if (rank == 0) {
+            printf("\n");
+            printf("FATAL  : No saved iteration could be found when reading %s!\n", csv.c_str());
+            printf("       : with first read iteration = %d, last read iteration %d, and --thin = %d and --save = %d\n\n", first_thinned_iteration, it_, optThin, optSave);
+            fflush(stdout);
+        } 
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 }
+
 
 // SO: Currently basically the copy of the previous version.
 //     Consider using adding reading mu for bR so the same function could be used

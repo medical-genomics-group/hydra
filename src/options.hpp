@@ -26,6 +26,7 @@ public:
     string   groupIndexFile    = "";
     string   groupMixtureFile  = "";
     bool     restart             = false;
+    bool     useXfilesInRestart  = true;
     bool     sparseSync          = false;
     bool     bedSync             = false;
     unsigned syncRate            = 1;

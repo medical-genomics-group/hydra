@@ -34,7 +34,11 @@ class BayesRRm
     const double       s02F    = 1.0;
     const size_t       LENBUF  = 50000;
 
-    const bool use_xfiles_in_restart = true; // Restart from .xbet rather than .bet file
+
+    uint iteration_start           = 0;
+    uint iteration_to_restart_from = 0;
+    uint first_thinned_iteration   = 0;
+    uint first_saved_iteration     = 0;
 
     VectorXd  cva;
     MatrixXd  cVa;       // component-specific variance
@@ -96,10 +100,6 @@ class BayesRRm
 
     double epsilonsum;
     double ytildesum;
-
-    uint iteration_restart      = 0;
-    uint iteration_start        = 0;
-    uint first_saved_it_restart = 0;
 
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();

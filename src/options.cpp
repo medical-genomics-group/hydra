@@ -22,6 +22,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             restart = true;
             ss << "--restart " << "\n";
         }
+        else if (!strcmp(argv[i], "--ignore-xfiles")) {
+            useXfilesInRestart = false;
+            ss << "--ignore-xfiles " << "\n";
+        }
         else if (!strcmp(argv[i], "--sparse-sync")) {
             sparseSync = true;
             ss << "--sparse-sync " << "\n";
@@ -60,10 +64,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if (!strcmp(argv[i], "--check-RAM")) {
             checkRam = true;
             ss << "--check-RAM " << "\n";
-        }
-        else if (!strcmp(argv[i], "--restart")) {
-            restart = true;
-            ss << "--restart " << "\n";
         }
         else if (!strcmp(argv[i], "--raw-update")) {
             deltaUpdate = false;
