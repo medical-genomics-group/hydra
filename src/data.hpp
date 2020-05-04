@@ -159,9 +159,12 @@ public:
                                    const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                    VectorXd&    Beta);
 
-    void read_mcmc_output_csv_file(const string mcmcOut, const uint optSave, const int K,
-                                   VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
-                                   uint& iteration_restart, uint& first_saved_it_restart);
+    void read_mcmc_output_csv_file(const string mcmcOut,
+                                   const uint optThin, const uint optSave,
+                                   const int K, VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
+                                   uint& iteration_to_restart_from,
+                                   uint& first_thinned_iteration,
+                                   uint& first_saved_iteration);
 
     // Three functions tailored for bW output. Consider using same format in bR
     void read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,

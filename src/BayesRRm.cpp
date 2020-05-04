@@ -833,6 +833,12 @@ void BayesRRm::init_from_scratch() {
 }
 
 
+//EO: .csv, .bet, .acu, .cpn, .mus         : written every --opt.thin
+//    .eps, .mrk, .gam, .xiv, .xbet, .xcpn : last itertion only written every --opt.save
+// 
+//    one can restart from .bet and .cpn files or .xbet and .xcpn files,
+//    by using --restart --ignore-xfiles rather than --restart
+//
 void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot,
                                  const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart) {
 
@@ -842,46 +848,80 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
     if (rank == 0)
         printf("RESTART: from files: %s.* files\n", opt.mcmcOut.c_str());
 
-    data.read_mcmc_output_csv_file(opt.mcmcOut, opt.save, K, sigmaG, sigmaE, estPi,
-                                   iteration_restart, first_saved_it_restart);
+    //EO: the .csv files is read to decide where to restart from
+    data.read_mcmc_output_csv_file(opt.mcmcOut,
+                                   opt.thin, opt.save,
+                                   K, sigmaG, sigmaE, estPi,
+                                   iteration_to_restart_from,
+                                   first_thinned_iteration,
+                                   first_saved_iteration);
+
     if (rank == 0) {
-        printf("RESTART: init_from_restart iteration_restart      = %d\n", iteration_restart);
-        printf("RESTART: init_from_restart first_saved_it_restart = %d\n", first_saved_it_restart);
+        printf("RESTART: Reading .cvs file %s\n", (opt.mcmcOut + ".csv").c_str());
+        printf("RESTART: --thin %d  -- save %d\n", opt.thin, opt.save);
+        printf("RESTART: iteration_to_restart_from = %d\n", iteration_to_restart_from);
+        printf("RESTART: first_thinned_iteration   = %d\n", first_thinned_iteration);
+        printf("RESTART: first_saved_iteration     = %d\n", first_saved_iteration);
+        fflush(stdout);
     }
+    
+    //EO: Kill the processing if one's try to restart from iteration 0 as 
+    //    we do not save this iteration, as this makes no sense to do so
+    if (iteration_to_restart_from == 0) {
+        printf("\nFATAL  : There is no point in restarting a chain from iteration 0 (not saved anyway)\n");
+        printf("         => restart your analysis from scratch\n\n");
+        fflush(stdout);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
 
     MPI_Barrier(MPI_COMM_WORLD);
 
-    data.read_mcmc_output_bet_file(opt.mcmcOut,
-                                   Mtot, iteration_restart, first_saved_it_restart, opt.thin,
-                                   MrankS, MrankL, use_xfiles_in_restart,
+    // .bet  saved at --opt.thin
+    // .xbet saved at --opt.save, single line with last iteration
+    data.read_mcmc_output_bet_file(opt.mcmcOut, Mtot,
+                                   iteration_to_restart_from,
+                                   first_thinned_iteration,
+                                   opt.thin,
+                                   MrankS, MrankL,
+                                   use_xfiles_in_restart,
                                    Beta);
 
-    data.read_mcmc_output_cpn_file(opt.mcmcOut,
-                                   Mtot, iteration_restart, first_saved_it_restart, opt.thin,
-                                   MrankS, MrankL, use_xfiles_in_restart,
+    data.read_mcmc_output_cpn_file(opt.mcmcOut, Mtot,
+                                   iteration_to_restart_from,
+                                   first_thinned_iteration,
+                                   opt.thin,
+                                   MrankS, MrankL,
+                                   use_xfiles_in_restart,
                                    components);
 
-    data.read_mcmc_output_eps_file(opt.mcmcOut, Ntot, iteration_restart,
+    data.read_mcmc_output_mus_file(opt.mcmcOut,
+                                   iteration_to_restart_from,
+                                   first_thinned_iteration,
+                                   opt.thin,
+                                   mu_restart);
+
+    data.read_mcmc_output_eps_file(opt.mcmcOut, Ntot,
+                                   iteration_to_restart_from,
                                    epsilon_restart);
 
-    data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_restart,
+    data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M,
+                                   iteration_to_restart_from,
                                    markerI_restart);
-
-    data.read_mcmc_output_mus_file(opt.mcmcOut,
-                                   iteration_restart, first_saved_it_restart, opt.thin,
-                                   mu_restart);
 
     if (opt.covariates) {
 
-        data.read_mcmc_output_gam_file(opt.mcmcOut, data.X.cols(), iteration_restart,
+        data.read_mcmc_output_gam_file(opt.mcmcOut, data.X.cols(),
+                                       iteration_to_restart_from,
                                        gamma_restart);
 
-        data.read_mcmc_output_idx_file(opt.mcmcOut, "xiv", (uint)data.X.cols(), iteration_restart,
+        data.read_mcmc_output_idx_file(opt.mcmcOut, "xiv", (uint)data.X.cols(),
+                                       iteration_to_restart_from,
                                        xI_restart);
     }
 
     // Adjust starting iteration number.
-    iteration_start = iteration_restart + 1;
+    iteration_start = iteration_to_restart_from + 1;
 
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -1109,11 +1149,10 @@ int BayesRRm::runMpiGibbs() {
     // ----------------------------------------------------
     if (opt.restart) {
 
-        init_from_restart(K, M, Mtot, Ntot - data.numNAs, MrankS, MrankL, use_xfiles_in_restart);
-        //cout << "estPi after restart " << estPi << endl;
+        init_from_restart(K, M, Mtot, Ntot - data.numNAs, MrankS, MrankL, opt.useXfilesInRestart);
 
         if (rank == 0)
-            data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_restart, iteration_start);
+            data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_to_restart_from, iteration_start);
 
         dist.read_rng_state_from_file(rngfp);
 
@@ -2550,10 +2589,9 @@ int BayesRRm::runMpiGibbs() {
 
                 offset = size_t(n_thinned_saved) * strlen(buff);
                 check_mpi(MPI_File_write_at(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
-            }
 
-            // Write iteration number
-            if (rank == 0) {
+                
+                // Write iteration number in .bet, acu, cpn
                 offset = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double));
                 check_mpi(MPI_File_write_at(betfh,  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
                 check_mpi(MPI_File_write_at(acufh,  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
