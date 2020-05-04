@@ -6,9 +6,9 @@
  */
 
 #include "BayesRRm.h"
-#include "hydra.h"
 #include "data.hpp"
 #include "distributions_boost.hpp"
+#include "hydra.h"
 #include "options.hpp"
 #include "samplewriter.h"
 #include <algorithm>
@@ -1267,6 +1267,9 @@ int BayesRRm::runMpiGibbs() {
   VectorXd dirc(K);
   dirc.array() = 1.0;
 
+  
+  double betaA = opt.betaA;
+  double betaB = opt.betaB;
 
   VectorXd A(numGroups);
   VectorXd B(numGroups);
@@ -1274,13 +1277,12 @@ int BayesRRm::runMpiGibbs() {
   double InitEps;
   double Aeps;
   double Beps;
-  A.array()= (double)1.0/numGroups;
-  B.array()= 1.0;
-  Init.array() = 0.5/numGroups;
-  InitEps = 0.5;
-  Aeps=1.0;
-  Beps=1.0;
-    
+  A.array() = betaA / numGroups;
+  B.array() = betaA + betaB;
+  Init.array() = (betaA / (betaA + betaB)) / numGroups;
+  InitEps = 1 - (betaA / (betaA + betaB));
+  Aeps = betaB;
+  Beps = betaA + betaB;
 
   // Build global repartition of markers over the groups
   VectorXi MtotGrp(numGroups);
@@ -1329,8 +1331,9 @@ int BayesRRm::runMpiGibbs() {
 
     // EO: sample sigmaG and broadcast from rank 0 to all the others
     for (int i = 0; i < numGroups; i++) {
-      sigmaG[i] = dist.unif_rng();
+      sigmaG[i] = dist.unif_rng()/0.5;
     }
+    sigmaG=sigmaG.array()/sigmaG.sum();
     check_mpi(
         MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD),
         __LINE__, __FILE__);
@@ -1862,7 +1865,7 @@ int BayesRRm::runMpiGibbs() {
     //    results between Intel and GCC when shuffling the markers is on!!
     //------------------------------------------------------------------------
     if (opt.shuffleMarkers) {
-      std::shuffle(markerI.begin(), markerI.end(),dist.rng);
+      std::shuffle(markerI.begin(), markerI.end(), dist.rng);
     }
 
     m0.setZero();
@@ -2017,11 +2020,11 @@ int BayesRRm::runMpiGibbs() {
                        .array() > 700.0)
                       .any()) {
                 acum += 0.0; // we compare next mixture to the others, if to
-                              // big diff we skip
+                             // big diff we skip
               } else {
                 acum += 1.0 / ((logL.array() - logL[k + 1])
-                                    .exp()
-                                    .sum()); // if not , sample
+                                   .exp()
+                                   .sum()); // if not , sample
               }
             }
           }
@@ -2609,18 +2612,19 @@ int BayesRRm::runMpiGibbs() {
         // get vector of parameters for the current group
         dirc = data.dPriors.row(i).transpose().array();
       }
-      sigmaG[i] = dist.inv_scaled_chisq_rng(
-          v0G + (double)m0[i],
-          (beta_squaredNorm[i] * (double)m0[i] + v0G * s02G) /
-              (v0G + (double)m0[i]));
+      // sigmaG[i] = dist.inv_scaled_chisq_rng(
+          // v0G + (double)m0[i],
+          // (beta_squaredNorm[i] * (double)m0[i] + v0G * s02G) /
+              // (v0G + (double)m0[i]));
+
+      sigmaG[i] = SamplerV.sampleGroupVar(1, beta_squaredNorm[i],(double)m0[i],i);
+
+
       // we moved the pi update here to use the same loop
       VectorXd dirin =
           cass.row(i).transpose().array().cast<double>() + dirc.array();
       estPi.row(i) = dist.dirichlet_rng(dirin);
     }
-#ifdef Newtonian
-    sigmaG = SamplerV.sampleGroupVar(1, beta_squaredNorm, m0);
-#endif
     // printf("rank %d own sigmaG[0] = %20.15f with Mtot = %d and m0[0]
     // = %d\n", rank, sigmaG[0], Mtot, int(m0[0]));
 
@@ -2674,7 +2678,7 @@ int BayesRRm::runMpiGibbs() {
         cout << "COVARIATES with X of size " << data.X.rows() << "x"
              << data.X.cols() << endl;
 
-       std::shuffle(xI.begin(), xI.end(), dist.rng);
+      std::shuffle(xI.begin(), xI.end(), dist.rng);
 
       double gamma_old, num_f, denom_f;
       double sigE_sigF = sigmaE / sigmaF;
@@ -2717,8 +2721,8 @@ int BayesRRm::runMpiGibbs() {
     // s02E);
 
     // EO: sample sigmaE and broadcast the one from rank 0 to all the others
-    sigmaE =
-        dist.inv_scaled_chisq_rng(v0E + dN, (e_sqn + v0E * s02E) / (v0E + dN));
+    // sigmaE =
+        // dist.inv_scaled_chisq_rng(v0E + dN, (e_sqn + v0E * s02E) / (v0E + dN));
 #ifdef NEWTONIAN
     sigmaE = SamplerE.sampleEpsVar(1, e_sqn);
 #endif

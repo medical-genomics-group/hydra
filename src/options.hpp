@@ -84,6 +84,8 @@ public:
     // is greater than this threshold:
     double threshold_fnz = 0.06;
 
+    double betaA;
+    double betaB;
     string options_s;
 
     Options(){
@@ -112,6 +114,8 @@ public:
         priorsFile              = "";
         dPriorsFile             = "";
         mSfile                  = "";
+        betaA = 1.0;
+        betaB = 1.0;
     }
 
     void inputOptions(const int argc, const char* argv[]);

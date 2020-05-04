@@ -106,6 +106,14 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bedFile         = argv[++i];
             ss << "--bfile " << argv[i] << "\n";
         }
+	else if (!strcmp(argv[i], "--betaA")) {
+            betaA = atof(argv[++i]);
+            ss << "--betaA " << argv[i] << "\n";
+        }
+	else if (!strcmp(argv[i], "--betaB")) {
+            betaB = atof(argv[++i]);
+            ss << "--betaB " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--threshold-fnz")) {
             threshold_fnz = atof(argv[++i]);
             ss << "--threshold-fnz " << argv[i] << "\n";
