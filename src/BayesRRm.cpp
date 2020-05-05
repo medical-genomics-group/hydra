@@ -2615,11 +2615,10 @@ int BayesRRm::runMpiGibbs() {
       // sigmaG[i] = dist.inv_scaled_chisq_rng(
           // v0G + (double)m0[i],
           // (beta_squaredNorm[i] * (double)m0[i] + v0G * s02G) /
-              // (v0G + (double)m0[i]));
-
-      sigmaG[i] = SamplerV.sampleGroupVar(1, beta_squaredNorm[i],(double)m0[i],i);
-
-
+              // (v0G + (double)m0[i]));\
+//DT scaling for ishwaran rao
+      sigmaG[i] = SamplerV.sampleGroupVar(1,(double)m0[i]* beta_squaredNorm[i],(double)m0[i],i);
+       
       // we moved the pi update here to use the same loop
       VectorXd dirin =
           cass.row(i).transpose().array().cast<double>() + dirc.array();
@@ -2724,6 +2723,7 @@ int BayesRRm::runMpiGibbs() {
     // sigmaE =
         // dist.inv_scaled_chisq_rng(v0E + dN, (e_sqn + v0E * s02E) / (v0E + dN));
 #ifdef NEWTONIAN
+    //DT scaling like in ishwaran and rao
     sigmaE = SamplerE.sampleEpsVar(1, e_sqn);
 #endif
 
