@@ -1104,13 +1104,6 @@ int BayesRRm::runMpiGibbs() {
         MtotGrp[groups[i]] += 1;
     }
 
-    // Vector to store when an group was definitively excluded
-    // -1  : still in
-    // >= 0: iteration of exclusion (m0[i] == 0)
-    VectorXi grpExcludedAt(numGroups);
-    grpExcludedAt.fill(-1);
-
-
     // In case of a restart, we first read the latest dumps
     // ----------------------------------------------------
     if (opt.restart) {
@@ -1505,11 +1498,17 @@ int BayesRRm::runMpiGibbs() {
     //printf("sigmaE = %20.15f\n", sigmaE);
     //printf("mu = %20.15f\n", mu);
 
+
+    //EO: for now, we use adav to monitor markers belonging to groups
+    //    with sigmaG being null; so no need to dump additional information
+    //    in case of restart
     adaV.setOnes();
-    if (opt.restart) {
-        //if (rank == 0)  cout << "  !!!! RESTART ADAV!!!!  " << endl;
-        //adaV = data.rAdaV;
+    for (int i=0; i<M; i++) {
+        if (sigmaG[groups[MrankS[rank] + i]] == 0.0) {
+            adaV[i] = 0;
+        }
     }
+
 
     VectorXd sum_beta_squaredNorm(numGroups);
     VectorXd beta_squaredNorm(numGroups);
@@ -1626,11 +1625,8 @@ int BayesRRm::runMpiGibbs() {
                 double sigG_E  = sigmaG[groups[MrankS[rank] + marker]] / sigmaE;
                 double i_2sigE = 1.0 / (2.0 * sigmaE);
 
-
-                // Skip markers belonging to groups with sigmaG set to zero
-                //
-                if (adaV[j] && sigmaG[groups[MrankS[rank] + marker]] != 0.0) {
-
+                if (adaV[marker]) {
+                    
                     //we compute the denominator in the variance expression to save computations
                     //denom = dNm1 + sigE_G * cVaI.segment(1, km1).array();
                     for (int i=1; i<=km1; ++i) {
@@ -2343,8 +2339,6 @@ int BayesRRm::runMpiGibbs() {
 
         } // END PROCESSING OF ALL MARKERS
 
-        //exit(0);
-
         //continue;
         
 
@@ -2366,14 +2360,65 @@ int BayesRRm::runMpiGibbs() {
             cass             = sum_cass;
         }
 
+        // Update global parameters
+        // ------------------------
+        for (int i=0; i<numGroups; i++) {
+
+            // Skip empty groups 
+            if (MtotGrp[i] == 0)   continue;
+
+            //printf("%d: m0 = %d - %d, v0G = %20.15f\n", i, MtotGrp[i], cass(i, 0), v0G);
+            m0[i] = MtotGrp[i] - cass(i, 0);
+
+            // Skip groups with m0 being null or empty cass (adaV in action)
+            if (m0[i] == 0 || cass.row(i).sum() == 0) {
+                for (int ii=0; ii<M; ii++) {
+                    if (groups[MrankS[rank] + ii] == i) {
+                        adaV[ii] = 0;
+                    }
+                }
+                sigmaG[i] = 0.0;
+                continue;
+            }
+
+            // AH: naive check that v0G and s02G were supplied from file
+            if (opt.priorsFile != "") {
+                v0G  = data.priors(i, 0);
+                s02G = data.priors(i, 1);
+            }
+
+            // AH: similarly for dirichlet priors
+            if (opt.dPriorsFile != "") {
+                // get vector of parameters for the current group
+                dirc = data.dPriors.row(i).transpose().array();
+            }
+           
+            sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));                
+            //printf("???? %d: %d, bs %20.15f, m0 %d -> sigmaG[i] = %20.15f, call(%20.15f, %20.15f)\n", rank, i, beta_squaredNorm[i], m0[i], sigmaG[i], v0G + (double) m0[i],  (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
+
+            //we moved the pi update here to use the same loop
+            VectorXd dirin = cass.row(i).transpose().array().cast<double>() + dirc.array();
+            estPi.row(i) = dist.dirichlet_rng(dirin);
+        }
+
+        //fflush(stdout);
+
+        //printf("rank %d own sigmaG[0] = %20.15f with Mtot = %d and m0[0] = %d\n", rank, sigmaG[0], Mtot, int(m0[0]));
+
+        // Broadcast sigmaG of rank 0
+        check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        //printf("rank %d has sigmaG = %15.10f\n", rank, sigmaG);
+        //cout << "sigmaG = " << sigmaG << endl;
+
+
         if (rank == 0) {
             printf("\nINFO   : global cass on iteration %d:\n", iteration);
             for (int i=0; i<numGroups; i++) {
                 printf("         MtotGrp[%3d] = %8d  | ", i, MtotGrp[i]);
                 if (MtotGrp[i] == 0) {
                     printf(" (empty group)");
-                } else if (grpExcludedAt[i] >= 0) {
-                    printf(" excluded on iteration %5d", grpExcludedAt[i]);
+                } else if (sigmaG[i] == 0.0) {
+                    printf(" excluded (sigmaG set to zero)");
                 } else {
                     printf(" cass:");
                     for (int ii=0; ii<K; ii++) {
@@ -2387,53 +2432,7 @@ int BayesRRm::runMpiGibbs() {
         fflush(stdout);
 
 
-        // Update global parameters
-        // ------------------------
-        for (int i=0; i<numGroups; i++) {
 
-            // Skip groups already excluded
-            if (grpExcludedAt[i] >= 0)  continue;
-
-            // Skip empty groups 
-            if (MtotGrp[i] == 0)        continue;
-            
-
-            //printf("%d: m0 = %d - %d, v0G = %20.15f\n", i, MtotGrp[i], cass(i, 0), v0G);
-            m0[i] = MtotGrp[i] - cass(i, 0);
-            
-            // AH: naive check that v0G and s02G were supplied from file
-            if (opt.priorsFile != "") {
-                v0G  = data.priors(i, 0);
-                s02G = data.priors(i, 1);
-            }
-
-            // AH: similarly for dirichlet priors
-            if (opt.dPriorsFile != "") {
-                // get vector of parameters for the current group
-                dirc = data.dPriors.row(i).transpose().array();
-            }
-           
-            if (m0[i] == 0) {
-                sigmaG[i] = 0.0;
-                if (rank == 0)
-                    printf("WARNING: Group %d definitively excluded from model on iteration %d\n", i, iteration);
-                grpExcludedAt[i] = iteration;
-            } else {
-                sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));                
-                //printf("???? %d, bs %20.15f, m0 %d -> sigmaG[i] = %20.15f, call(%20.15f, %20.15f)\n", i, beta_squaredNorm[i], m0[i], sigmaG[i], v0G + (double) m0[i],  (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
-            }
-
-            //we moved the pi update here to use the same loop
-            VectorXd dirin = cass.row(i).transpose().array().cast<double>() + dirc.array();
-            estPi.row(i) = dist.dirichlet_rng(dirin);
-        }
-
-        //printf("rank %d own sigmaG[0] = %20.15f with Mtot = %d and m0[0] = %d\n", rank, sigmaG[0], Mtot, int(m0[0]));
-
-        // Broadcast sigmaG of rank 0
-        check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
-        //printf("rank %d has sigmaG = %15.10f\n", rank, sigmaG);
-        //cout << "sigmaG = " << sigmaG << endl;
 
         // Check iteration
         //
