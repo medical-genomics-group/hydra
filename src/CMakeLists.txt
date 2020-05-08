@@ -12,6 +12,7 @@ add_library(${CMAKE_PROJECT_NAME}_lib STATIC
   options.cpp
   samplewriter.cpp
   hydra.h
+  BayesFH.cpp
 )
 
 add_executable(${BINARY} main.cpp)
