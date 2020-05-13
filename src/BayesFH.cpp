@@ -1261,11 +1261,11 @@ int BayesFH::runMpiGibbs() {
   VectorXd nu_var(Beta.size());
   double tau;
   double tau0 = opt.tau0;
-  double c;
+  VectorXd c_slab(numGroups);
   double scaledBSQN;
   
   tau=0;
-  c=0;
+  c_slab.setZero();;
   lambda_var.setZero();
   nu_var.setZero();
   
@@ -1277,13 +1277,15 @@ int BayesFH::runMpiGibbs() {
   tau = dist.inv_gamma_rate_rng(0.5*v0t,v0t/hypTau);
   std::cout << "tau: " << tau <<"\n";
   std::cout << "INFO Sampling initial slab" <<"\n";
-  c = dist.inv_scaled_chisq_rng( v0c, s02c);
-  std::cout << "c: " << c <<"\n";
+  for(int jj=0;jj<numGroups;++jj)
+   c_slab[jj] = dist.inv_scaled_chisq_rng( v0c, s02c);
+  std::cout << "c: " << c_slab <<"\n";
   std::cout << "v0L" << v0L << "\n";
-  SamplerLocalVar  lambdaSampler(dist,v0L,c/(double)Mtot);
+  //if using newtonian uncomment this
+  //SamplerLocalVar  lambdaSampler(dist,v0L,c_slab/(double)Mtot);
 
-  std::cout << "INFO Sampling initial lambda with values: "<< c/(double)Mtot<<"\n";
-  lambda_var.array() = c/(double)Mtot;
+  std::cout << "INFO Sampling initial lambda with values: "<< c_slab.sum()/(double)Mtot<<"\n";
+  lambda_var.array() = c_slab.sum()/(double)Mtot;
   std::cout << "<------------ FH initialisation finished -------------------->\n";
   //--------------------------
 
@@ -1946,11 +1948,11 @@ int BayesFH::runMpiGibbs() {
 	// FHDT----------------
 	// Now the variance per mixture changes
 	nu_var(marker) =  dist.inv_gamma_rate_rng(0.5+0.5*v0L,v0L/lambda_var[marker] +1);//sample nu_var in case needed
-	double lambda_tilde = tau*c/(tau+c*lambda_var[marker]);
+	double lambda_tilde = tau*c_slab[groups[MrankS[rank] + marker]]/(tau+c_slab[groups[MrankS[rank] + marker]]*lambda_var[marker]);
 	#ifdef DEBUG
 	std::cout<< "marker:" << marker <<"\n";
 	std::cout << "tau: " << tau << "\n";
-	std::cout << "c: " << c << "\n";
+	std::cout << "c: " << c_slab << "\n";
 	std::cout << "local: "<< lambda_var[marker] << "\n";
 	std::cout << "lambda_tilde: "<< lambda_tilde << "\n";
 	#endif 
@@ -1961,8 +1963,10 @@ int BayesFH::runMpiGibbs() {
           // we compute the denominator in the variance expression to save
           // computations denom = dNm1 + sigE_G * cVaI.segment(1, km1).array();
           for (int i = 1; i <= km1; ++i) {
+	    //FHDT------------------
             denom(i - 1) =
                 dNm1 + sigmaE/lambda_tilde;
+	    //---------------------
             // printf("it %d, rank %d, m %d: denom[%d] = %20.15f, cvai =
             // %20.15f\n", iteration, rank, marker, i-1, denom(i-1),
             // cVaI(groups[MrankS[rank] + marker], i));
@@ -2099,7 +2103,7 @@ int BayesFH::runMpiGibbs() {
         deltaBeta = betaOld - beta;
         // printf("deltaBeta = %15.10f\n", deltaBeta);
 
-        //---- FHDT sample horseshoe global parameters
+        //---- FHDT sample horseshoe local parameters
         // this does not depend on other betas, and the rest of the loop does
         // not depend on the results of this, so could be done in a different
         // thread
@@ -2643,6 +2647,7 @@ int BayesFH::runMpiGibbs() {
     double scaledBSQN=0;
     for (int i = 0; i < M; i++) {
       beta_squaredNorm[groups[MrankS[rank] + i]] += Beta[i] * Beta[i];
+      //FHDT scaled sum of squares
       scaledBSQN +=  Beta[i] * Beta[i]/lambda_var[i];
     }
     // printf("rank %d it %d  beta_squaredNorm = %15.10f\n", rank, iteration,
@@ -2701,7 +2706,7 @@ int BayesFH::runMpiGibbs() {
     tau = dist.inv_gamma_rate_rng(0.5 * (m0[i] + v0t),
                                   v0t / hypTau + (0.5 * scaledBSQN));
 
-    c = dist.inv_scaled_chisq_rng(
+    c_slab[i] = dist.inv_scaled_chisq_rng(
         v0c + (double)m0[i],
         (beta_squaredNorm[i] * (double)m0[i] + v0c * s02G) /
             (v0c + (double)m0[i]));
