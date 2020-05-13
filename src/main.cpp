@@ -2,6 +2,7 @@
 #include <string>
 #include "BayesRRm.h"
 #include "BayesW.hpp"
+#include "BayesFH.h"
 // #include "BayesRRm_mt.h"
 #include "data.hpp"
 #include "options.hpp"
@@ -55,7 +56,7 @@ int main(int argc, const char * argv[]) {
                 analysis.checkRamUsage();
             }
 
-        } else if ((opt.bayesType == "bayesMPI" || opt.bayesType == "bayesWMPI") && opt.analysisType == "RAM") {
+        } else if ((opt.bayesType == "bayesMPI" || opt.bayesType == "bayesWMPI" || opt.bayesType == "bayesFHMPI") && opt.analysisType == "RAM") {
 
 
             // Reading from BED file
@@ -157,7 +158,13 @@ int main(int argc, const char * argv[]) {
                 //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 //analysis.runMpiGibbsMultiTraits();
 
-            } else if (opt.bayesType == "bayesWMPI") {
+            }else if (opt.bayesType == "bayesFHMPI") {
+
+                BayesFH analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+                analysis.runMpiGibbs();
+
+            } 
+	    else if (opt.bayesType == "bayesWMPI") {
 
                 BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
                 analysis.runMpiGibbs_bW();

@@ -88,34 +88,41 @@ public:
     double betaB;
     string options_s;
 
-    Options(){
-        chainLength             = 10000;
-        burnin                  = 5000;
-        seed                    = static_cast<unsigned int>(std::time(0));
-        thin                    = 5;
-        save                    = 10;
-        S.resize(3);
-        S[0]                    = 0.01;
-        S[1]                    = 0.001;
-        S[2]                    = 0.0001;
-        title                   = "brr";
-        analysisType            = "Bayes";
-        bayesType               = "C";
-        phenotypeFile           = "";
-        markerBlocksFile        = "";
-        bedFile                 = "";
-        sparseDir               = "";
-        sparseBsn               = "";
-        optionFile				= "";
-        //EO@@@ check for default value
-	//DT@@@ should be one group the default allowing for no group files
-        numGroups				= 1;
-        groupFile               = "";
-        priorsFile              = "";
-        dPriorsFile             = "";
-        mSfile                  = "";
-        betaA = 1.0;
-        betaB = 1.0;
+    //FHDT
+    double tau0 = 1; // global paeameter hyperparamter
+    double v0c = 3;  // degrees of freedom regularising slab
+    double s02c = 1; // scale regularising slab
+    double v0L = 3;  // degrees of freedom local paramters
+    double v0t = 3;  // dgrees of freedom global paramater
+
+    Options() {
+      chainLength = 10000;
+      burnin = 5000;
+      seed = static_cast<unsigned int>(std::time(0));
+      thin = 5;
+      save = 10;
+      S.resize(3);
+      S[0] = 0.01;
+      S[1] = 0.001;
+      S[2] = 0.0001;
+      title = "brr";
+      analysisType = "Bayes";
+      bayesType = "C";
+      phenotypeFile = "";
+      markerBlocksFile = "";
+      bedFile = "";
+      sparseDir = "";
+      sparseBsn = "";
+      optionFile = "";
+      // EO@@@ check for default value
+      // DT@@@ should be one group the default allowing for no group files
+      numGroups = 1;
+      groupFile = "";
+      priorsFile = "";
+      dPriorsFile = "";
+      mSfile = "";
+      betaA = 1.0;
+      betaB = 1.0;
     }
 
     void inputOptions(const int argc, const char* argv[]);

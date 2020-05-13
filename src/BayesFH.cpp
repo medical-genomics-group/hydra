@@ -925,7 +925,7 @@ void BayesFH::write_sparse_data_files(const uint bpr) {
               << " seconds." << std::endl;
 }
 
-size_t get_file_size(const std::string &filename) {
+size_t inline get_file_size(const std::string &filename) {
   struct stat st;
   if (stat(filename.c_str(), &st) != 0) {
     return 0;
@@ -1041,7 +1041,9 @@ void BayesFH::init_from_restart(const int K, const uint M, const uint Mtot,
 // EO: MPI GIBBS
 //-------------
 int BayesFH::runMpiGibbs() {
-
+  std::cout <<"################################################"<<"\n";
+  std::cout << "Samplng effects using Finnish horseshoe prior" << "\n";
+  std::cout << "##############################################"<<"\n\n";
   typedef Matrix<bool, Dynamic, 1> VectorXb;
 
   char buff[LENBUF];
@@ -1250,33 +1252,39 @@ int BayesFH::runMpiGibbs() {
   Beta.setZero();
 
   //----------- FHDT parameters
-  double v0L;
-  double v0t;
-  double v0c;
-  double s02c;
+  double v0L = opt.v0L;
+  double v0t = opt.v0t;
+  double v0c = opt.v0c;
+  double s02c = opt.s02c;
   double hypTau;
-  VectorXd lambda_var;
+  VectorXd lambda_var(Beta.size());
+  VectorXd nu_var(Beta.size());
   double tau;
-  double tau0;
+  double tau0 = opt.tau0;
   double c;
   double scaledBSQN;
   
   tau=0;
-  
-  tau0=0;
   c=0;
   lambda_var.setZero();
-
-  hypTau = dist.inv_gamma_rate_rng(0.5,1/(tau0*tau0));
+  nu_var.setZero();
   
+  std::cout << "INFO Sampling initial hypTau" <<"\n";
+  std::cout << "tau0: "<<tau0 << "\n";
+  hypTau = dist.inv_gamma_rate_rng(0.5,1.0/(tau0*tau0));
+  std::cout << "hypTau: "<< hypTau <<"\n";
+  std::cout << "INFO Sampling initial tau" <<"\n";
   tau = dist.inv_gamma_rate_rng(0.5*v0t,v0t/hypTau);
+  std::cout << "tau: " << tau <<"\n";
+  std::cout << "INFO Sampling initial slab" <<"\n";
   c = dist.inv_scaled_chisq_rng( v0c, s02c);
+  std::cout << "c: " << c <<"\n";
+  std::cout << "v0L" << v0L << "\n";
+  SamplerLocalVar  lambdaSampler(dist,v0L,c/(double)Mtot);
 
-  SamplerLocalVar  lambdaSampler(dist,v0L,dist.unif_rng());
-  
-  for(int i=0; i< Mtot; i++)
-    lambda_var[i] = lambdaSampler.sampleLocalVar(10,tau,c,0); 
-  
+  std::cout << "INFO Sampling initial lambda with values: "<< c/(double)Mtot<<"\n";
+  lambda_var.array() = c/(double)Mtot;
+  std::cout << "<------------ FH initialisation finished -------------------->\n";
   //--------------------------
 
   
@@ -1848,7 +1856,9 @@ int BayesFH::runMpiGibbs() {
     stats_dis = (int *)_mm_malloc(size_t(nranks) * sizeof(int), 64);
     check_malloc(stats_dis, __LINE__, __FILE__);
   }
-
+  assert(lambda_var.size() > 0);
+  assert(lambda_var.size() == Beta.size());
+  std::cout<< "<---------- MCMC sampling -------------->\n";
   for (uint iteration = iteration_start; iteration < opt.chainLength;
        iteration++) {
 
@@ -1897,6 +1907,8 @@ int BayesFH::runMpiGibbs() {
     // EO: watch out, std::shuffle is not portable, so do no expect identical
     //    results between Intel and GCC when shuffling the markers is on!!
     //------------------------------------------------------------------------
+
+    std::cout<< "<----------  sampling markers -------------->\n";
     if (opt.shuffleMarkers) {
       std::shuffle(markerI.begin(), markerI.end(), dist.rng);
     }
@@ -1933,7 +1945,15 @@ int BayesFH::runMpiGibbs() {
 
 	// FHDT----------------
 	// Now the variance per mixture changes
+	nu_var(marker) =  dist.inv_gamma_rate_rng(0.5+0.5*v0L,v0L/lambda_var[marker] +1);//sample nu_var in case needed
 	double lambda_tilde = tau*c/(tau+c*lambda_var[marker]);
+	#ifdef DEBUG
+	std::cout<< "marker:" << marker <<"\n";
+	std::cout << "tau: " << tau << "\n";
+	std::cout << "c: " << c << "\n";
+	std::cout << "local: "<< lambda_var[marker] << "\n";
+	std::cout << "lambda_tilde: "<< lambda_tilde << "\n";
+	#endif 
 	//---------------------------------------
 
         if (adaV[j]) {
@@ -2083,10 +2103,22 @@ int BayesFH::runMpiGibbs() {
         // this does not depend on other betas, and the rest of the loop does
         // not depend on the results of this, so could be done in a different
         // thread
-        lambda_var(marker) =
-	  lambdaSampler.sampleLocalVar(10, tau, c, beta*beta );
+	#ifdef DEBUG
+	std::cout << "<----- sampling local variance -------->\n";
+	std::cout << "tau: "<< tau << "\n";
+	std::cout << "c: " << c << "\n";
+	std::cout << "beta^2: " << beta*beta <<"\n";
+	#endif
+	//if doing newtonian montecarlo use this
+        // lambda_var(marker) =
+	//   lambdaSampler.sampleLocalVar(10, tau, c, beta*beta );
+	lambda_var(marker)=  dist.inv_gamma_rate_rng(0.5+0.5*v0L,0.5*beta*beta/tau + v0L/nu_var(marker));
+	#ifdef DEBUG
+	std::cout << "lambda_var: " << lambda_var(marker) << "\n"; 
 
+	#endif
 
+        //-------------------------------------------------
         // Compute delta epsilon
         if (deltaBeta != 0.0) {
 
@@ -2675,7 +2707,7 @@ int BayesFH::runMpiGibbs() {
             (v0c + (double)m0[i]));
     //--------------------------------
   
-      sigmaG[i] = c;
+      sigmaG[i] = beta_squaredNorm[i];
       // sigmaG[i] = dist.inv_scaled_chisq_rng(
       // v0G + (double)m0[i],
       // (Beta_squaredNorm[i] * (double)m0[i] + v0G * s02G) /
