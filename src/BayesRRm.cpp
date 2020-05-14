@@ -1144,7 +1144,6 @@ int BayesRRm::runMpiGibbs() {
         MtotGrp[groups[i]] += 1;
     }
 
-
     // In case of a restart, we first read the latest dumps
     // ----------------------------------------------------
     if (opt.restart) {
@@ -1188,18 +1187,22 @@ int BayesRRm::runMpiGibbs() {
         check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
     }
 
+    // Set sigmaG of empty groups to zero
+    for (int i=0; i<numGroups; i++)
+        if (MtotGrp[i] == 0)  sigmaG[i] = 0.0;
+
+    //cout << "sigmaG = " << sigmaG << endl;
+
 
     // Build a list of the files to tar
     // --------------------------------
     MPI_Barrier(MPI_COMM_WORLD);
     ofstream listFile;
     listFile.open(lstfp);
-    listFile << outfp << "\n";
+    listFile << outfp  << "\n";
     listFile << xbetfp << "\n"; // Only tar the last saved iteration, no need for full history
     listFile << xcpnfp << "\n"; // Idem
-    //EO@@@ do we need acu files in tarballs?
-    //DT@@@ not really, so we can leave things as is
-    listFile << acufp << "\n";
+    listFile << acufp  << "\n";
     for (int i=0; i<nranks; i++) {
         listFile << opt.mcmcOut + ".rng." + std::to_string(i) << "\n";
         listFile << opt.mcmcOut + ".mrk." + std::to_string(i) << "\n";
@@ -1534,18 +1537,20 @@ int BayesRRm::runMpiGibbs() {
     //printf("sigmaE = %20.15f\n", sigmaE);
     //printf("mu = %20.15f\n", mu);
 
+
+    //EO: for now, we use adav to monitor markers belonging to groups
+    //    with sigmaG being null; so no need to dump additional information
+    //    in case of restart
     adaV.setOnes();
-    if (opt.restart) {
-        //if (rank == 0)  cout << "  !!!! RESTART ADAV!!!!  " << endl;
-        //adaV = data.rAdaV;
+    for (int i=0; i<M; i++) {
+        if (sigmaG[groups[MrankS[rank] + i]] == 0.0) {
+            adaV[i] = 0;
+        }
     }
 
+
     VectorXd sum_beta_squaredNorm(numGroups);
-    double   sigE_G, sigG_E, i_2sigE;
-    double   beta, betaOld, deltaBeta, p, acum, e_sqn;
     VectorXd beta_squaredNorm(numGroups);
-    size_t   markoff;
-    int      marker, cx;
 
     logL.resize(K);
 
@@ -1647,25 +1652,20 @@ int BayesRRm::runMpiGibbs() {
 	 
             sinceLastSync += 1;
 
-            // Sparse indices storage for BED markers needing expansion to SPARSE at processing time
-            //
-            //uint *XI1 = NULL, *XI2 = NULL, *XIM = NULL;
+            double deltaBeta  = 0.0;
 
             if (j < M) {
 
-                marker  = markerI[j];
+                const int marker  = markerI[j];
 
-                beta    = Beta(marker);
+                double beta    = Beta(marker);
 
-                sigE_G  = sigmaE / sigmaG[groups[MrankS[rank] + marker]];
+                double sigE_G  = sigmaE / sigmaG[groups[MrankS[rank] + marker]];
+                double sigG_E  = sigmaG[groups[MrankS[rank] + marker]] / sigmaE;
+                double i_2sigE = 1.0 / (2.0 * sigmaE);
 
-                sigG_E  = sigmaG[groups[MrankS[rank] + marker]] / sigmaE;
-
-                i_2sigE = 1.0 / (2.0 * sigmaE);
-                
-
-                if (adaV[j]) {
-
+                if (adaV[marker]) {
+                    
                     //we compute the denominator in the variance expression to save computations
                     //denom = dNm1 + sigE_G * cVaI.segment(1, km1).array();
                     for (int i=1; i<=km1; ++i) {
@@ -1777,56 +1777,55 @@ int BayesRRm::runMpiGibbs() {
                     //printf("it %d, rank %d, mark %d: num = %22.15f, %20.15f, %20.15f\n", iteration, rank, marker, num, mave[marker], mstd[marker]);
 
                     //muk for the other components is computed according to equations
-                    muk.segment(1, km1) = num / denom.array();
-                    
+                    muk.segment(1, km1) = num / denom.array();                    
                     //cout << "muk = " << endl << muk << endl;
                     
                     //first component probabilities remain unchanged
                     for (int i=0; i<K; i++)
                         logL[i] = log(estPi(groups[MrankS[rank] + marker], i));
-                    //if (marker == 0)  cout << "logL = " << endl << logL << endl;
 
                     // Update the log likelihood for each component
                     for (int i=1; i<1+km1; i++) {
                         logL[i] = logL[i]
-                            - 0.5 * log(sigG_E * dNm1 * cVa(groups[MrankS[rank] + marker],i) + 1.0)
+                            - 0.5 * log(sigG_E * dNm1 * cVa(groups[MrankS[rank] + marker], i) + 1.0)
                             +  muk[i] * num * i_2sigE;
                     }
 
-                    p = dist.unif_rng();
-                    //printf("%d/%d/%d  p = %15.10f\n", iteration, rank, j, p);
+                    double prob = dist.unif_rng();
+                    //printf("%d/%d/%d  prob = %15.10f\n", iteration, rank, j, prob);
 
-                    acum = 0.0;
+                    double acum = 0.0;
                     if (((logL.segment(1,km1).array()-logL[0]).abs().array() > 700.0).any()) {
                         acum = 0.0;
                     } else{
                         acum = 1.0 / ((logL.array()-logL[0]).exp().sum());
                     }
-                    //printf("acum = %20.15f, p = %20.15f\n", acum, p);
-
+                    //printf("it %d, marker %d, acum = %20.15f, prob = %20.15f\n", iteration, marker, acum, prob);
                     //continue;
 
-
-                    //TODO Store marker acum for later dump to file
                     Acum(marker) = acum;
 
                     for (int k=0; k<K; k++) {
-                        if (p <= acum || k == km1) { //if we p is less than acum or if we are already in the last mixt.
+
+                        if (prob <= acum || k == km1) { // if prob is less than acum or if we are already in the last mixt.
+
                             if (k==0) {
                                 Beta(marker) = 0.0;
                             } else {
                                 Beta(marker) = dist.norm_rng(muk[k], sigmaE/denom[k-1]);
-                                //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with p=%15.10f <= acum = %15.10f, denom = %15.10f, sigmaE = %15.10f: beta = %15.10f\n", iteration, rank, marker, k, muk[k], p, acum, denom[k-1], sigmaE, Beta(marker));
+                                //printf("@B@ beta update %4d/%4d/%4d muk[%4d] = %15.10f with prob=%15.10f <= acum = %15.10f, denom = %15.10f, sigmaE = %15.10f: beta = %15.10f\n", iteration, rank, marker, k, muk[k], prob, acum, denom[k-1], sigmaE, Beta(marker));
                             }
                             cass(groups[MrankS[rank] + marker], k) += 1;
                             components[marker]  = k;
                             break;
+
                         } else {
                             //if too big or too small
                             if (k+1 >= K) {
-                                printf("FATAL  : iteration %d, marker = %d, p = %15.10f, acum = %15.10f logL overflow with %d => %d\n", iteration, marker, p, acum, k+1, K);
+                                printf("FATAL  : iteration %d, marker = %d, prob = %15.10f, acum = %15.10f logL overflow with %d => %d\n", iteration, marker, prob, acum, k+1, K);
                                 MPI_Abort(MPI_COMM_WORLD, 1);
                             }
+
                             if (((logL.segment(k+1,K-(k+1)).array()-logL[k+1]).abs().array() > 700.0).any()) {
                                 acum += 0.0d; // we compare next mixture to the others, if to big diff we skip
                             } else{
@@ -1840,13 +1839,12 @@ int BayesRRm::runMpiGibbs() {
                     Acum(marker) = 1.0; // probability of beta being 0 equals 1.0
                 }
 
-                //printf("After acum = %15.10f\n", acum);
-                //printf("it %d, task %3d, marker %5d: @SO_FAR_SO_GOOD@\n", iteration, rank, marker);
-                //continue;
+                fflush(stdout);
 
-                betaOld   = beta;
-                beta      = Beta(marker);
-                deltaBeta = betaOld - beta;
+
+                double betaOld = beta;
+                beta           = Beta(marker);
+                deltaBeta      = betaOld - beta;
                 //printf("deltaBeta = %20.15f\n", deltaBeta);
                 
                 //continue;
@@ -2380,8 +2378,6 @@ int BayesRRm::runMpiGibbs() {
 
         } // END PROCESSING OF ALL MARKERS
 
-        //exit(0);
-
         //continue;
         
 
@@ -2403,53 +2399,79 @@ int BayesRRm::runMpiGibbs() {
             cass             = sum_cass;
         }
 
-        if (rank == 0) {
-            printf("\nINFO   : global cass on iteration %d:\n", iteration);
-            for (int i=0; i<numGroups; i++) {
-                printf("         Mtot[%3d] = %8d  | cass:", i, MtotGrp[i]);
-                for (int ii=0; ii<K; ii++) {
-                    printf(" %8d", cass(i, ii));
-                }
-                printf(" -> sum = %8d\n", cass.row(i).sum());
-            }
-        }
-        fflush(stdout);
-
         // Update global parameters
         // ------------------------
         for (int i=0; i<numGroups; i++) {
 
-            // Skip empty groups
-            if (MtotGrp[i] == 0) {
+            // Skip empty groups 
+            if (MtotGrp[i] == 0)   continue;
+
+            //printf("%d: m0 = %d - %d, v0G = %20.15f\n", i, MtotGrp[i], cass(i, 0), v0G);
+            m0[i] = MtotGrp[i] - cass(i, 0);
+
+            // Skip groups with m0 being null or empty cass (adaV in action)
+            if (m0[i] == 0 || cass.row(i).sum() == 0) {
+                for (int ii=0; ii<M; ii++) {
+                    if (groups[MrankS[rank] + ii] == i) {
+                        adaV[ii] = 0;
+                    }
+                }
                 sigmaG[i] = 0.0;
                 continue;
             }
-            
-            //printf("%d: m0 = %d - %d, v0G = %20.15f\n", i, MtotGrp[i], cass(i, 0), v0G);
-            m0[i]        = MtotGrp[i] - cass(i, 0);
-            
+
             // AH: naive check that v0G and s02G were supplied from file
             if (opt.priorsFile != "") {
-                v0G = data.priors(i, 0);
+                v0G  = data.priors(i, 0);
                 s02G = data.priors(i, 1);
             }
+
             // AH: similarly for dirichlet priors
             if (opt.dPriorsFile != "") {
                 // get vector of parameters for the current group
                 dirc = data.dPriors.row(i).transpose().array();
             }
-            sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
-            
+           
+            sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));                
+            //printf("???? %d: %d, bs %20.15f, m0 %d -> sigmaG[i] = %20.15f, call(%20.15f, %20.15f)\n", rank, i, beta_squaredNorm[i], m0[i], sigmaG[i], v0G + (double) m0[i],  (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
+
             //we moved the pi update here to use the same loop
             VectorXd dirin = cass.row(i).transpose().array().cast<double>() + dirc.array();
             estPi.row(i) = dist.dirichlet_rng(dirin);
         }
+
+        //fflush(stdout);
+
         //printf("rank %d own sigmaG[0] = %20.15f with Mtot = %d and m0[0] = %d\n", rank, sigmaG[0], Mtot, int(m0[0]));
 
         // Broadcast sigmaG of rank 0
         check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //printf("rank %d has sigmaG = %15.10f\n", rank, sigmaG);
         //cout << "sigmaG = " << sigmaG << endl;
+
+
+        if (rank == 0) {
+            printf("\nINFO   : global cass on iteration %d:\n", iteration);
+            for (int i=0; i<numGroups; i++) {
+                printf("         MtotGrp[%3d] = %8d  | ", i, MtotGrp[i]);
+                if (MtotGrp[i] == 0) {
+                    printf(" (empty group)");
+                } else if (sigmaG[i] == 0.0) {
+                    printf(" excluded (sigmaG set to zero)");
+                } else {
+                    printf(" cass:");
+                    for (int ii=0; ii<K; ii++) {
+                        printf(" %8d", cass(i, ii));
+                    }
+                    assert(cass.row(i).sum() == MtotGrp[i]);
+                }
+                printf("\n");
+            }
+        }
+        fflush(stdout);
+
+
+
 
         // Check iteration
         //
@@ -2523,7 +2545,7 @@ int BayesRRm::runMpiGibbs() {
 
         MPI_Barrier(MPI_COMM_WORLD);
 
-        e_sqn = 0.0d;
+        double e_sqn = 0.0d;
         for (int i=0; i<Ntot; ++i) e_sqn += epsilon[i] * epsilon[i];
         //printf("e_sqn = %20.15f, v0E = %20.15f, s02E = %20.15f\n", e_sqn, v0E, s02E);
 
@@ -2566,7 +2588,7 @@ int BayesRRm::runMpiGibbs() {
             //EO: now only global parameters to out
             if (rank == 0) {
 
-                cx = snprintf(buff, LENBUF, "%5d, %4d", iteration, (int) sigmaG.size());
+                int cx = snprintf(buff, LENBUF, "%5d, %4d", iteration, (int) sigmaG.size());
                 assert(cx >= 0 && cx < LENBUF);
 
                 for(int jj = 0; jj < sigmaG.size(); ++jj){
