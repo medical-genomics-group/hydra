@@ -167,14 +167,14 @@ public:
                                    uint& first_saved_iteration);
 
     // Three functions tailored for bW output. Consider using same format in bR
-    void read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
-                                      VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
-                                      uint& iteration_restart, uint& first_saved_it_restart);
+    void read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optThin, const uint optSave, const int K, double& mu,
+                                        VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
+                                        uint& iteration_to_restart_from, uint& first_thinned_iteration, uint& first_saved_iteration);
 
     void read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave, const int gamma_length,
-                                     VectorXd& gamma, uint& iteration_restart);
+                                     VectorXd& gamma);
 
-    void read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
+    void read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_to_restart_from,
                                      std::vector<int>& markerI);
 
     void read_mcmc_output_mus_file(const string mcmcOut,

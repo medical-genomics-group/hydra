@@ -856,11 +856,11 @@ void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, cons
     init(Ntot,Mtot, fixtot);    
 
     //TODO @@@DT change this function to read the csv file from restart in groups 
-    data.read_mcmc_output_csv_file_bW(opt.mcmcOut, opt.save, K, mu, sigmaG, used_data.alpha, pi_L,
-                                      iteration_restart, first_saved_it_restart);
+    data.read_mcmc_output_csv_file_bW(opt.mcmcOut, opt.thin, opt.save, K, mu, sigmaG, used_data.alpha, pi_L,
+                                      iteration_to_restart_from, first_thinned_iteration, first_saved_iteration);
     
     // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
-    srand(opt.seed + iteration_restart);
+    srand(opt.seed + iteration_to_restart_from);
 
     //Carry the values to the other structures
     used_data_beta.alpha = used_data.alpha;
@@ -868,29 +868,29 @@ void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, cons
     MPI_Barrier(MPI_COMM_WORLD);
 
     data.read_mcmc_output_bet_file(opt.mcmcOut,
-                                   Mtot, iteration_restart, first_saved_it_restart, opt.thin,
+                                   Mtot, iteration_to_restart_from, first_thinned_iteration, opt.thin,
                                    MrankS, MrankL, use_xfiles_in_restart,
                                    Beta);
 
     data.read_mcmc_output_cpn_file(opt.mcmcOut,
-                                   Mtot, iteration_restart, first_saved_it_restart, opt.thin,
+                                   Mtot, iteration_to_restart_from, first_thinned_iteration, opt.thin,
                                    MrankS, MrankL, use_xfiles_in_restart,
                                    components);
 
-    data.read_mcmc_output_eps_file(opt.mcmcOut, Ntot, iteration_restart,
+    data.read_mcmc_output_eps_file(opt.mcmcOut, Ntot, iteration_to_restart_from,
                                    epsilon_restart);
-    
-    data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_restart,
+
+    data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_to_restart_from,
                                    markerI_restart);
 
     if (opt.covariates) {
-        data.read_mcmc_output_gam_file_bW(opt.mcmcOut, opt.save, fixtot, gamma_restart, iteration_restart);
+        data.read_mcmc_output_gam_file_bW(opt.mcmcOut, opt.save, fixtot, gamma_restart);
 
-        data.read_mcmc_output_idx_file_bW(opt.mcmcOut, "xiv", fixtot, iteration_restart, xI_restart);
+        data.read_mcmc_output_idx_file_bW(opt.mcmcOut, "xiv", fixtot, iteration_to_restart_from, xI_restart);
     }
 
     // Adjust starting iteration number.
-    iteration_start = iteration_restart + 1;
+    iteration_start = iteration_to_restart_from + 1;
              
     MPI_Barrier(MPI_COMM_WORLD);
 }
@@ -1002,9 +1002,9 @@ int BayesW::runMpiGibbs_bW() {
     string epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
 
     if(opt.restart){
-        init_from_restart(K, M, Mtot, Ntot - data.numNAs, numFixedEffects, MrankS, MrankL, use_xfiles_in_restart);
+        init_from_restart(K, M, Mtot, Ntot - data.numNAs, numFixedEffects, MrankS, MrankL, opt.useXfilesInRestart);
         if (rank == 0)
-            data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_restart, iteration_start);
+            data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_to_restart_from, iteration_start);
 
         dist.read_rng_state_from_file(rngfp);
 
@@ -1318,7 +1318,7 @@ int BayesW::runMpiGibbs_bW() {
     }
 
     //Set iteration_start=0
-    for (uint iteration=0; iteration<opt.chainLength; iteration++) {
+    for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
 
         double start_it = MPI_Wtime();
         double it_sync_ar1  = 0.0;
