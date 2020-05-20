@@ -121,7 +121,7 @@ public:
     map<string, SnpInfo*> snpInfoMap;
     map<string, IndInfo*> indInfoMap;
     
-    unsigned numFixedEffects;
+    unsigned numFixedEffects = 0;
 
     unsigned numSnps = 0;
     unsigned numInds = 0;
