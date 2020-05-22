@@ -1351,13 +1351,13 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
 
         for (size_t ii=0; ii<numInds; ++ii) {
             if (tmpi[ii] < 0) {
-                locpp[ii] = 0.0d;
+                locpp[ii] = 0.0;
             } else {
                 locpp[ii] = double(tmpi[ii]) - mean;
             }
         }
 
-        double sqn  = 0.0d;
+        double sqn  = 0.0;
         for (size_t ii=0; ii<numInds; ++ii) {
             sqn += locpp[ii] * locpp[ii];
         }

@@ -105,6 +105,34 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bedFile         = argv[++i];
             ss << "--bfile " << argv[i] << "\n";
         }
+	else if (!strcmp(argv[i], "--betaA")) {
+	    betaA = atof(argv[++i]);
+            ss << "--betaA " << argv[i] << "\n";
+        }
+	else if (!strcmp(argv[i], "--betaB")) {
+            betaB = atof(argv[++i]);
+            ss << "--betaB " << argv[i] << "\n";
+        }
+	else if (!strcmp(argv[i], "--tau0")) {
+            tau0 = atof(argv[++i]);
+            ss << "--tau0 " << argv[i] << "\n";
+        }
+	else if (!strcmp(argv[i], "--v0c")) {
+            v0c = atof(argv[++i]);
+            ss << "--v0c " << argv[i] << "\n";
+        }
+	else if (!strcmp(argv[i], "--s02c")) {
+            s02c = atof(argv[++i]);
+            ss << "--s02c " << argv[i] << "\n";
+        }
+	else if (!strcmp(argv[i], "--v0L")) {
+            v0L = atof(argv[++i]);
+            ss << "--v0L " << argv[i] << "\n";
+        }
+	else if (!strcmp(argv[i], "--v0t")) {
+            v0t = atof(argv[++i]);
+            ss << "--v0t " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--threshold-fnz")) {
             threshold_fnz = atof(argv[++i]);
             ss << "--threshold-fnz " << argv[i] << "\n";
