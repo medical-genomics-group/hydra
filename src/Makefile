@@ -44,11 +44,14 @@ LIBS     = -lz
 #LIBS    += -lboost_system 
 #LIBS    += -lboost_filesystem
 
+CCASFLAGS=-no-multibyte-chars
+#LANG=en_US.utf8
+#LC_ALL=en_US.utf8
 
 #SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 #//EO@@@ remove multi-trait version for now
 SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
-SOURCES = main.cpp data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
+#SOURCES = main.cpp data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 

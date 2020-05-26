@@ -16,6 +16,8 @@ CXXFLAGS += -funroll-loops
 CXXFLAGS += -std=c++17
 #CXXFLAGS += -march=native
 CXXFLAGS += -D USE_MPI
+CXXFLAGS += -fopenmp
+
 
 #CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 
@@ -26,9 +28,14 @@ CXXFLAGS += -D USE_MPI
 #INCLUDE += -I$(BOOST_ROOT)/include
 #INCLUDE += -I$(MVAPICH2_ROOT)/include
 
+INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
+INCLUDE += -I$(BOOST_ROOT)/include
+
 LIBS     = -lz
 
-SRC = data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW.cpp BayesW_arms.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
+#SRC = data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW.cpp BayesW_arms.cpp gadgets.cpp distributions_boost.cpp main.cpp options.cpp samplewriter.cpp compression.cpp
+SRC = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
+
 
 OBJ = $(SRC:.cpp = .o)
 
