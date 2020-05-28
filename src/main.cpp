@@ -2,7 +2,7 @@
 #include <string>
 #include "BayesRRm.h"
 #include "BayesW.hpp"
-#include "BayesRRm_mt.h"
+//#include "BayesRRm_mt.h"
 #include "data.hpp"
 #include "options.hpp"
 #ifndef USE_MPI
@@ -57,7 +57,9 @@ int main(int argc, const char * argv[]) {
                 analysis.checkRamUsage();
             }
 
-        } else if ((opt.bayesType == "bayesMPI" || opt.bayesType == "bayesWMPI") && opt.analysisType == "RAM") {
+        } else if ((opt.bayesType == "bayesMPI"  ||
+		    opt.bayesType == "bayesWMPI" ||
+		    opt.bayesType == "bayesFHMPI"   ) && opt.analysisType == "RAM") {
 
 
             // Reading from BED file

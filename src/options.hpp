@@ -85,6 +85,17 @@ public:
     // is greater than this threshold:
     double threshold_fnz = 0.06;
 
+    // FH related
+    double betaA = 0.0;
+    double betaB = 0.0;
+    double tau0  = 1.0;  // global hyperparameter
+    double s02c  = 1.0;  // scale regularising slab
+    //EO: should be of type int. const as well? 
+    double v0c   = 3;  // degrees of freedom regularising slab
+    double v0L   = 3;  // degrees of freedom local parameters
+    double v0t   = 3;  // degrees of freedom global paramaeters
+
+
     string options_s;
 
     Options(){
@@ -105,14 +116,14 @@ public:
         bedFile                 = "";
         sparseDir               = "";
         sparseBsn               = "";
-        optionFile				= "";
-        //EO@@@ check for default value
-	//DT@@@ should be one group the default allowing for no group files
-        numGroups				= 1;
+        optionFile		= "";
+        numGroups		= 1;
         groupFile               = "";
         priorsFile              = "";
         dPriorsFile             = "";
         mSfile                  = "";
+	betaA                   = 1.0;
+	betaB                   = 1.0;
     }
 
     void inputOptions(const int argc, const char* argv[]);
