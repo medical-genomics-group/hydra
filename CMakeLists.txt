@@ -14,8 +14,6 @@ add_definitions("-DNEWTONIAN")
 
 
 set(CMAKE_CXX_STANDARD 17)
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -D USE_MPI")
-add_definitions("-DUSE_MPI")
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
 

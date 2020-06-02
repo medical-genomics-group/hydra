@@ -46,7 +46,6 @@ class BayesRRm
 
     Distributions_boost dist;
     Distributions_boost dist8[8];
-    bool usePreprocessedData;
     bool showDebug;
 
     MatrixXd X;         // "fixed effects" matrix.
@@ -146,10 +145,9 @@ class BayesRRm
 
     int runGibbs();
 
-#ifdef USE_MPI
     void   init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
                              const int* MrankS, const int* MrankL, const bool use_xbet);
-
+    
     void   init_from_scratch();
 
     string mpi_get_sparse_output_filebase(const int rank);
@@ -171,9 +169,6 @@ class BayesRRm
     void   mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax);
 
     void   mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks);
-
-#endif
-
 };
 
 #endif /* SRC_BAYESRRM_H_ */

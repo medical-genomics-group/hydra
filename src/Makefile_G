@@ -16,7 +16,6 @@ CXXFLAGS += -std=c++17
 #CXXFLAGS += -xCORE-AVX2
 #CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
 CXXFLAGS += -march=native
-CXXFLAGS += -D USE_MPI
 #CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 CXXFLAGS += -fopenmp
 #CXXFLAGS += -qopt-report=2

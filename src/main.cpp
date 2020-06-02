@@ -5,26 +5,20 @@
 //#include "BayesRRm_mt.h"
 #include "data.hpp"
 #include "options.hpp"
-#ifndef USE_MPI
-#include "BayesRRmz.hpp"
-#endif
-#ifdef USE_MPI
 #include <mpi.h>
-#endif
 
 using namespace std;
 
 int main(int argc, const char * argv[]) {
 
-#ifdef USE_MPI
     MPI_Init(NULL, NULL);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-#else
+
     Gadget::Timer timer;
     timer.setTime();
     cout << "\nAnalysis started: " << timer.getDate();
-#endif
+
 
     if (argc < 2){
         cerr << " \nDid you forget to give the input parameters?\n" << endl;
@@ -35,12 +29,9 @@ int main(int argc, const char * argv[]) {
 
         Options opt;
 
-#ifndef USE_MPI
-        opt.printBanner();
-#endif
+        if (rank == 0)  opt.printBanner();
 
         opt.inputOptions(argc, argv);
-
 
         Data data;
 
@@ -57,11 +48,11 @@ int main(int argc, const char * argv[]) {
                 analysis.checkRamUsage();
             }
 
-        } else if ((opt.bayesType == "bayesMPI"  ||
-		    opt.bayesType == "bayesWMPI" ||
-		    opt.bayesType == "bayesFHMPI"   ) && opt.analysisType == "RAM") {
+        } else if (opt.bayesType == "bayesMPI"  ||
+                   opt.bayesType == "bayesWMPI" ||
+                   opt.bayesType == "bayesFHMPI"   ) {
 
-
+            
             // Reading from BED file
             // ---------------------
             if (opt.readFromBedFile && !opt.readFromSparseFiles) {
@@ -173,9 +164,9 @@ int main(int argc, const char * argv[]) {
             }
 
         } else {
-            throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);
+            throw(" Error: Wrong analysis requested: " + opt.bayesType);
         }
-    } 
+    }
     catch (const string &err_msg) {
         cerr << "\n" << err_msg << endl;
     }
@@ -183,13 +174,11 @@ int main(int argc, const char * argv[]) {
         cerr << "\n" << err_msg << endl;
     }
     
-#ifdef USE_MPI
     MPI_Finalize();
-#else
+
     timer.getTime();
     cout << "\nAnalysis finished: " << timer.getDate();
     cout << "Computational time: "  << timer.format(timer.getElapse()) << endl;
-#endif
     
     return 0;
 }

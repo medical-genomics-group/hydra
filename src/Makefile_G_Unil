@@ -15,9 +15,7 @@ CXXFLAGS += -funroll-loops
 #CXXFLAGS += g
 CXXFLAGS += -std=c++17
 #CXXFLAGS += -march=native
-CXXFLAGS += -D USE_MPI
 CXXFLAGS += -fopenmp
-
 
 #CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 

@@ -3,8 +3,11 @@
 
 
 void Options::inputOptions(const int argc, const char* argv[]){
+
     stringstream ss;
+
     for (unsigned i=1; i<argc; ++i) {
+
         if (!strcmp(argv[i], "--inp-file")) {
             optionFile = argv[++i];
             readFile(optionFile);
@@ -12,13 +15,8 @@ void Options::inputOptions(const int argc, const char* argv[]){
         } else {
             if (i==1) ss << "\nOptions:\n\n";
         }
-        if (!strcmp(argv[i], "--bayes")) {
-            analysisType = "RAMBayes";
-            bayesType = argv[++i];
-            ss << "--bayes " << argv[i] << "\n";
-        }
-#ifdef USE_MPI
-        else if (!strcmp(argv[i], "--restart")) {
+
+        if (!strcmp(argv[i], "--restart")) {
             restart = true;
             ss << "--restart " << "\n";
         }
@@ -34,12 +32,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bedSync = true;
             ss << "--bed-sync " << "\n";
         }
-        /*
-        else if (!strcmp(argv[i], "--mpiBayesGroups")) {
-            mpiBayesGroups = true;
-            ss << "--mpiBayesGroups " << "\n";
-        }
-        */
         else if (!strcmp(argv[i], "--groupIndexFile")) {
             groupIndexFile = argv[++i];
             ss << "--groupIndexFile " << argv[i] << "\n";
@@ -49,7 +41,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             ss << "--groupMixtureFile " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--mpibayes")) {
-            analysisType = "RAM";
             bayesType = argv[++i];
             ss << "--mpibayes " << argv[i] << "\n";
         }
@@ -81,21 +72,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             checkRamTpn = tmp;
             ss << "--check-RAM-tasks-per-node " << "\n";
         }
-#endif
-        else if (!strcmp(argv[i], "--ppbayes")) {
-            analysisType = "PPBayes";
-            bayesType = argv[++i];
-            ss << "--ppbayes " << argv[i] << "\n";
-        }
-        else if (!strcmp(argv[i], "--ppasyncbayes")) {
-            analysisType = "PPAsyncBayes";
-            bayesType = argv[++i];
-            ss << "--ppasyncbayes " << argv[i] << "\n";
-        }
-        else if (!strcmp(argv[i], "--preprocess")) {
-            analysisType = "Preprocess";
-            ss << "--preprocess " << "\n";
-        }
         else if (!strcmp(argv[i], "--compress")) {
             compress = true;
             ss << "--compress " << "\n";
@@ -105,31 +81,31 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bedFile         = argv[++i];
             ss << "--bfile " << argv[i] << "\n";
         }
-	else if (!strcmp(argv[i], "--betaA")) {
-	    betaA = atof(argv[++i]);
+        else if (!strcmp(argv[i], "--betaA")) {
+            betaA = atof(argv[++i]);
             ss << "--betaA " << argv[i] << "\n";
         }
-	else if (!strcmp(argv[i], "--betaB")) {
+        else if (!strcmp(argv[i], "--betaB")) {
             betaB = atof(argv[++i]);
             ss << "--betaB " << argv[i] << "\n";
         }
-	else if (!strcmp(argv[i], "--tau0")) {
+        else if (!strcmp(argv[i], "--tau0")) {
             tau0 = atof(argv[++i]);
             ss << "--tau0 " << argv[i] << "\n";
         }
-	else if (!strcmp(argv[i], "--v0c")) {
+        else if (!strcmp(argv[i], "--v0c")) {
             v0c = atof(argv[++i]);
             ss << "--v0c " << argv[i] << "\n";
         }
-	else if (!strcmp(argv[i], "--s02c")) {
+        else if (!strcmp(argv[i], "--s02c")) {
             s02c = atof(argv[++i]);
             ss << "--s02c " << argv[i] << "\n";
         }
-	else if (!strcmp(argv[i], "--v0L")) {
+        else if (!strcmp(argv[i], "--v0L")) {
             v0L = atof(argv[++i]);
             ss << "--v0L " << argv[i] << "\n";
         }
-	else if (!strcmp(argv[i], "--v0t")) {
+        else if (!strcmp(argv[i], "--v0t")) {
             v0t = atof(argv[++i]);
             ss << "--v0t " << argv[i] << "\n";
         }
@@ -159,12 +135,12 @@ void Options::inputOptions(const int argc, const char* argv[]){
             // Disabled for now!!
             if (nphen > 1) {
                 /*
-                for (int i=0; i < 8/nphen - 1; i++) {
-                    for (int j=0; j<nphen; j++) {
-                        phenotypeFiles.push_back(phenotypeFiles[j]);
-                    }
-                }
-                assert(phenotypeFiles.size() == 8);
+                  for (int i=0; i < 8/nphen - 1; i++) {
+                  for (int j=0; j<nphen; j++) {
+                  phenotypeFiles.push_back(phenotypeFiles[j]);
+                  }
+                  }
+                  assert(phenotypeFiles.size() == 8);
                 */
                 multi_phen = true;
                 //nphen = 8;
@@ -209,7 +185,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             markerBlocksFile = argv[++i];
             ss << "--marker-blocks-file " << argv[i] << "\n";
         }
-#ifdef USE_MPI
         else if (!strcmp(argv[i], "--sync-rate")) {    //EO
             syncRate = atoi(argv[++i]);
             ss << "--sync-rate " << argv[i] << "\n";
@@ -223,7 +198,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             sparseBsn = argv[++i];
             ss << "--sparse-basename " << argv[i] << "\n";
         }
-#endif
         else if (!strcmp(argv[i], "--number-markers")) {    //EO
             numberMarkers = atoi(argv[++i]);
             ss << "--number-markers " << argv[i] << "\n";
@@ -348,22 +322,17 @@ void Options::readFile(const string &file){  // input options from file
             bedFile = value;
         } else if (key == "phenotypeFile") {
             phenotypeFile = value;
-        } else if (key == "analysisType") {
-            analysisType = value;
         } else if (key == "bayesType") {
             bayesType = value;
         } else if (key == "mcmcOut") {
             mcmcOut = value;
         } else if (key == "shuffleMarkers") {
             shuffleMarkers = stoi(value);
-#ifdef USE_MPI
         } else if (key == "syncRate") {
             syncRate = stoi(value);
         } else if (key == "blocksPerRank") {
             blocksPerRank = stoi(value);
-        }
-#endif
-        else if (key == "numberMarkers") {
+        } else if (key == "numberMarkers") {
             numberMarkers = stoi(value);
         } else if (key == "numberIndividuals") {
             numberIndividuals = stoi(value);
@@ -385,7 +354,7 @@ void Options::readFile(const string &file){  // input options from file
                 S[j] = stof(strvec[j]);
             }
         } else if (key.substr(0,2) == "//" ||
-                key.substr(0,1) == "#") {
+                   key.substr(0,1) == "#") {
             continue;
         } else {
             throw("\nError: invalid option " + key + " " + value + "\n");

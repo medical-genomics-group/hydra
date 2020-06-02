@@ -25,11 +25,8 @@
 #include <iostream>
 #include <ctime>
 #include <mm_malloc.h>
-#ifdef USE_MPI
 #include <mpi.h>
 #include "mpi_utils.hpp"
-#endif
-
 #include <omp.h>
 #include "BayesW_arms.h"
 #include <math.h>
@@ -2142,28 +2139,3 @@ int BayesW::runMpiGibbs_bW() {
 
     return 0;
 }
-
-
-// Get directory and basename of bed file (passed with no extension via command line)
-// ----------------------------------------------------------------------------------
-
-//  ORIGINAL (SEQUENTIAL) VERSION
-/*
-  VectorXd BayesW::getSnpData(unsigned int marker) const
-  {
-  if (!usePreprocessedData) {
-  //read column from RAM loaded genotype matrix.
-  return data.Z.col(marker);//.cast<double>();
-  } else {
-  //read column from preprocessed and memory mapped genotype matrix file.
-  return data.mappedZ.col(marker).cast<double>();
-  }
-  }
-
-  void BayesW::printDebugInfo() const
-  {
-  //const unsigned int N(data.numInds);
-  // cout << "x mean " << Cx.mean() << "\n";
-  //   cout << "x sd " << sqrt(Cx.squaredNorm() / (double(N - 1))) << "\n";
-  }
-*/

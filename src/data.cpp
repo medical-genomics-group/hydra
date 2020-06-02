@@ -8,15 +8,11 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <mm_malloc.h>
-#ifdef USE_MPI
-#include <mpi.h>
-#include "mpi_utils.hpp"
-#endif
+//#include <mpi.h>
+//#include "mpi_utils.hpp"
 
-Data::Data() {
-}
 
-#ifdef USE_MPI
+Data::Data() {}
 
 
 void Data::print_restart_banner(const string mcmcOut, const uint iteration_restart, 
@@ -1379,8 +1375,6 @@ void Data::preprocess_data(const char* rawdata, const uint NC, const uint NB, do
     _mm_free(tmpi);
 }
 
-#endif
-
 
 
 // EO
@@ -1444,9 +1438,7 @@ void Data::readFamFile(const string &famFile){
     // ignore phenotype column
     ifstream in(famFile.c_str());
     if (!in) throw ("Error: can not open the file [" + famFile + "] to read.");
-#ifndef USE_MPI
-    cout << "Reading PLINK FAM file from [" + famFile + "]." << endl;
-#endif
+    //cout << "Reading PLINK FAM file from [" + famFile + "]." << endl;
     indInfoVec.clear();
     indInfoMap.clear();
     string fid, pid, dad, mom, sex, phen;
@@ -1460,10 +1452,7 @@ void Data::readFamFile(const string &famFile){
     }
     in.close();
     numInds = (unsigned) indInfoVec.size();
-
-#ifndef USE_MPI
-    cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
-#endif
+    //cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
 }
 
 
@@ -1471,9 +1460,7 @@ void Data::readBimFile(const string &bimFile) {
     // Read bim file: recombination rate is defined between SNP i and SNP i-1
     ifstream in(bimFile.c_str());
     if (!in) throw ("Error: can not open the file [" + bimFile + "] to read.");
-#ifndef USE_MPI
-    cout << "Reading PLINK BIM file from [" + bimFile + "]." << endl;
-#endif
+    //cout << "Reading PLINK BIM file from [" + bimFile + "]." << endl;
     snpInfoVec.clear();
     snpInfoMap.clear();
     string id, allele1, allele2;
@@ -1489,9 +1476,7 @@ void Data::readBimFile(const string &bimFile) {
     }
     in.close();
     numSnps = (unsigned) snpInfoVec.size();
-#ifndef USE_MPI
-    cout << numSnps << " SNPs to be included from [" + bimFile + "]." << endl;
-#endif
+    //cout << numSnps << " SNPs to be included from [" + bimFile + "]." << endl;
 }
 
 
@@ -1580,9 +1565,7 @@ void Data::readPhenotypeFileAndSetNanMask(const string &phenFile, const int numb
     numInds = numberIndividuals;
     ifstream in(phenFile.c_str());
     if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
-#ifndef USE_MPI
     //cout << "Reading phenotypes from [" + phenFile + "], and setting NAn" << endl;
-#endif
     uint line = 0, nonas = 0;
     Gadget::Tokenizer colData;
     string inputStr;
@@ -1806,9 +1789,7 @@ void Data::readPhenotypeFile(const string &phenFile, const int numberIndividuals
     numInds = numberIndividuals;
     ifstream in(phenFile.c_str());
     if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
-#ifndef USE_MPI
     //cout << "Reading phenotypes from [" + phenFile + "]." << endl;
-#endif
     uint line = 0, nas = 0, nonas = 0;
     Gadget::Tokenizer colData;
     string inputStr;
@@ -1841,9 +1822,7 @@ void Data::readPhenotypeFile(const string &phenFile) {
     // NA: missing phenotype
     ifstream in(phenFile.c_str());
     if (!in) throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
-#ifndef USE_MPI
     //cout << "Reading phenotypes from [" + phenFile + "]." << endl;
-#endif
     map<string, IndInfo*>::iterator it, end=indInfoMap.end();
     IndInfo *ind = NULL;
     Gadget::Tokenizer colData;

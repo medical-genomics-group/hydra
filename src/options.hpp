@@ -21,8 +21,6 @@ class Options {
 public:
 
     unsigned shuffleMarkers      = 1;
-#ifdef USE_MPI
-    //bool     mpiBayesGroups    = false;
     string   groupIndexFile    = "";
     string   groupMixtureFile  = "";
     bool     restart             = false;
@@ -38,7 +36,6 @@ public:
     bool     checkRam            = false;
     unsigned checkRamTasks       = 0;
     unsigned checkRamTpn         = 0;
-#endif
     unsigned numberMarkers       = 0;
     unsigned numberIndividuals   = 0;
     unsigned chainLength;
@@ -60,7 +57,6 @@ public:
     string dPriorsFile;
 
     string title;
-    string analysisType;
     string bayesType;
 
     string phenotypeFile;
@@ -91,39 +87,38 @@ public:
     double tau0  = 1.0;  // global hyperparameter
     double s02c  = 1.0;  // scale regularising slab
     //EO: should be of type int. const as well? 
-    double v0c   = 3;  // degrees of freedom regularising slab
-    double v0L   = 3;  // degrees of freedom local parameters
-    double v0t   = 3;  // degrees of freedom global paramaeters
+    double v0c   = 3;    // degrees of freedom regularising slab
+    double v0L   = 3;    // degrees of freedom local parameters
+    double v0t   = 3;    // degrees of freedom global paramaeters
 
 
     string options_s;
 
     Options(){
-        chainLength             = 10000;
-        burnin                  = 5000;
-        seed                    = static_cast<unsigned int>(std::time(0));
-        thin                    = 5;
-        save                    = 10;
+        chainLength      = 10000;
+        burnin           = 5000;
+        seed             = static_cast<unsigned int>(std::time(0));
+        thin             = 5;
+        save             = 10;
         S.resize(3);
-        S[0]                    = 0.01;
-        S[1]                    = 0.001;
-        S[2]                    = 0.0001;
-        title                   = "brr";
-        analysisType            = "Bayes";
-        bayesType               = "C";
-        phenotypeFile           = "";
-        markerBlocksFile        = "";
-        bedFile                 = "";
-        sparseDir               = "";
-        sparseBsn               = "";
-        optionFile		= "";
-        numGroups		= 1;
-        groupFile               = "";
-        priorsFile              = "";
-        dPriorsFile             = "";
-        mSfile                  = "";
-	betaA                   = 1.0;
-	betaB                   = 1.0;
+        S[0]             = 0.01;
+        S[1]             = 0.001;
+        S[2]             = 0.0001;
+        title            = "brr";
+        bayesType        = "C";
+        phenotypeFile    = "";
+        markerBlocksFile = "";
+        bedFile          = "";
+        sparseDir        = "";
+        sparseBsn        = "";
+        optionFile       = "";
+        numGroups		 = 1;
+        groupFile        = "";
+        priorsFile       = "";
+        dPriorsFile      = "";
+        mSfile           = "";
+        betaA            = 1.0;
+        betaB            = 1.0;
     }
 
     void inputOptions(const int argc, const char* argv[]);
@@ -134,7 +129,6 @@ public:
 private:
     void readFile(const string &file);
     void makeTitle(void);
-    void seedEngine(void);
 };
 
 #endif /* options_hpp */

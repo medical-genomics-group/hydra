@@ -12,10 +12,8 @@
 #include <Eigen/Sparse>
 #include <boost/format.hpp>
 #include "gadgets.hpp"
-#ifdef USE_MPI
 #include <mpi.h>
 #include "mpi_utils.hpp"
-#endif
 
 
 using namespace std;
@@ -132,8 +130,6 @@ public:
     vector<int>  blocksEnds;
     uint         numBlocks = 0;
 
-
-#ifdef USE_MPI
 
     void center_and_scale(double* __restrict__ vec, int* __restrict__ mask, const uint N, const uint nas);
 
@@ -316,7 +312,6 @@ public:
     }
 
     void preprocess_data(const char* data, const uint NC, const uint NB, double* ppdata, const int rank);
-#endif
 
     //EO to read definitions of blocks of markers to process
     void readMarkerBlocksFile(const string &markerBlocksFile);

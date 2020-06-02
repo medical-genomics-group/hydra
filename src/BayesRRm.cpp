@@ -23,12 +23,11 @@
 #include <iostream>
 #include <ctime>
 #include <mm_malloc.h>
-#ifdef USE_MPI
-#include <mpi.h>
-#include "mpi_utils.hpp"
-#endif
+//#include <mpi.h>
+//#include "mpi_utils.hpp"
 #include <omp.h>
 #include "dotp_lut.h"
+
 
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
     : data(data)
@@ -38,13 +37,12 @@ BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
     , seed(opt.seed)
     , max_iterations(opt.chainLength)
     , burn_in(opt.burnin)
-      //, dist(opt.seed)
-    , usePreprocessedData(opt.analysisType == "PPBayes")
     , showDebug(false)
 {
     double* ptr = &opt.S[0];
     cva = (Eigen::Map<Eigen::VectorXd>(ptr, static_cast<long>(opt.S.size()))).cast<double>();
 }
+
 
 BayesRRm::~BayesRRm()
 {
@@ -386,8 +384,6 @@ inline void center_and_scale(double* __restrict__ vec, const int N) {
     // Scale
     for (int i=0; i<N; ++i)  vec[i] *= sqn;
 }
-
-#ifdef USE_MPI
 
 
 // Define blocks of markers to be processed by each task
@@ -2842,7 +2838,7 @@ int BayesRRm::runMpiGibbs() {
             //    Print only first and last value handled by each task
             //printf("%4d/%4d epsilon[%5d] = %15.10f, epsilon[%5d] = %15.10f\n", iteration, rank, IrankS[rank], epsilon[IrankS[rank]], IrankS[rank]+IrankL[rank]-1, epsilon[IrankS[rank]+IrankL[rank]-1]);
 
-#if 1
+
             //EO system call to create a tarball of the dump
             //TODO: quite rough, make it more selective...
             //----------------------------------------------
@@ -2868,7 +2864,6 @@ int BayesRRm::runMpiGibbs() {
                 std::system(cmd.c_str());
             }
             MPI_Barrier(MPI_COMM_WORLD);
-#endif
         }
 
         //double end_it = MPI_Wtime();
@@ -3152,6 +3147,3 @@ uint BayesRRm::set_Mtot(const int rank) {
 
     return Mtot;
 }
-
-
-#endif

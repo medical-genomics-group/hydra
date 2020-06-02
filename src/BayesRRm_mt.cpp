@@ -16,10 +16,8 @@
 #include <sys/time.h>
 #include <iostream>
 #include <ctime>
-#ifdef USE_MPI
-#include <mpi.h>
-#include "mpi_utils.hpp"
-#endif
+//#include <mpi.h>
+//#include "mpi_utils.hpp"
 
 #include <omp.h>
 
