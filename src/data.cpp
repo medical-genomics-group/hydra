@@ -26,7 +26,11 @@ void Data::print_restart_banner(const string mcmcOut, const uint iteration_resta
 }
 
 
-void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, const uint length, const uint iteration_to_restart_from,
+void Data::read_mcmc_output_idx_file(const string      mcmcOut,
+                                     const string      ext,
+                                     const uint        length,
+                                     const uint        iteration_to_restart_from,
+                                     const string      bayesType,
                                      std::vector<int>& markerI)  {
     
     int nranks, rank;
@@ -36,48 +40,11 @@ void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, con
     MPI_Status status;
     MPI_File   fh;
 
-    const string fp = mcmcOut + "." + ext + "." + std::to_string(rank);
-    check_mpi(MPI_File_open(MPI_COMM_SELF, fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
+    // No rank dependency for bayesW
+    string fp = mcmcOut + "." + ext + "." + std::to_string(rank);
+    if (bayesType == "bayesWMPI")
+        fp = mcmcOut + "." + ext;
 
-    // 1. get and validate iteration number that we are about to read
-    MPI_Offset off = size_t(0);
-    uint iteration_ = UINT_MAX;
-    check_mpi(MPI_File_read_at(fh, off, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    if (iteration_ != iteration_to_restart_from) {
-        printf("Mismatch between expected and read mrk iteration: %d vs %d\n", iteration_to_restart_from, iteration_);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-    // 2. get and validate M (against size of markerI)
-    uint M_ = 0;
-    off = sizeof(uint);
-    check_mpi(MPI_File_read_at(fh, off, &M_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    uint M = markerI.size();
-    if (M_ != M) {
-        printf("Mismatch between expected and read mrk M: %d vs %d\n", M, M_);
-        MPI_Abort(MPI_COMM_WORLD, 1);
-    }
-
-    // 3. read the M_ coefficients
-    off = sizeof(uint) + sizeof(uint);
-    check_mpi(MPI_File_read_at(fh, off, markerI.data(), M_, MPI_INT, &status), __LINE__, __FILE__);
-
-
-    check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
-}
-
-//SO: remove rank specificity for bW
-void Data::read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_to_restart_from,
-                                     std::vector<int>& markerI)  {
-   
-    int nranks, rank;
-    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-
-    MPI_Status status;
-    MPI_File   fh;
-
-    const string fp = mcmcOut + "." + ext;
     check_mpi(MPI_File_open(MPI_COMM_SELF, fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
 
     // 1. get and validate iteration number that we are about to read

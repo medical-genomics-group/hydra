@@ -902,7 +902,7 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
                                    epsilon_restart);
 
     data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M,
-                                   iteration_to_restart_from,
+                                   iteration_to_restart_from, opt.bayesType,
                                    markerI_restart);
 
     if (opt.covariates) {
@@ -912,7 +912,7 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
                                        gamma_restart);
 
         data.read_mcmc_output_idx_file(opt.mcmcOut, "xiv", (uint)data.X.cols(),
-                                       iteration_to_restart_from,
+                                       iteration_to_restart_from, opt.bayesType,
                                        xI_restart);
     }
 

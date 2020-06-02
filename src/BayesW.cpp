@@ -877,13 +877,14 @@ void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, cons
     data.read_mcmc_output_eps_file(opt.mcmcOut, Ntot, iteration_to_restart_from,
                                    epsilon_restart);
 
-    data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_to_restart_from,
+    data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_to_restart_from, opt.bayesType,
                                    markerI_restart);
 
     if (opt.covariates) {
         data.read_mcmc_output_gam_file_bW(opt.mcmcOut, opt.save, fixtot, gamma_restart);
 
-        data.read_mcmc_output_idx_file_bW(opt.mcmcOut, "xiv", fixtot, iteration_to_restart_from, xI_restart);
+        data.read_mcmc_output_idx_file(opt.mcmcOut, "xiv", fixtot, iteration_to_restart_from, opt.bayesType,
+                                       xI_restart);
     }
 
     // Adjust starting iteration number.

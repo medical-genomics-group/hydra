@@ -136,7 +136,7 @@ public:
     void print_restart_banner(const string mcmcOut, const uint iteration_restart, const uint iteration_start);
 
     
-    void read_mcmc_output_idx_file(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
+    void read_mcmc_output_idx_file(const string mcmcOut, const string ext, const uint length, const uint iteration_restart, const string bayesType,
                                    std::vector<int>& markerI);
     
     void read_mcmc_output_gam_file(const string mcmcOut, const int gamma_length, const uint iteration_restart,
@@ -169,9 +169,6 @@ public:
 
     void read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave, const int gamma_length,
                                      VectorXd& gamma);
-
-    void read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_to_restart_from,
-                                     std::vector<int>& markerI);
 
     void read_mcmc_output_mus_file(const string mcmcOut,
                                    const uint  iteration_restart, const uint first_saved_it_restart, const int thin,
