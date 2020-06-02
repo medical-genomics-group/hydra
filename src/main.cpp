@@ -38,7 +38,9 @@ int main(int argc, const char * argv[]) {
 #ifndef USE_MPI
         opt.printBanner();
 #endif
+
         opt.inputOptions(argc, argv);
+
 
         Data data;
 
@@ -161,8 +163,8 @@ int main(int argc, const char * argv[]) {
 
             } else if (opt.bayesType == "bayesWMPI") {
 
-                //BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
-                //analysis.runMpiGibbs_bW();
+                BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+                analysis.runMpiGibbs_bW();
 
             } else {
 

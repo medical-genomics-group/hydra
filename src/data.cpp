@@ -71,7 +71,7 @@ void Data::read_mcmc_output_idx_file(const string mcmcOut, const string ext, con
 }
 
 //SO: remove rank specificity for bW
-void Data::read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_restart,
+void Data::read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, const uint length, const uint iteration_to_restart_from,
                                      std::vector<int>& markerI)  {
    
     int nranks, rank;
@@ -88,8 +88,8 @@ void Data::read_mcmc_output_idx_file_bW(const string mcmcOut, const string ext, 
     MPI_Offset off = size_t(0);
     uint iteration_ = UINT_MAX;
     check_mpi(MPI_File_read_at(fh, off, &iteration_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    if (iteration_ != iteration_restart) {
-        printf("Mismatch between expected and read mrk iteration: %d vs %d\n", iteration_restart, iteration_);
+    if (iteration_ != iteration_to_restart_from) {
+        printf("Mismatch between expected and read mrk iteration: %d vs %d\n", iteration_to_restart_from, iteration_);
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
@@ -521,10 +521,9 @@ void Data::read_mcmc_output_csv_file(const string mcmcOut,
 
 // SO: Currently basically the copy of the previous version.
 //     Consider using adding reading mu for bR so the same function could be used
-void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave, const int K, double& mu,
+void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optThin, const uint optSave, const int K, double& mu,
                                         VectorXd& sigmaG, double& sigmaE, MatrixXd& pi, 
-                                        uint& iteration_restart, uint& first_saved_it_restart) {
-
+                                        uint& iteration_to_restart_from, uint& first_thinned_iteration, uint& first_saved_iteration){
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -533,20 +532,36 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
     std::ifstream file(csv);
    
     int it_ = 1E9, rank_ = -1, m0_ = -1, pirows_ = -1, picols_ = -1, nchar = 0;
+    int nSavedIt = 0, nThinnedIt = 0;
     double mu_, sige_, rat_, siggSum_;
 
     VectorXd sigg_(numGroups);
-
-    int lastSavedIt = 0;
 
     if (file.is_open()) {
         std::string str;
         while (std::getline(file, str)) {
             if (str.length() > 0) {
                 int nread = sscanf(str.c_str(), "%5d", &it_);
+ 		assert(it_ % optThin == 0);
+                nThinnedIt += 1;
+                if (nThinnedIt == 1) {
+                    first_thinned_iteration = it_;
+                    printf("#######: iteration %d is first_thinned_iteration\n", first_thinned_iteration);
+                }
+
                 if (it_%optSave == 0) {
-                    lastSavedIt = it_;
-                    char cstr[str.length()+1];
+                    nSavedIt += 1;
+                    
+                    //EO: in case of multiple restarts, we need to know where
+                    //    we restarted from last time
+                    if (nSavedIt == 1) {
+                        first_saved_iteration = it_;
+                        printf("#######: iteration %d is first_saved_iteration\n", first_saved_iteration);
+                    }
+                    
+                    iteration_to_restart_from = it_;                    
+
+		    char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
                     nread = sscanf(cstr, "%5d, %lf, %lf, %lf, %lf, %7d, %7d, %2d, %n",
                                    &it_, &mu_, &siggSum_, &sige_, &rat_, &m0_, &pirows_, &picols_, &nchar);
@@ -584,24 +599,27 @@ void Data::read_mcmc_output_csv_file_bW(const string mcmcOut, const uint optSave
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    //printf("INFO   : read csv last it on rank %3d: %5d %15.10f %15.10f %15.10f %7d %2d ",
-    //       rank, lastSavedIt, mu_, sigg_, sige_, m0_, pisize_);
-    //for (int i=0; i<K; i++)  printf("%15.10f ", pipi[i]);
-    //printf("\n");
-
-    // Sanity checks and assign
-    assert(lastSavedIt % optSave == 0);
-    assert(lastSavedIt >= 0);
-    assert(lastSavedIt <= UINT_MAX);
-    iteration_restart = lastSavedIt;
+    // Assign
     mu		      = mu_;
     sigmaE            = sige_;
+
+    //EO: if no saved iteration is found in the .csv file, we kill the process
+    if (nSavedIt == 0) {
+        if (rank == 0) {
+            printf("\n");
+            printf("FATAL  : No saved iteration could be found when reading %s!\n", csv.c_str());
+            printf("       : with first read iteration = %d, last read iteration %d, and --thin = %d and --save = %d\n\n", first_thinned_iteration, it_, optThin, optSave);
+            fflush(stdout);
+        } 
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
 }
 
 
 // SO: Function to read fixed covariate effects from csv format file. Consider using adding reading mu for bR so the same function could be used
 void Data::read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave, const int gamma_length, 
-                                     VectorXd& gamma, uint& iteration_restart) {
+                                     VectorXd& gamma) {
 
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
@@ -611,7 +629,6 @@ void Data::read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave
     std::ifstream file(csv);
     int it_ = 1E9, nchar = 0;
     double gamma_[gamma_length];
-    int lastSavedIt = 0;
 
     if (file.is_open()) {
         std::string str;
@@ -619,7 +636,6 @@ void Data::read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave
             if (str.length() > 0) {
                 int nread = sscanf(str.c_str(), "%5d", &it_);
                 if (it_%optSave == 0) {
-                    lastSavedIt = it_;
                     char cstr[str.length()+1];
                     strcpy(cstr, str.c_str());
                     nread = sscanf(cstr, "%5d, %n",
@@ -643,16 +659,7 @@ void Data::read_mcmc_output_gam_file_bW(const string mcmcOut, const uint optSave
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 
-    //printf("INFO   : read csv last it on rank %3d: %5d %15.10f %15.10f %15.10f %7d %2d ",
-    //       rank, lastSavedIt, mu_, sigg_, sige_, m0_, pisize_);
-    //for (int i=0; i<K; i++)  printf("%15.10f ", pipi[i]);
-    //printf("\n");
-
-    // Sanity checks and assign
-    assert(lastSavedIt % optSave == 0);
-    assert(lastSavedIt >= 0);
-    assert(lastSavedIt <= UINT_MAX);
-    iteration_restart = lastSavedIt;
+    // Assign
     for (int i = 0; i < gamma_length; i++)
         gamma[i] = gamma_[i];
 }
