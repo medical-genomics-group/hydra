@@ -18,8 +18,8 @@
 #include <ctime>
 //#include <mpi.h>
 //#include "mpi_utils.hpp"
-
 #include <omp.h>
+#include "dense.hpp"
 
 BayesRRm_mt::~BayesRRm_mt()
 {
@@ -130,7 +130,7 @@ void BayesRRm_mt::sparse_dotprod_mt(const double* __restrict__ vin1, const uint8
 
         for (int i=0; i<NT; i++) {
             const int ioff = i * Ntot;            
-            syt8[i] = sum_vector_elements_f64(&vin1[ioff], Ntot);
+            syt8[i] = sum_array_elements(&vin1[ioff], Ntot);
         }
     }
     */
@@ -192,7 +192,7 @@ void BayesRRm_mt::sparse_scaadd_mt(double*       __restrict__ vout,
 
     if (all_zeros) {
 
-        set_vector_f64(vout, 0.0, NT * Ntot);
+        set_array(vout, 0.0, NT * Ntot);
 
     } else {
         
@@ -268,7 +268,7 @@ void BayesRRm_mt::sum_mt_vector_elements_f64(const double* __restrict__ vec,
     } else {
         for (int i=0; i<NT; i++) {
             const int ioff = i * N;            
-            syt8[i] = sum_vector_elements_f64(&vec[ioff], N);
+            syt8[i] = sum_array_elements(&vec[ioff], N);
         }
     }
 }
@@ -699,7 +699,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
     MPI_Reduce(&dalloc, &totalloc, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     if (rank == 0) printf("INFO   : overall allocation %.3f GB\n", totalloc);
 
-    set_vector_f64(dEpsSum, 0.0, Ntot * NT);
+    set_array(dEpsSum, 0.0, Ntot * NT);
 
     if (opt.covariates) {
     	gamma = VectorXd(data.X.cols()); 
@@ -1065,7 +1065,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
                                      IM, NMS[marker], NML[marker], 
                                      mave[marker], mstd[marker], Ntot, NT, opt.interleave);
 
-                    sum_vectors_f64(dEpsSum, deltaEps, Ntot * NT);
+                    add_arrays(dEpsSum, deltaEps, Ntot * NT);
                 }
             }
             // Make the contribution of tasks beyond their last marker nill
@@ -1074,7 +1074,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
                 for (int i=0; i<NT; i++)
                     deltaBeta8[i] = 0.0;
                 
-                set_vector_f64(deltaEps, 0.0, Ntot * NT);
+                set_array(deltaEps, 0.0, Ntot * NT);
             }
 
             // Check whether we have a non-zero beta somewhere
@@ -1110,22 +1110,22 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
                 // Update local copy of epsilon
                 if (nranks > 1) {
                     check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot*NT, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-                    sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot * NT);
+                    add_arrays(epsilon, tmpEps, deltaSum, Ntot * NT);
                 } else {
                     count__sum_vectors_f64_v2 += 1;
                     //double t1 = -mysecond();
                     //for (int ii=0; ii<100; ii++) {
-                        sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot * NT);
+                        add_arrays(epsilon, tmpEps, dEpsSum,  Ntot * NT);
                         //}
                         //t1 += mysecond();
                         //printf("kernel 1 BW MT = %g\n", double(NT) * double(Ntot) * 3.0 * sizeof(double) / 1024. / 1024. / (t1 / 100.0)); 
                 }
 
                 // Store epsilon state at last synchronization
-                copy_vector_f64(tmpEps, epsilon, Ntot * NT);
+                copy_array(tmpEps, epsilon, Ntot * NT);
 
                 // Reset local sum of delta epsilon
-                set_vector_f64(dEpsSum, 0.0, Ntot * NT);
+                set_array(dEpsSum, 0.0, Ntot * NT);
                 
                 // Reset cumulated sum of delta betas
                 for (int i=0; i<NT; i++) 

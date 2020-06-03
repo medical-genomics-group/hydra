@@ -30,6 +30,8 @@
 #include <omp.h>
 #include "BayesW_arms.h"
 #include <math.h>
+#include "dense.hpp"
+
 
 /* Pre-calculate used constants */
 #define PI 3.14159265359
@@ -1268,7 +1270,7 @@ int BayesW::runMpiGibbs_bW() {
     MPI_Reduce(&dalloc, &totalloc, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     if (rank == 0) printf("INFO   : overall allocation %.3f GB\n", totalloc);
 
-    set_vector_f64(dEpsSum, 0.0, Ntot);
+    set_array(dEpsSum, 0.0, Ntot);
 
     // Copy, center and scale phenotype observations
     // In bW we are not scaling and centering phenotypes
@@ -1491,25 +1493,25 @@ int BayesW::runMpiGibbs_bW() {
                 //Change the residual vector only if the previous beta was non-zero
                 if(Beta(marker) != 0){
                     //Calculate the change in epsilon if we remove the previous marker effect (-Beta(marker))
-                    set_vector_f64(tmp_deltaEps, 0.0, Ntot);
+                    set_array(tmp_deltaEps, 0.0, Ntot);
                     sparse_scaadd(tmp_deltaEps, Beta(marker),
                                   I1, N1S[marker], N1L[marker],
                                   I2, N2S[marker], N2L[marker],
                                   IM, NMS[marker], NML[marker],
                                   mave[marker], 1/mstd[marker] , Ntot);
                     //Create the temporary vector to store the vector without the last Beta(marker)
-                    sum_vectors_f64(tmpEps_vi, epsilon, tmp_deltaEps,  Ntot);
+                    add_arrays(tmpEps_vi, epsilon, tmp_deltaEps,  Ntot);
                     //Also find the transformed residuals
                     for(uint i=0; i<Ntot; ++i){
                         tmp_vi[i] = exp(used_data.alpha * tmpEps_vi[i] - EuMasc);
                     }
-                    vi_sum = sum_vector_elements_f64(tmp_vi, Ntot);
+                    vi_sum = sum_array_elements(tmp_vi, Ntot);
                     vi_2 = partial_sum(tmp_vi, I2, N2S[marker], N2L[marker]);
                     vi_1 = partial_sum(tmp_vi, I1, N1S[marker], N1L[marker]);
 
                 }else{
                     // Calculate the sums of vi elements
-                    vi_sum = sum_vector_elements_f64(vi, Ntot);
+                    vi_sum = sum_array_elements(vi, Ntot);
                     vi_2 = partial_sum(vi, I2, N2S[marker], N2L[marker]);
                     vi_1 = partial_sum(vi, I1, N1S[marker], N1L[marker]);
 
@@ -1612,7 +1614,7 @@ int BayesW::runMpiGibbs_bW() {
                                       mave[marker], 1/mstd[marker] , Ntot); //Use here 1/sd
                         
                         // Update local sum of delta epsilon
-                        sum_vectors_f64(dEpsSum, deltaEps, Ntot);
+                        add_arrays(dEpsSum, deltaEps, Ntot);
                     }
                 }	
             }
@@ -1625,7 +1627,7 @@ int BayesW::runMpiGibbs_bW() {
                 //cout << "rank " << rank << " with M=" << M << " waiting for " << lmax << endl;
                 deltaBeta = 0.0;
                 
-                set_vector_f64(deltaEps, 0.0, Ntot);
+                set_array(deltaEps, 0.0, Ntot);
             }
 
             task_sum_abs_deltabeta += fabs(deltaBeta);
@@ -1752,9 +1754,9 @@ int BayesW::runMpiGibbs_bW() {
                             
                             // Set all to 0 contribution
                             if (i == 0) {
-                                set_vector_f64(deltaSum, lambda0, Ntot);
+                                set_array(deltaSum, lambda0, Ntot);
                             } else {
-                                offset_vector_f64(deltaSum, lambda0, Ntot);
+                                offset_array(deltaSum, lambda0, Ntot);
                             }
                             
                             // M -> revert lambda 0 (so that equiv to add 0.0)
@@ -1793,7 +1795,7 @@ int BayesW::runMpiGibbs_bW() {
                     
                     }
                     
-                    sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
+                    add_arrays(epsilon, tmpEps, deltaSum, Ntot);
                     
                     double te = MPI_Wtime();
                     tot_sync_ar2  += te - tb;
@@ -1803,7 +1805,7 @@ int BayesW::runMpiGibbs_bW() {
 
                 } else { // case nranks == 1    
                     if(opt.deltaUpdate == true){
-                        sum_vectors_f64(epsilon, tmpEps, dEpsSum,  Ntot);
+                        add_arrays(epsilon, tmpEps, dEpsSum,  Ntot);
                     }else{	
                         for(uint i=0; i < Ntot; i++){
                             epsilon[i] = epsilon[i] -  betaOld * mave[marker]/mstd[marker];
@@ -1829,10 +1831,10 @@ int BayesW::runMpiGibbs_bW() {
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
                 
                 // Store epsilon state at last synchronization
-                copy_vector_f64(tmpEps, epsilon, Ntot);
+                copy_array(tmpEps, epsilon, Ntot);
                 
                 // Reset local sum of delta epsilon
-                set_vector_f64(dEpsSum, 0.0, Ntot);
+                set_array(dEpsSum, 0.0, Ntot);
                 
                 // Reset cumulated sum of delta betas
                 cumSumDeltaBetas       = 0.0;

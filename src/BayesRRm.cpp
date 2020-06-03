@@ -23,10 +23,9 @@
 #include <iostream>
 #include <ctime>
 #include <mm_malloc.h>
-//#include <mpi.h>
-//#include "mpi_utils.hpp"
 #include <omp.h>
 #include "dotp_lut.h"
+#include "dense.hpp"
 
 
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
@@ -53,158 +52,6 @@ BayesRRm::~BayesRRm()
 #pragma omp declare reduction \
     (addpd4:__m256d:omp_out+=omp_in) \
     initializer(omp_priv=_mm256_setzero_pd())
-
-
-void BayesRRm::offset_vector_f64(double* __restrict__ vec, const double offset, const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec,   64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        vec[i] += offset;
-    }
-}
-
-
-void BayesRRm::set_vector_f64(double* __restrict__ vec, const double val, const int N) {
-
-    const int N8 = (N/8) * 8;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume(N8%8==0);
-#endif
-    //#pragma unroll(8)
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N8; i++) {
-        vec[i] = val;
-    }
-
-    for (int i=N8; i<N; ++i) {
-        vec[i] = val;
-    }
-}
-
-
-void BayesRRm::copy_vector_f64(double* __restrict__ dest, const double* __restrict__ source, const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(dest,   64);
-    __assume_aligned(source, 64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        dest[i] = source[i];
-    }
-}
-
-
-double BayesRRm::sum_vector_elements_f64_base(const double* __restrict__ vec, const int N) {
-
-    const int N8 = (N/8) * 8;
-    double sum = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume(N8%8==0);
-#endif
-#pragma unroll(8)
-    for (int i=0; i<N8; i++) {
-        sum += vec[i];
-    }
-
-    for (int i=N8; i<N; ++i) {
-        sum += vec[i];
-    }
-
-    return sum;
-}
-
-
-double BayesRRm::sum_vector_elements_f64(const double* __restrict__ vec, const int N) {
-
-    double sum = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-#endif
-    //#pragma unroll
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+: sum)
-#endif
-    for (int i=0; i<N; i++) {
-        sum += vec[i];
-    }
-
-    return sum;
-}
-
-
-void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
-                               const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(in2, 64);
-    __assume_aligned(out, 64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        out[i] = in1[i] + in2[i];
-    }
-}
-
-
-void BayesRRm::sum_vectors_f64(double* __restrict__ out, const double* __restrict__ in1, const int N) {
-
-    const int N8 = (N/8) * 8;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(out, 64);
-    __assume(N8%8==0);
-#endif
-    //#pragma unroll(8)
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N8; i++) {
-        out[i] += in1[i];
-    }
-
-    for (int i=N8; i<N; ++i) {
-        out[i] += in1[i];
-    }
-}
-
-
-inline void sum_vectors_f64_ref(double* __restrict__ out, const double* __restrict__ in1, const double* __restrict__ in2,
-                                const int N) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(in1, 64);
-    __assume_aligned(in2, 64);
-    __assume_aligned(out, 64);
-#endif
-    for (int i=0; i<N; ++i) {
-        out[i] = in1[i] + in2[i];
-    }
-}
-
-
-inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin1, const double* __restrict__ vin2, const double dMULT, const int N) {
-
-    if   (dMULT == 0.0) {
-        for (int i=0; i<N; i++) {
-            vout[i] = vin1[i];
-        }
-    } else {
-        for (int i=0; i<N; i++) {
-            vout[i] = vin1[i] + dMULT * vin2[i];
-        }
-    }
-}
 
 
 inline void sparse_set(double*       __restrict__ vec,
@@ -256,13 +103,13 @@ void BayesRRm::sparse_scaadd(double*     __restrict__ vout,
 
     if (dMULT == 0.0) {
 
-        set_vector_f64(vout, 0.0, N);
+        set_array(vout, 0.0, N);
 
     } else {
 
         double aux = mu * sig_inv * dMULT;
         //printf("sparse_scaadd aux = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", aux, mu, sig_inv * dMULT);
-        set_vector_f64(vout, -aux, N);
+        set_array(vout, -aux, N);
 
         //cout << "sparse set on M: " << NMS << ", " << NML << endl;
         sparse_set(vout, 0.0, IM, NMS, NML);
@@ -326,7 +173,7 @@ double BayesRRm::sparse_dotprod(const double* __restrict__ vin1,
 
     dp += partial_sparse_dotprod(vin1, I2, N2S, N2L, 2.0);
 
-    double syt = sum_vector_elements_f64(vin1, N);
+    double syt = sum_array_elements(vin1, N);
 
     double dsyt = partial_sparse_dotprod(vin1, IM, NMS, NML, 1.0);
 
@@ -1532,7 +1379,7 @@ int BayesRRm::runMpiGibbs() {
     if (rank == 0) printf("INFO   : overall allocation %.3f GB\n", totalloc);
 
 
-    set_vector_f64(dEpsSum, 0.0, Ntot);
+    set_array(dEpsSum, 0.0, Ntot);
 
     // Set gamma and xI, following a restart or not
     if (opt.covariates) {
@@ -1622,14 +1469,12 @@ int BayesRRm::runMpiGibbs() {
         stats_dis = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(stats_dis,  __LINE__, __FILE__);
     }
 
-    //@@@@@ FH
+
+    // FH
     if (opt.bayesType == "bayesFHMPI") {
-      assert(lambda_var.size() > 0);
-      assert(lambda_var.size() == Beta.size());
+        assert(lambda_var.size() > 0);
+        assert(lambda_var.size() == Beta.size());
     }
-    //@@@@@ FH
-
-
 
 
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
@@ -1806,7 +1651,7 @@ int BayesRRm::runMpiGibbs() {
                             double c1  = 0.0, c2 = 0.0;
                             double dp1 = 0.0, dp2 = 0.0, dpm = 0.0;
                             
-                            double syt = sum_vector_elements_f64(epsilon, Ntot);
+                            double syt = sum_array_elements(epsilon, Ntot);
                             
                             for (int ii=0; ii<snpLenByt; ++ii) {
                                 for (int iii=0; iii<4; ++iii) {                                    
@@ -2010,7 +1855,7 @@ int BayesRRm::runMpiGibbs() {
                         }
 
                         // Update local sum of delta epsilon
-                        sum_vectors_f64(dEpsSum, deltaEps, Ntot);
+                        add_arrays(dEpsSum, deltaEps, Ntot);
                     }
                 }
             }
@@ -2021,7 +1866,7 @@ int BayesRRm::runMpiGibbs() {
                 //cout << "rank " << rank << " with M=" << M << " waiting for " << lmax << endl;
                 deltaBeta = 0.0;
 
-                set_vector_f64(deltaEps, 0.0, Ntot);
+                set_array(deltaEps, 0.0, Ntot);
             }
 
             task_sum_abs_deltabeta += fabs(deltaBeta);
@@ -2188,9 +2033,9 @@ int BayesRRm::runMpiGibbs() {
                             // Use it
                             // Set all to 0 contribution
                             if (i == 0) {
-                                set_vector_f64(deltaSum, lambda0, Ntot);
+                                set_array(deltaSum, lambda0, Ntot);
                             } else {
-                                offset_vector_f64(deltaSum, lambda0, Ntot);
+                                offset_array(deltaSum, lambda0, Ntot);
                             }
                             
                             // M -> revert lambda 0 (so that equiv to add 0.0)
@@ -2353,7 +2198,7 @@ int BayesRRm::runMpiGibbs() {
                             if (glob_dat[loci + 1] == UINT_MAX) {
 
                                 // Reset vector
-                                if (i == 0)  set_vector_f64(deltaSum, 0.0, Ntot);
+                                if (i == 0)  set_array(deltaSum, 0.0, Ntot);
 
                                 const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&glob_dat[loci + 3]);
 
@@ -2405,9 +2250,9 @@ int BayesRRm::runMpiGibbs() {
                             } else {
                                 
                                 if (i == 0) {
-                                    set_vector_f64(deltaSum, lambda0, Ntot);
+                                    set_array(deltaSum, lambda0, Ntot);
                                 } else {
-                                    offset_vector_f64(deltaSum, lambda0, Ntot);
+                                    offset_array(deltaSum, lambda0, Ntot);
                                 }
 
                                 // M -> revert lambda 0 (so that equiv to add 0.0)
@@ -2448,7 +2293,7 @@ int BayesRRm::runMpiGibbs() {
 
                     }
 
-                    sum_vectors_f64(epsilon, tmpEps, deltaSum, Ntot);
+                    add_arrays(epsilon, tmpEps, deltaSum, Ntot);
 
                     double te = MPI_Wtime();
                     tot_sync_ar2  += te - tb;
@@ -2459,17 +2304,17 @@ int BayesRRm::runMpiGibbs() {
                 } else { // case nranks == 1
 
                     //cout << "COME HERE" << endl;
-                    sum_vectors_f64(epsilon, tmpEps, dEpsSum, Ntot);
+                    add_arrays(epsilon, tmpEps, dEpsSum, Ntot);
                 }
 
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
 
                 // Store epsilon state at last synchronization
-                copy_vector_f64(tmpEps, epsilon, Ntot);
+                copy_array(tmpEps, epsilon, Ntot);
 
                 // Reset local sum of delta epsilon
-                set_vector_f64(dEpsSum, 0.0, Ntot);
+                set_array(dEpsSum, 0.0, Ntot);
 
                 // Reset cumulated sum of delta betas
                 cumSumDeltaBetas       = 0.0;
