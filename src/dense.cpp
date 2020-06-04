@@ -111,19 +111,22 @@ void add_arrays(double*       __restrict__ out,
 }
 
 
-void scaadd(double*       __restrict__ vout,
-            const double* __restrict__ vin1,
-            const double* __restrict__ vin2,
-            const double               dMULT,
-            const int                  N) {
-    
-    if   (dMULT == 0.0) {
-        for (int i=0; i<N; i++) {
-            vout[i] = vin1[i];
-        }
-    } else {
-        for (int i=0; i<N; i++) {
-            vout[i] = vin1[i] + dMULT * vin2[i];
-        }
-    }
+void center_and_scale(double* __restrict__ vec,
+                      const int            N) {
+
+    // Compute mean
+    double mean = 0.0;
+    for (int i=0; i<N; ++i)  mean += vec[i];
+    mean /= N;
+
+    // Center
+    for (int i=0; i<N; ++i)  vec[i] -= mean;
+
+    // Compute scale
+    double sqn = 0.0;
+    for (int i=0; i<N; ++i)  sqn += vec[i] * vec[i];
+    sqn = sqrt(double(N-1) / sqn);
+
+    // Scale
+    for (int i=0; i<N; ++i)  vec[i] *= sqn;
 }

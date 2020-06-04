@@ -32,11 +32,8 @@ void add_arrays(double*       __restrict__ out,
                 const int N);
 
 
-void scaadd(double*       __restrict__ vout,
-            const double* __restrict__ vin1,
-            const double* __restrict__ vin2,
-            const double               dMULT,
-            const int                  N);
+void center_and_scale(double* __restrict__ vec,
+                      const int            N);
 
 
-#endif
+#endif //#define HYDRA_DENSE_H

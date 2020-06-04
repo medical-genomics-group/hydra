@@ -187,52 +187,6 @@ double BayesRRm::sparse_dotprod(const double* __restrict__ vin1,
 }
 
 
-inline void scaadd(double* __restrict__ vout, const double* __restrict__ vin, const double dMULT, const int N) {
-
-    if (dMULT == 0.0) {
-        for (int i=0; i<N; i++) {
-            vout[i] = 0.0;
-        }
-    } else {
-        for (int i=0; i<N; i++) {
-            vout[i] = dMULT * vin[i];
-        }
-    }
-}
-
-
-inline double dotprod(const double* __restrict__ vec1, const double* __restrict__ vec2, const int N) {
-
-    double dp = 0.0d;
-
-    for (int i=0; i<N; i++) {
-        dp += vec1[i] * vec2[i];
-    }
-
-    return dp;
-}
-
-
-inline void center_and_scale(double* __restrict__ vec, const int N) {
-
-    // Compute mean
-    double mean = 0.0;
-    for (int i=0; i<N; ++i)  mean += vec[i];
-    mean /= N;
-
-    // Center
-    for (int i=0; i<N; ++i)  vec[i] -= mean;
-
-    // Compute scale
-    double sqn = 0.0;
-    for (int i=0; i<N; ++i)  sqn += vec[i] * vec[i];
-    sqn = sqrt(double(N-1) / sqn);
-
-    // Scale
-    for (int i=0; i<N; ++i)  vec[i] *= sqn;
-}
-
-
 // Define blocks of markers to be processed by each task
 // By default processes all markers
 // -----------------------------------------------------
