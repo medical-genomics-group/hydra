@@ -1,7 +1,4 @@
-#include <cstdlib>
-#include <immintrin.h>
 #include <math.h>
-#include <stdio.h>
 
 
 // Add offset to each element of the array
@@ -114,13 +111,10 @@ void add_arrays(double*       __restrict__ out,
 void center_and_scale(double* __restrict__ vec,
                       const int            N) {
 
-    // Compute mean
-    double mean = 0.0;
-    for (int i=0; i<N; ++i)  mean += vec[i];
-    mean /= N;
+    double mean = sum_array_elements(vec, N) / N;
 
     // Center
-    for (int i=0; i<N; ++i)  vec[i] -= mean;
+    offset_array(vec, -mean, N);
 
     // Compute scale
     double sqn = 0.0;
