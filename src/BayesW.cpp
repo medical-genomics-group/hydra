@@ -31,7 +31,7 @@
 #include "BayesW_arms.h"
 #include <math.h>
 #include "dense.hpp"
-
+#include "sparse.hpp"
 
 /* Pre-calculate used constants */
 #define PI 3.14159265359
