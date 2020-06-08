@@ -35,6 +35,26 @@ void sparse_add(double*       __restrict__ vec,
 }
 
 
+// Function that finds the sum across the sum across individuals who have marker with specified value
+double sparse_partial_sum(const double* __restrict__ vec,
+                          const uint*   __restrict__ IX,
+                          const size_t               NXS,
+                          const size_t               NXL) {
+    double sum = 0.0;
+#ifdef __INTEL_COMPILER
+    __assume_aligned(vec, 64);
+    __assume_aligned(IX,  64);
+#endif
+#ifdef _OPENMP
+#pragma omp parallel for reduction(+: sum)
+#endif
+    for (size_t i=NXS; i < NXS + NXL; i++) {
+        sum += vec[IX[i]];
+    }
+    return sum;
+}
+
+
 void sparse_scaadd(double*     __restrict__ vout,
                    const double             dMULT,
                    const uint* __restrict__ I1, const size_t N1S, const size_t N1L,

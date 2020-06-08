@@ -20,7 +20,8 @@ CXXFLAGS += -qopenmp
 #CXXFLAGS += -qopt-report=2
 #CXXFLAGS += -qopt-report-phase=loop,vec
 #CXXFLAGS += -qopt-report-file=stdout
-CXXFLAGS += -L/usr/lib64
+#CXXFLAGS += -qopt-report=4 -qopt-report-phase ipo
+#CXXFLAGS += -L/usr/lib64
 
 #EO: set this back when switching to production
 #    This will allow to fully use vectorization on both fidis and gacrux
@@ -49,7 +50,7 @@ CCASFLAGS=-no-multibyte-chars
 
 #SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 #//EO@@@ remove multi-trait version for now
-SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp dense.cpp sparse.cpp
+SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp dense.cpp sparse.cpp gauss_hermite.cpp mpi_utils.cpp
 #SOURCES = main.cpp data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))

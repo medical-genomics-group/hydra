@@ -27,6 +27,8 @@
 #include "dotp_lut.h"
 #include "dense.hpp"
 #include "sparse.hpp"
+#include "mpi_utils.hpp"
+
 
 
 BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)

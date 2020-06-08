@@ -1,25 +1,16 @@
-#ifndef data_hpp
-#define data_hpp
+#ifndef HYDRA_DATA_H_
+#define HYDRA_DATA_H_
 
-#include <iostream>
-#include <stdio.h>
-#include <stdlib.h>
-#include <fstream>
-#include <set>
-#include <bitset>
-#include <iomanip>
 #include <Eigen/Eigen>
-#include <Eigen/Sparse>
-#include <boost/format.hpp>
-#include "gadgets.hpp"
 #include <mpi.h>
 #include "mpi_utils.hpp"
-
 
 using namespace std;
 using namespace Eigen;
 
+
 class SnpInfo {
+
 public:
     const string ID;
     const string a1; // the referece allele
@@ -52,6 +43,7 @@ public:
 
 
 class IndInfo {
+
 public:
     const string famID;
     const string indID;
@@ -84,6 +76,7 @@ struct IndexEntry {
 
 
 class Data {
+
 public:
     Data();
 

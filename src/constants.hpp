@@ -1,0 +1,15 @@
+#ifndef HYDRA_CONSTANTS_HPP_
+#define HYDRA_CONSTANTS_HPP_
+
+
+#define PI 3.14159265359
+
+#define PI_squared 9.86960440109
+
+#define PI2 6.28318530718
+
+#define sqrtPI 1.77245385090552
+
+#define EuMasc 0.577215664901532
+
+#endif

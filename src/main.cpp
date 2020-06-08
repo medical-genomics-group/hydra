@@ -1,11 +1,12 @@
 #include <iostream>
 #include <string>
+#include <mpi.h>
 #include "BayesRRm.h"
 #include "BayesW.hpp"
 //#include "BayesRRm_mt.h"
 #include "data.hpp"
 #include "options.hpp"
-#include <mpi.h>
+
 
 using namespace std;
 

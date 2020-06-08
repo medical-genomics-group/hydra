@@ -1,5 +1,7 @@
 #include "data.hpp"
-#include <Eigen/Eigen>
+#include <fstream>
+#include <iostream>
+//#include <Eigen/Eigen>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -9,8 +11,11 @@
 #include <boost/algorithm/string/classification.hpp>
 #include <mm_malloc.h>
 //#include <mpi.h>
-//#include "mpi_utils.hpp"
+#include "mpi_utils.hpp"
+#include "gadgets.hpp"
 
+using namespace Eigen;
+using namespace std;
 
 Data::Data() {}
 

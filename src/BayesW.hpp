@@ -12,70 +12,9 @@
 #include "data.hpp"
 #include "options.hpp"
 #include "distributions_boost.hpp"
-
+#include "ars.hpp"
 #include <Eigen/Eigen>
 
-
-// Three structures for ARS
-struct pars{
-	/* Common parameters for the densities */
-	VectorXd epsilon;			// epsilon per subject (before each sampling, need to remove the effect of the sampled parameter and then carry on
-
-	//Probably unnecessary to store mixture classes
-	//VectorXd mixture_classes; // Vector to store mixture component C_k values
-	//int used_mixture; //Write the index of the mixture we decide to use
-
-	/* Store the current variables */
-	double alpha;
-
-	/* Beta_j - specific variables */
-	VectorXd X_j;
-
-	/*  of sum(X_j*failure) */
-	double sum_failure;
-
-	/* Mu-specific variables */
-	double sigma_mu;
-	/* sigma_b-specific variables */
-	double alpha_sigma, beta_sigma;
-
-	/* Number of events (sum of failure indicators) */
-	double d;
-};
-
-struct pars_beta_sparse{
-	/* Common parameters for the densities */
-	
-	double mixture_value; // Instead of storing the vector of mixtures and the corresponding index, we keep only the mixture value in the structure
-
-	/* Store the current variables */
-	double alpha, sigmaG;
-
-	/* Beta_j - specific variables */
-	double vi_0, vi_1, vi_2; // Sums of vi elements
-
-	// Mean, std dev and their ratio for snp j
-	double mean, sd, mean_sd_ratio;
-
-	/*  of sum(X_j*failure) */
-	double sum_failure;
-
-	/* Number of events (sum of failure indicators) */
-	double d;
-  
-        
-};
-
-struct pars_alpha{
-	VectorXd failure_vector;
-	VectorXd epsilon;			// epsilon per subject (before each sampling, need to remove the effect of the sampled parameter and then carry on
-
-	/* Alpha-specific variables */
-	double alpha_0, kappa_0;  /*  Prior parameters */
-
-	/* Number of events (sum of failure indicators) */
-	double d;
-};
 
 
 class BayesW : public BayesRRm
@@ -86,10 +25,10 @@ public:
     const double    sigma_mu     = 100;
     const double    alpha_sigma  = 1;
     const double    beta_sigma   = 0.0001;
-    const string 	quad_points  = opt.quad_points;  // Number of Gaussian quadrature points
-    unsigned int 	K            = opt.S.size()+1;   // Number of mixtures + 0 class
-    unsigned int    km1          = opt.S.size();     // Number of mixtures 
-    const size_t    LENBUF_gamma = 3500;             // Not more than 160 "fixed effects can be used at the moment 
+    const string 	quad_points  = opt.quad_points;   // Number of Gaussian quadrature points
+    unsigned int 	K            = opt.S.size() + 1;  // Number of mixtures + 0 class
+    unsigned int    km1          = opt.S.size();      // Number of mixtures 
+    const size_t    LENBUF_gamma = 3500;              // Not more than 160 "fixed effects can be used at the moment 
 
 	// The ARS structures
 	struct pars used_data;
@@ -118,11 +57,22 @@ public:
     
 private:
     void init(unsigned int individualCount, unsigned int Mtot, unsigned int fixedCount);
+
 	void init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot, const uint fixtot,
                            const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart);
-	void marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n, double vi_sum, double vi_2,double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio, unsigned int group_index);
-	double gauss_hermite_adaptive_integral(double C_k, double sigma, string n, double vi_sum, double vi_2, double vi_1, double vi_0, double mean, double sd, double mean_sd_ratio);
-	double partial_sum(const double* __restrict__ vec, const uint*   __restrict__ IX, const size_t  NXS, const size_t NXL);
+
+	void marginal_likelihood_vec_calc(VectorXd prior_prob,
+                                      VectorXd &post_marginals,
+                                      string   n,
+                                      double   vi_sum,
+                                      double   vi_2,
+                                      double   vi_1,
+                                      double   vi_0,
+                                      double   mean,
+                                      double   sd,
+                                      double   mean_sd_ratio,
+                                      unsigned int group_index,
+                                      const pars_beta_sparse used_data_beta);
 };
 
 #endif /* SRC_BAYESW_HPP_ */
