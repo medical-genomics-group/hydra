@@ -2095,6 +2095,7 @@ void Data::read_train_data(const string &bimFile, string &betFile, uint iteratio
     Gadget::Tokenizer tok;
     predBet.resize(commonSnps.size(), iterations);
     string line, snp;
+    double effect;
     uint iter   = 0;
     uint snpInd = 0;
     while (getline(in, line)) {
@@ -2106,8 +2107,19 @@ void Data::read_train_data(const string &bimFile, string &betFile, uint iteratio
         }
         snp  = "rs" + tok[1];
         // TODO: replace linear search with hash-based check
+        // check the SNP is in the current common set
         if (std::find(commonSnps.begin(), commonSnps.end(), snp) != commonSnps.end()) {
-            predBet(snpInd, iter) = stod(tok[2]);
+            // check strands in the two .bim files
+            string a1_train = snpInfoMap_train.find(snp)->second->a1;
+            string a1_test  = snpInfoMap.find(snp)->second->a1;
+            string a2_test  = snpInfoMap.find(snp)->second->a2;
+            if (a1_train == a1_test) {
+                effect = stod(tok[2]);
+            // flip the strand
+            } else if (a1_train == a2_test) {
+                effect = stod(tok[2]) * -1;
+            }
+            predBet(snpInd, iter) = effect;
             snpInd++;
         }
     }
@@ -2132,7 +2144,6 @@ void Data::get_common_snps(const string& file) {
     uint snpInd = 0;
     vector<uint> snpInds;
     while (true) {
-        // TODO: check strands in the two .bim files
         getline(in, line);
         tok.getTokens(line, " ");
         if (stoi(tok[0]) != firstIter) break;
