@@ -2086,11 +2086,12 @@ void Data::read_dirichlet_priors(const string& file){
  * pre  : binary PLINK files have been read
  * post : predBet contains effect estimates for the set of common SNPs
  */
-void Data::load_data_from_bet_file(const string &file, uint iterations) {
-    get_bed_snp_names();    // get SNP names as string for matching common SNPs
-    get_common_snps(file);  // match SNP IDs between .bed and .bet files
+void Data::read_train_data(const string &bimFile, string &betFile, uint iterations) {
+    read_train_bim(bimFile);  // read .bim associated with the betas
+    get_bed_snp_names();      // get SNP names as string for matching common SNPs
+    get_common_snps(betFile); // match SNP IDs between .bed and .bet files
 
-    ifstream in(file);
+    ifstream in(betFile);
     Gadget::Tokenizer tok;
     predBet.resize(commonSnps.size(), iterations);
     string line, snp;
@@ -2099,6 +2100,7 @@ void Data::load_data_from_bet_file(const string &file, uint iterations) {
     while (getline(in, line)) {
         tok.getTokens(line, " ");
         if (stoi(tok[0]) > iter) { // check if iteration number has increased
+            // TODO: check common SNPs whenever iteration number changes
             iter = stoi(tok[0]);
             snpInd = 0;
         }
@@ -2130,6 +2132,7 @@ void Data::get_common_snps(const string& file) {
     uint snpInd = 0;
     vector<uint> snpInds;
     while (true) {
+        // TODO: check strands in the two .bim files
         getline(in, line);
         tok.getTokens(line, " ");
         if (stoi(tok[0]) != firstIter) break;
@@ -2160,5 +2163,34 @@ void Data::get_bed_snp_names() {
         // TODO: prepend rs to SNP ID if not already present
         bedSnps.push_back(snpInfoVec.at(i)->ID.c_str());
     }
+}
+
+// AH: dirty hack to make prediction work
+// TODO: modify original readBimFile function to specify train/test dataset
+void Data::read_train_bim(const string &bimFile) {
+    // Read bim file: recombination rate is defined between SNP i and SNP i-1
+    ifstream in(bimFile.c_str());
+    if (!in) throw ("Error: can not open the file [" + bimFile + "] to read.");
+#ifndef USE_MPI
+    cout << "Reading PLINK BIM file from [" + bimFile + "]." << endl;
+#endif
+    snpInfoVec_train.clear();
+    snpInfoMap_train.clear();
+    string id, allele1, allele2;
+    unsigned chr, physPos;
+    float genPos;
+    unsigned idx = 0;
+    while (in >> chr >> id >> genPos >> physPos >> allele1 >> allele2) {
+        SnpInfo *snp = new SnpInfo(idx++, id, allele1, allele2, chr, genPos, physPos);
+        snpInfoVec_train.push_back(snp);
+        if (snpInfoMap_train.insert(pair<string, SnpInfo*>(id, snp)).second == false) {
+            throw ("Error: Duplicate SNP ID found: \"" + id + "\".");
+        }
+    }
+    in.close();
+    numSnps = (unsigned) snpInfoVec_train.size();
+#ifndef USE_MPI
+    cout << numSnps << " SNPs to be included from [" + bimFile + "]." << endl;
+#endif
 }
 

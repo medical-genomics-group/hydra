@@ -174,7 +174,7 @@ int main(int argc, const char * argv[]) {
             data.readBimFile(opt.bimFile);
             data.readFamFile(opt.famFile);
             data.readBedFile_noMPI(opt.bedFile);
-            data.load_data_from_bet_file(opt.betFile, opt.betIterations);
+            data.read_train_data(opt.trainBim, opt.betLong, opt.betIterations);
             // perform prediction
             LinPred predictor(data, opt);
             predictor.predict_genetic_values(opt.predOutDir + "/" + opt.predOutName);

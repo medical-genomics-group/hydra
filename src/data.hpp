@@ -111,6 +111,8 @@ public:
     MatrixXd pred;              // NxI matrix of predictions
     vector<string> bedSnps;     // SNPs read from .bim file
     vector<string> commonSnps;  // SNPs in both .bim and .bet files
+    vector<SnpInfo*> snpInfoVec_train; // SNPs read from the training .bim file
+    map<string, SnpInfo*> snpInfoMap_train;
 
     VectorXd fail;           // Failure indicator
 
@@ -358,7 +360,8 @@ public:
     void read_dirichlet_priors(const string& file);
 
     // AH: prediction functions
-    void load_data_from_bet_file(const string &file, uint iterations);
+    void read_train_data(const string &bimFile, string &betFile, uint iterations);
+    void read_train_bim(const string &bimFile);
     void get_bed_snp_names();
     void get_common_snps(const string &file);
     void predict_from_betas(string &betFile, string &bedFile, string &bimFile, uint iterations);
