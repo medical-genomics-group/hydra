@@ -1489,23 +1489,23 @@ void Data::readBedFile_noMPI(const string &bedFile){
         snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
 
         // standardize genotypes
-        float sqn = Z.col(j).squaredNorm() - numInds * mean * mean;
-        Z.col(j).array() -= mean;
-        float std_ = 1.f / (sqrt(sqn / float(numInds)));
+        //float sqn = Z.col(j).squaredNorm() - numInds * mean * mean;
+        //Z.col(j).array() -= mean;
+        //float std_ = 1.f / (sqrt(sqn / float(numInds)));
 
-        Z.col(j).array() *= std_;
+        //Z.col(j).array() *= std_;
 
-        ZPZdiag[j] = sqn;
+        //ZPZdiag[j] = sqn;
 
         if (++snp == numSnps) break;
     }
     BIT.clear();
     BIT.close();
     // standardize genotypes
-    for (i=0; i<numSnps; ++i) {
-        Z.col(i).array() -= Z.col(i).mean();
-        ZPZdiag[i] = Z.col(i).squaredNorm();
-    }
+    //for (i=0; i<numSnps; ++i) {
+    //    Z.col(i).array() -= Z.col(i).mean();
+    //    ZPZdiag[i] = Z.col(i).squaredNorm();
+    //}
     cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
 }
 
@@ -2089,24 +2089,25 @@ void Data::read_dirichlet_priors(const string& file){
 void Data::read_train_data(const string &bimFile, string &betFile, uint iterations) {
     read_train_bim(bimFile);  // read .bim associated with the betas
     get_bed_snp_names();      // get SNP names as string for matching common SNPs
-    get_common_snps(betFile); // match SNP IDs between .bed and .bet files
+    predBet.resize(bedSnps.size(), iterations);
 
     ifstream in(betFile);
     Gadget::Tokenizer tok;
-    predBet.resize(commonSnps.size(), iterations);
     string line, snp;
     double effect;
     uint iter   = 0;
     uint snpInd = 0;
+    get_common_snps(betFile); // match SNP IDs between .bed and .bet files
     while (getline(in, line)) {
         tok.getTokens(line, " ");
         if (stoi(tok[0]) > iter) { // check if iteration number has increased
-            // TODO: check common SNPs whenever iteration number changes
+            // check common SNPs whenever iteration number changes
             iter = stoi(tok[0]);
+            get_common_snps(betFile, iter);
             snpInd = 0;
         }
         snp  = "rs" + tok[1];
-        // TODO: replace linear search with hash-based check
+        effect = 0.0; // effect size should be zero unless the SNP is in this iteration
         // check the SNP is in the current common set
         if (std::find(commonSnps.begin(), commonSnps.end(), snp) != commonSnps.end()) {
             // check strands in the two .bim files
@@ -2119,8 +2120,32 @@ void Data::read_train_data(const string &bimFile, string &betFile, uint iteratio
             } else if (a1_train == a2_test) {
                 effect = stod(tok[2]) * -1;
             }
-            predBet(snpInd, iter) = effect;
-            snpInd++;
+        }
+        predBet(snpInd, iter) = effect;
+        snpInd++;
+    }
+    in.clear();
+    in.close();
+}
+
+
+void Data::get_common_snps(const string& betFile, const uint iter) {
+    commonSnps.clear(); // clear the common SNPs from the last iteration
+    ifstream in(betFile);
+    Gadget::Tokenizer tok;
+    string line, snp;
+    uint currentIter;
+    while (true) {
+        getline(in, line);
+        tok.getTokens(line, " ");
+        currentIter = stoi(tok[0]);
+        if (currentIter > iter) {
+            break;
+        } else if (currentIter == iter) {
+            snp = "rs" + tok[1]; // TODO: is prepending "rs" necessary?
+            if (std::find(bedSnps.begin(), bedSnps.end(), snp) != bedSnps.end()) {
+                commonSnps.push_back(snp);
+            }
         }
     }
     in.clear();

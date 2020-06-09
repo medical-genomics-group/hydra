@@ -363,6 +363,7 @@ public:
     void read_train_data(const string &bimFile, string &betFile, uint iterations);
     void read_train_bim(const string &bimFile);
     void get_bed_snp_names();
+    void get_common_snps(const string &betFile, const uint iter);
     void get_common_snps(const string &file);
     void predict_from_betas(string &betFile, string &bedFile, string &bimFile, uint iterations);
 };
