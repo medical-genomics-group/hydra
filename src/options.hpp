@@ -124,11 +124,17 @@ public:
     void inputOptions(const int argc, const char* argv[]);
 
     void printBanner(void);
+
     void printProcessingOptions(void);
+
+    std::string get_sparse_output_filebase(const int rank) const;
+
 
 private:
     void readFile(const string &file);
+    
     void makeTitle(void);
+
 };
 
 #endif /* options_hpp */

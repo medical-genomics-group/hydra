@@ -3,7 +3,7 @@
 
 #include <Eigen/Eigen>
 #include <mpi.h>
-#include "mpi_utils.hpp"
+#include "utils.hpp"
 
 using namespace std;
 using namespace Eigen;
@@ -124,6 +124,10 @@ public:
     uint         numBlocks = 0;
 
 
+    uint set_Ntot(const int rank, const Options opt);
+
+    uint set_Mtot(const int rank, Options opt);
+
     void center_and_scale(double* __restrict__ vec, int* __restrict__ mask, const uint N, const uint nas);
 
     void print_restart_banner(const string mcmcOut, const uint iteration_restart, const uint iteration_start);
@@ -204,8 +208,10 @@ public:
     void sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M, const bool* USEBED);
 
     void sparse_data_get_sizes_from_raw(const char* rawdata,
-                                        const uint NC, const uint NB, const uint NA,
-                                        size_t& N1,    size_t& N2,    size_t& NM);
+                                        const uint  NC,
+                                        const uint  NB,
+                                        const uint  NA,
+                                        size_t& N1,    size_t& N2,    size_t& NM) const;
 
     void sparse_data_fill_indices(const char* rawdata,
                                   const uint  NC,
@@ -213,7 +219,7 @@ public:
                                   const uint  NA,
                                   size_t* N1S, size_t* N1L, uint* I1,
                                   size_t* N2S, size_t* N2L, uint* I2,
-                                  size_t* NMS, size_t* NML, uint* IM);
+                                  size_t* NMS, size_t* NML, uint* IM) const;
 
     size_t get_number_of_elements_from_sparse_files(const std::string basename, const std::string id, const int* MrankS, const int* MrankL,
                                                     size_t* S, size_t* L);
@@ -221,10 +227,11 @@ public:
     void read_sparse_data_file(const std::string filename, const size_t N, const size_t OFF, const int NREAD, uint* out);
 
 
+
     // MPI_File_read_at_all handling count argument larger than INT_MAX
     //
     template <typename T>
-    void mpi_file_read_at_all(const size_t N, const MPI_Offset offset, const MPI_File fh, const MPI_Datatype MPI_DT, const int NREADS, T buffer, size_t &bytes) {
+    void mpi_file_read_at_all(const size_t N, const MPI_Offset offset, const MPI_File fh, const MPI_Datatype MPI_DT, const int NREADS, T buffer, size_t &bytes) const {
 
         int rank, dtsize;
         MPI_Status status;
@@ -276,8 +283,8 @@ public:
     // MPI_File_write_at_all handling count argument larger than INT_MAX
     //
     template <typename T>
-    void mpi_file_write_at_all(const size_t N, MPI_Offset offset, MPI_File fh, MPI_Datatype MPI_DT, const int NWRITES, T buffer) 
-    {
+    void mpi_file_write_at_all(const size_t N, MPI_Offset offset, MPI_File fh, MPI_Datatype MPI_DT, const int NWRITES, T buffer) const {
+
         int rank, dtsize;
         MPI_Status status;
 

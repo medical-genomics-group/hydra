@@ -1,9 +1,15 @@
-#ifndef HYDRA_MPI_UTILS_H_
-#define HYDRA_MPI_UTILS_H_
+#ifndef HYDRA_UTILS_H_
+#define HYDRA_UTILS_H_
 
+#include <vector>
+#include <string>
 #include <mpi.h>
 #include <ctime>
 #include <sys/time.h>
+#include "hydra.h"
+#include "options.hpp"
+#include "data.hpp"
+
 
 inline double mysecond() {
     struct timeval  tp;
@@ -16,10 +22,40 @@ inline double mysecond() {
 
 void check_malloc(const void* ptr, const int linenumber, const char* filename);
 
+
 void check_mpi(const int error, const int linenumber, const char* filename);
+
 
 int check_int_overflow(const size_t n, const int linenumber, const char* filename);
 
+
 void check_file_size(const MPI_File fh, const size_t N, const size_t DTSIZE, const int linenumber, const char* filename);
+
+
+void define_blocks_of_markers(const int  Mtot,
+                              int*       MrankS,
+                              int*       MrankL,
+                              const uint nblocks);
+
+
+void check_whole_array_was_set(const uint*  array,
+                               const size_t size,
+                               const int    linenumber,
+                               const char*  filename);
+
+
+size_t get_file_size(const std::string& filename);
+
+
+void assign_blocks_to_tasks(const uint             numBlocks,
+                            const std::vector<int> blocksStarts,
+                            const std::vector<int> blocksEnds,
+                            const uint Mtot,
+                            const int  nranks,
+                            const int  rank,
+                            int* MrankS,
+                            int* MrankL,
+                            int& lmin,
+                            int& lmax);
 
 #endif 

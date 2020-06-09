@@ -1,11 +1,12 @@
 #include <iostream>
 #include <string>
 #include <mpi.h>
+#include "data.hpp"
+#include "options.hpp"
 #include "BayesRRm.h"
 #include "BayesW.hpp"
 //#include "BayesRRm_mt.h"
-#include "data.hpp"
-#include "options.hpp"
+#include "bed_to_sparse.hpp"
 
 
 using namespace std;
@@ -44,7 +45,7 @@ int main(int argc, const char * argv[]) {
             BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
 
             if (opt.bedToSparse) {
-                analysis.write_sparse_data_files(opt.blocksPerRank);
+                write_sparse_data_files(opt.blocksPerRank, data, opt);
             } else if (opt.checkRam) {
                 analysis.checkRamUsage();
             }

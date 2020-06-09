@@ -1,5 +1,8 @@
 #include "options.hpp"
 #include <sys/stat.h>
+#include <mpi.h>
+#include <libgen.h>
+
 
 
 void Options::inputOptions(const int argc, const char* argv[]){
@@ -390,3 +393,35 @@ void Options::makeTitle(void){
     }
 }
 
+// Get directory and basename of bed file (passed with no extension via command line)
+// ----------------------------------------------------------------------------------
+std::string Options::get_sparse_output_filebase(const int rank) const {
+
+    std::string dir, bsn;
+
+    if (sparseDir.length() > 0) {
+        // Make sure the requested output directory exists
+        struct stat stats;
+        stat(sparseDir.c_str(), &stats);
+        if (!S_ISDIR(stats.st_mode)) {
+            if (rank == 0)
+                printf("Fatal: requested directory for sparse output (%s) not found. Must be an existing directory (line %d in %s).\n", sparseDir.c_str(), __LINE__, __FILE__);
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        dir = string(sparseDir);
+    } else {
+        char *cstr = new char[bedFile.length() + 1];
+        strcpy(cstr, bedFile.c_str());
+        dir = string(dirname(cstr));
+    }
+
+    if (sparseBsn.length() > 0) {
+        bsn = sparseBsn.c_str();
+    } else {
+        char *cstr = new char[bedFile.length() + 1];
+        strcpy(cstr, bedFile.c_str());
+        bsn = string(basename(cstr));
+    }
+
+    return string(dir) + string("/") + string(bsn);
+}

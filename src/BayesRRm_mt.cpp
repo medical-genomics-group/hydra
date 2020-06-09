@@ -313,7 +313,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
 
     // Set Ntot and Mtot
     // -----------------
-    uint Ntot = set_Ntot(rank);
+    uint Ntot = set_Ntot(rank, opt, data);
     const uint Mtot = set_Mtot(rank);
     if (rank == 0)
         printf("INFO   : Full dataset includes Mtot=%d markers and Ntot=%d individuals.\n", Mtot, Ntot);
@@ -538,7 +538,7 @@ int BayesRRm_mt::runMpiGibbsMultiTraits() {
                                      NMS, NML, IM,
                                      taskBytes);
     } else {
-        string sparseOut = mpi_get_sparse_output_filebase(rank);
+        string sparseOut = opt.get_sparse_output_filebase(rank);
         data.load_data_from_sparse_files(rank, nranks, M, MrankS, MrankL, sparseOut,
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,

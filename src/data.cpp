@@ -1,7 +1,6 @@
 #include "data.hpp"
 #include <fstream>
 #include <iostream>
-//#include <Eigen/Eigen>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -10,14 +9,55 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/algorithm/string/classification.hpp>
 #include <mm_malloc.h>
-//#include <mpi.h>
-#include "mpi_utils.hpp"
+#include "utils.hpp"
 #include "gadgets.hpp"
 
 using namespace Eigen;
 using namespace std;
 
 Data::Data() {}
+
+
+
+uint Data::set_Ntot(const int rank, const Options opt) {
+
+    uint Ntot = opt.numberIndividuals;
+
+    if (Ntot == 0) {
+        printf("FATAL  : opt.numberIndividuals is zero! Set it via --number-individuals in call.");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    if (Ntot != numInds - numNAs) {
+        if (rank == 0)
+            printf("WARNING: opt.numberIndividuals set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot, numInds, numNAs, numInds - numNAs);
+    }
+
+    return Ntot;
+}
+
+
+uint Data::set_Mtot(const int rank, Options opt) {
+
+    uint Mtot = opt.numberMarkers;
+
+    if (Mtot == 0) throw("FATAL  : opt.numberMarkers is zero! Set it via --number-markers in call.");
+
+    // Block marker definition has precedence over requested number of markers
+    if (opt.markerBlocksFile != "" && opt.numberMarkers > 0) {
+        opt.numberMarkers = 0;
+        if (rank == 0)
+            printf("WARNING: --number-markers option ignored, a marker block definition file was passed!\n");
+    }
+
+    if (opt.numberMarkers > 0 && opt.numberMarkers < Mtot) {
+        Mtot = opt.numberMarkers;
+        if (rank == 0)
+            printf("INFO   : Option passed to process only %d markers!\n", Mtot);
+    }
+
+    return Mtot;
+}
 
 
 void Data::print_restart_banner(const string mcmcOut, const uint iteration_restart, 
@@ -1135,7 +1175,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata,
                                           const uint  NC,
                                           const uint  NB,
                                           const uint  NA,
-                                          size_t& N1, size_t& N2, size_t& NM) {
+                                          size_t& N1, size_t& N2, size_t& NM) const {
 
     assert(numInds - NA <= NB * 4);
 
@@ -1195,7 +1235,7 @@ void Data::sparse_data_fill_indices(const char* rawdata,
                                     const uint  NA,
                                     size_t* N1S, size_t* N1L, uint* I1,
                                     size_t* N2S, size_t* N2L, uint* I2,
-                                    size_t* NMS, size_t* NML, uint* IM) {
+                                    size_t* NMS, size_t* NML, uint* IM) const {
     
     
     assert(numInds - NA <= NB * 4);

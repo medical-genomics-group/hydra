@@ -5,8 +5,8 @@
  *      Author: admin
  */
 
-#ifndef SRC_BAYESRRM_H_
-#define SRC_BAYESRRM_H_
+#ifndef HYDRA_BAYESRRM_H_
+#define HYDRA_BAYESRRM_H_
 
 #include "data.hpp"
 #include "options.hpp"
@@ -32,8 +32,6 @@ class BayesRRm
     double             v0G     = 0.0001;
     double             s02G    = 0.0001;
     const double       s02F    = 1.0;
-    const size_t       LENBUF  = 50000;
-
 
     uint iteration_start           = 0;
     uint iteration_to_restart_from = 0;
@@ -57,10 +55,7 @@ class BayesRRm
     VectorXd logL;      // log likelihood of component
     VectorXd muk;       // mean of k-th component marker effect size
     VectorXd denom;     // temporal variable for computing the inflation of the effect variance for a given non-zero componnet
-    VectorXi      m0;        // total number of markers in model
-
-    //EO@@@ watch type change by EO for cass (former v)
-   //DT@@@ there is no side effects for letting cass be a matrix. Just change indexing in Bw
+    VectorXi m0;        // total number of markers in model
     MatrixXi cass;
     MatrixXi cass8;
 
@@ -103,36 +98,22 @@ class BayesRRm
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();
 
-    void   setDebugEnabled(bool enabled) { showDebug = enabled; }
+    void setDebugEnabled(bool enabled) { showDebug = enabled; }
 
-    bool   isDebugEnabled() const { return showDebug; }    
+    bool isDebugEnabled() const { return showDebug; }    
 
-    int runGibbs();
+    int  runGibbs();
 
-    void   init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
+    void init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
                              const int* MrankS, const int* MrankL, const bool use_xbet);
     
-    void   init_from_scratch();
+    void init_from_scratch();
 
-    string mpi_get_sparse_output_filebase(const int rank);
+    int  checkRamUsage();
 
-    void   write_sparse_data_files(const uint bpr);
+    int  runMpiGibbs();
 
-    int    checkRamUsage();
-
-    uint   set_Ntot(const int rank);
-
-    uint   set_Mtot(const int rank);
-
-    int    runMpiGibbs();
-
-    int    runMpiGibbsMultiTraits();
-
-    void   check_whole_array_was_set(const uint* array, const size_t size, const int linenumber, const char* filename);
-
-    void   mpi_assign_blocks_to_tasks(const uint numBlocks, const vector<int> blocksStarts, const vector<int> blocksEnds, const uint Mtot, const int nranks, const int rank, int* MrankS, int* MrankL, int& lmin, int& lmax);
-
-    void   mpi_define_blocks_of_markers(const int Mtot, int* MrankS, int* MrankL, const uint nblocks);
+    int  runMpiGibbsMultiTraits();
 };
 
 #endif /* SRC_BAYESRRM_H_ */

@@ -37,7 +37,7 @@
 #include "gauss_hermite.hpp"
 #include "ars.hpp"
 #include "densities.hpp"
-#include "mpi_utils.hpp"
+#include "utils.hpp"
 
 
 BayesW::~BayesW()
@@ -276,9 +276,9 @@ int BayesW::runMpiGibbs_bW() {
     }
 
     // Set Ntot and Mtot
-    // -----------------
-    uint Ntot = set_Ntot(rank);
-    const uint Mtot = set_Mtot(rank);
+    uint Ntot       = data.set_Ntot(rank, opt);
+    const uint Mtot = data.set_Mtot(rank, opt);
+
     //Reset the dist
     dist.reset_rng((uint)(opt.seed + rank*1000));
 
@@ -290,7 +290,7 @@ int BayesW::runMpiGibbs_bW() {
     // Define global marker indexing
     // -----------------------------
     int MrankS[nranks], MrankL[nranks], lmin = 1E9, lmax = 0;
-    mpi_assign_blocks_to_tasks(data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot, nranks, rank, MrankS, MrankL, lmin, lmax);
+    assign_blocks_to_tasks(data.numBlocks, data.blocksStarts, data.blocksEnds, Mtot, nranks, rank, MrankS, MrankL, lmin, lmax);
 
     uint M = MrankL[rank];
     if (rank % 10 == 0) {
@@ -304,7 +304,7 @@ int BayesW::runMpiGibbs_bW() {
     //       hence the correction in the call
     // --------------------------------------------------------------------
     int IrankS[nranks], IrankL[nranks];
-    mpi_define_blocks_of_markers(Ntot - data.numNAs, IrankS, IrankL, nranks);
+    define_blocks_of_markers(Ntot - data.numNAs, IrankS, IrankL, nranks);
 
     Beta.resize(M);
     Beta.setZero();
@@ -497,7 +497,7 @@ int BayesW::runMpiGibbs_bW() {
                                      NMS, NML, IM,
                                      taskBytes);
     } else {
-        string sparseOut = mpi_get_sparse_output_filebase(rank);
+        string sparseOut = opt.get_sparse_output_filebase(rank);
         data.load_data_from_sparse_files(rank, nranks, M, MrankS, MrankL, sparseOut,
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,
