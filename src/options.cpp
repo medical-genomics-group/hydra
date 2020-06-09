@@ -265,21 +265,25 @@ void Options::inputOptions(const int argc, const char* argv[]){
             predict = true;
             ss << "--predict" << argv[i] << "\n";
         }
-        else if (!strcmp(argv[i], "--bed-file")) {
+        else if (!strcmp(argv[i], "--test-bed")) {
             bedFile = argv[++i];
-            ss << "--bed-file" << argv[i] << "\n";
+            ss << "--test-bed" << argv[i] << "\n";
         }
-        else if (!strcmp(argv[i], "--bim-file")) {
+        else if (!strcmp(argv[i], "--test-bim")) {
             bimFile = argv[++i];
-            ss << "--bim-file " << argv[i] << "\n";
+            ss << "--test-bim " << argv[i] << "\n";
         }
-        else if (!strcmp(argv[i], "--fam-file")) {
+        else if (!strcmp(argv[i], "--test-fam")) {
             famFile = argv[++i];
-            ss << "--fam-file " << argv[i] << "\n";
+            ss << "--test-fam " << argv[i] << "\n";
         }
-        else if (!strcmp(argv[i], "--bet-file")) {
-            betFile = argv[++i];
-            ss << "--bet-file " << argv[i] << "\n";
+        else if (!strcmp(argv[i], "--train-bim")) {
+            trainBim = argv[++i];
+            ss << "--train-bim " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--bet-long")) {
+            betLong = argv[++i];
+            ss << "--bet-long " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--bet-iterations")) {
             betIterations = stoi(argv[++i]);

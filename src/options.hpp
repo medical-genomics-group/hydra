@@ -71,7 +71,8 @@ public:
     string bedFile;
     string bimFile;
     string famFile;
-    string betFile;
+    string trainBim;
+    string betLong;
     uint   betIterations;
     string mcmcOutDir  = "";
     string mcmcOutNam  = "default_output_name";
@@ -111,7 +112,8 @@ public:
         bedFile                 = "";
         bimFile                 = "";
         famFile                 = "";
-        betFile                 = "";
+        trainBim                = "";
+        betLong                 = "";
         betIterations           = 0;
         sparseDir               = "";
         sparseBsn               = "";
