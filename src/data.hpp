@@ -365,6 +365,7 @@ public:
     void get_bed_snp_names();
     void get_common_snps(const string &betFile, const uint iter);
     void get_common_snps(const string &file);
+    void get_strand_index();
     void predict_from_betas(string &betFile, string &bedFile, string &bimFile, uint iterations);
 };
 

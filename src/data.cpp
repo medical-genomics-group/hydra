@@ -2090,13 +2090,13 @@ void Data::read_train_data(const string &bimFile, string &betFile, uint iteratio
     read_train_bim(bimFile);  // read .bim associated with the betas
     get_bed_snp_names();      // get SNP names as string for matching common SNPs
     predBet.resize(bedSnps.size(), iterations);
-
     ifstream in(betFile);
     Gadget::Tokenizer tok;
     string line, snp;
     double effect;
     uint iter   = 0;
     uint snpInd = 0;
+
     get_common_snps(betFile); // match SNP IDs between .bed and .bet files
     while (getline(in, line)) {
         tok.getTokens(line, " ");
@@ -2104,28 +2104,38 @@ void Data::read_train_data(const string &bimFile, string &betFile, uint iteratio
             // check common SNPs whenever iteration number changes
             iter = stoi(tok[0]);
             get_common_snps(betFile, iter);
-            snpInd = 0;
         }
         snp  = "rs" + tok[1];
-        effect = 0.0; // effect size should be zero unless the SNP is in this iteration
         // check the SNP is in the current common set
         if (std::find(commonSnps.begin(), commonSnps.end(), snp) != commonSnps.end()) {
+            // get the index of the current SNP
+            std::vector<string>::iterator itr = std::find(bedSnps.begin(), bedSnps.end(), snp);
+            snpInd = std::distance(bedSnps.begin(), itr);
             // check strands in the two .bim files
             string a1_train = snpInfoMap_train.find(snp)->second->a1;
             string a1_test  = snpInfoMap.find(snp)->second->a1;
             string a2_test  = snpInfoMap.find(snp)->second->a2;
+            printf("INFO    : A1 train = %s, A1 test = %s, A2 test = %s\n", a1_train.c_str(), a1_test.c_str(), a2_test.c_str());
             if (a1_train == a1_test) {
                 effect = stod(tok[2]);
             // flip the strand
             } else if (a1_train == a2_test) {
                 effect = stod(tok[2]) * -1;
             }
+            predBet(snpInd, iter) = effect;
         }
-        predBet(snpInd, iter) = effect;
-        snpInd++;
     }
     in.clear();
     in.close();
+}
+
+/* Create a map of RS ID to signs for flipping strand alignment.
+ * pre  : train and test .bim files have been read
+ * post : strandAlign contains 1 for SNPs that match alignment, -1 for those
+ *        that do not, and 0 for mismatched alleles.
+ */
+void Data::get_strand_index() {
+    // TODO: refactor strand alignment check
 }
 
 
