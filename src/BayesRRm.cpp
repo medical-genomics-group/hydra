@@ -169,7 +169,7 @@ int BayesRRm::runMpiGibbs() {
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File   outfh, betfh, epsfh, gamfh, cpnfh, acufh, mrkfh, xivfh, musfh;
+    MPI_File   outfh,  betfh, epsfh, gamfh, cpnfh, acufh, mrkfh, xivfh, musfh;
     MPI_File   xbetfh, xcpnfh;
     MPI_Status status;
     MPI_Info   info;
@@ -191,11 +191,14 @@ int BayesRRm::runMpiGibbs() {
         }
     }
 
-
-    // Set Ntot and Mtot
-    //
     uint Ntot       = data.set_Ntot(rank, opt);
     const uint Mtot = data.set_Mtot(rank, opt);
+
+    //@@@@@ BW
+    //Reset the dist
+    //dist.reset_rng((uint)(opt.seed + rank*1000));
+
+
     if (rank == 0)
         printf("INFO   : Full dataset includes Mtot=%d markers and Ntot=%d individuals.\n", Mtot, Ntot);
 
@@ -748,12 +751,11 @@ int BayesRRm::runMpiGibbs() {
     // ---------------
     const auto st3 = std::chrono::high_resolution_clock::now();
 
-    double   *y, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum; //, *previt_eps;
+    double   *y, *epsilon, *tmpEps, *deltaEps, *dEpsSum, *deltaSum;
     const size_t NDB = size_t(Ntot) * sizeof(double);
     y          = (double*)_mm_malloc(NDB, 64);  check_malloc(y,          __LINE__, __FILE__);
     epsilon    = (double*)_mm_malloc(NDB, 64);  check_malloc(epsilon,    __LINE__, __FILE__);
     tmpEps     = (double*)_mm_malloc(NDB, 64);  check_malloc(tmpEps,     __LINE__, __FILE__);
-    //previt_eps = (double*)malloc(NDB);  check_malloc(previt_eps, __LINE__, __FILE__);
     deltaEps   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaEps,   __LINE__, __FILE__);
     dEpsSum    = (double*)_mm_malloc(NDB, 64);  check_malloc(dEpsSum,    __LINE__, __FILE__);
     deltaSum   = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaSum,   __LINE__, __FILE__);
@@ -830,16 +832,9 @@ int BayesRRm::runMpiGibbs() {
     // A counter on previously saved thinned iterations
     uint n_thinned_saved = 0;
 
-    //double   previt_m0 = 0.0;
-    //double   previt_sg = 0.0;
-    //double   previt_mu = 0.0;
-    //double   previt_se = 0.0;
-    //VectorXd previt_Beta(M);
-
 
     // Main iteration loop
     // -------------------
-    //bool replay_it = false;
     double tot_sync_ar1  = 0.0;
     double tot_sync_ar2  = 0.0;
     int    tot_nsync_ar1 = 0;
@@ -869,29 +864,6 @@ int BayesRRm::runMpiGibbs() {
         double it_sync_ar2  = 0.0;
         int    it_nsync_ar1 = 0;
         int    it_nsync_ar2 = 0;
-
-        //if (replay_it) {
-        //    printf("INFO: replay iteration with m0=%.0f sigG=%15.10f sigE=%15.10f\n", previt_m0, previt_sg, previt_se);
-        //    m0        = previt_m0;
-        //    sigmaG    = previt_sg;
-        //    sigmaE    = previt_se;
-        //    mu        = previt_mu;
-        //    sync_rate = 0;
-        //    for (int i=0; i<Ntot; ++i) epsilon[i] = previt_eps[i];
-        //    Beta      = previt_Beta;
-        //    replay_it = false;
-        //}
-
-
-        // Store status of iteration to revert back to it if required
-        // ----------------------------------------------------------
-        //previt_m0 = m0;
-        //marion : this should probably be a vector with sigmaGG
-        //previt_sg = sigmaG;
-        //previt_se = sigmaE;
-        //previt_mu = mu;
-        //for (int i=0; i<Ntot; ++i) previt_eps[i]  = epsilon[i];
-        //for (int i=0; i<M;    ++i) previt_Beta(i) = Beta(i);
 
         for (int i=0; i<Ntot; ++i) epsilon[i] += mu;
 
@@ -1829,39 +1801,6 @@ int BayesRRm::runMpiGibbs() {
         fflush(stdout);
 
 
-
-
-        // Check iteration
-        //
-        // ---------------
-        /*
-          if (iteration >= 0) {
-
-          double max_sg = 0.0;
-          MPI_Allreduce(&sigmaG, &max_sg, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-          if (rank == 0) printf("INFO   : max sigmaG of iteration %d is %15.10f with sync rate of %d\n", iteration, max_sg, sync_rate);
-
-          if (max_sg > 1.0) {
-          if (sync_rate == 0) {
-          if (rank == 0) {
-          printf("CRITICAL: detected task with sigmaG = %15.10f and sync rate of %d\n", max_sg, sync_rate);
-          printf("          => desperate situation, aborting...\n");
-          }
-          MPI_Abort(MPI_COMM_WORLD, 1);
-          } else {
-          if (rank == 0)
-          printf("          => will do an attempt with setting sync_rate to 0\n");
-          replay_it = true;
-          continue;
-          }
-          }
-
-          //if ( m0 > 1.2 * previt_m0 || m0 < 0.8 * previt_m0) {
-          //    printf("CRITICAL: divergence detected! Will cancel iteration and set up a lower sync rate\n");
-          //}
-          }
-        */
-
         // For the fixed effects
         // ---------------------
         uint gamma_length = 0;
@@ -2120,7 +2059,6 @@ int BayesRRm::runMpiGibbs() {
     _mm_free(y);
     _mm_free(epsilon);
     _mm_free(tmpEps);
-    //free(previt_eps);
     _mm_free(deltaEps);
     _mm_free(dEpsSum);
     _mm_free(deltaSum);
