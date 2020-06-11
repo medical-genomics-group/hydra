@@ -16,21 +16,23 @@ LinPred::LinPred(Data &data, Options &opt)
  * post : NxI prediction matrix is stored in pred member variable
  */
 void LinPred::predict_genetic_values(string outfile) {
+    cout << data.Z << std::endl;
     // perform prediction
-    data.pred.resize(data.Z_common.rows(), data.predBet.cols());
+    data.pred.resize(data.Z.rows(), data.predBet.cols());
     // scatter rows and cols across processes
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     // get data dimensions and create arrays
-    int N = data.Z_common.rows();
-    int M = data.Z_common.cols();
+    int N = data.Z.rows();
+    int M = data.Z.cols();
     int I = data.predBet.cols();
+    printf("N = %d, M = %d, I = %d\n", N, M, I);
     double a[N*M];
     double b[M*I];
     // map data matrices to arrays for scattering
     // we'll scatter A, and broadcast B because we assume B is smaller
-    Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(a, N, M) = data.Z_common; // LHS row-major format
+    Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(a, N, M) = data.Z; // LHS row-major format
     Map<MatrixXd>(b, M, I) = data.predBet; // RHS col-major format
     // assume N is divisible by number of processes
     int block_rows_a = N / nranks;
