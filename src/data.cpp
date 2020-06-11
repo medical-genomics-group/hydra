@@ -1502,10 +1502,10 @@ void Data::readBedFile_noMPI(const string &bedFile){
     BIT.clear();
     BIT.close();
     // standardize genotypes
-    //for (i=0; i<numSnps; ++i) {
-    //    Z.col(i).array() -= Z.col(i).mean();
-    //    ZPZdiag[i] = Z.col(i).squaredNorm();
-    //}
+    for (i=0; i<numSnps; ++i) {
+        Z.col(i).array() -= Z.col(i).mean();
+        ZPZdiag[i] = Z.col(i).squaredNorm();
+    }
     cout << "Genotype data for " << numInds << " individuals and " << numSnps << " SNPs are included from [" + bedFile + "]." << endl;
 }
 
@@ -2089,18 +2089,21 @@ void Data::read_dirichlet_priors(const string& file){
 void Data::read_train_data(const string &bimFile, string &betFile, uint iterations) {
     read_train_bim(bimFile);  // read .bim associated with the betas
     get_bed_snp_names();      // get SNP names as string for matching common SNPs
-    predBet.resize(bedSnps.size(), iterations);
+    predBet = MatrixXd::Zero(numSnps, iterations);
+    cout << predBet << std::endl;
     ifstream in(betFile);
     Gadget::Tokenizer tok;
     string line, snp;
     double effect;
-    uint iter   = 0;
     uint snpInd = 0;
+    uint iter = 0;
 
-    get_common_snps(betFile); // match SNP IDs between .bed and .bet files
+    get_common_snps(betFile, iter); // match SNP IDs between .bed and .bet files
     while (getline(in, line)) {
         tok.getTokens(line, " ");
-        if (stoi(tok[0]) > iter) { // check if iteration number has increased
+        if (stoi(tok[0]) >= iterations) {
+            break;
+        } else if (stoi(tok[0]) > iter) {
             // check common SNPs whenever iteration number changes
             iter = stoi(tok[0]);
             get_common_snps(betFile, iter);
@@ -2115,13 +2118,13 @@ void Data::read_train_data(const string &bimFile, string &betFile, uint iteratio
             string a1_train = snpInfoMap_train.find(snp)->second->a1;
             string a1_test  = snpInfoMap.find(snp)->second->a1;
             string a2_test  = snpInfoMap.find(snp)->second->a2;
-            printf("INFO    : A1 train = %s, A1 test = %s, A2 test = %s\n", a1_train.c_str(), a1_test.c_str(), a2_test.c_str());
             if (a1_train == a1_test) {
                 effect = stod(tok[2]);
             // flip the strand
             } else if (a1_train == a2_test) {
                 effect = stod(tok[2]) * -1;
             }
+            printf("INFO    : after strand check %s has effect %f\n", snp.c_str(), effect);
             predBet(snpInd, iter) = effect;
         }
     }
