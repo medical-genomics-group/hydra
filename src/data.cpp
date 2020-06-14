@@ -1490,13 +1490,13 @@ void Data::readBedFile_noMPI(const string &bedFile){
         snp2pq[snp] = 2.0f*snpInfo->af*(1.0f-snpInfo->af);
 
         // standardize genotypes
-        //float sqn = Z.col(j).squaredNorm() - numInds * mean * mean;
-        //Z.col(j).array() -= mean;
-        //float std_ = 1.f / (sqrt(sqn / float(numInds)));
+        float sqn = Z.col(j).squaredNorm() - numInds * mean * mean;
+        Z.col(j).array() -= mean;
+        float std_ = 1.f / (sqrt(sqn / float(numInds)));
 
-        //Z.col(j).array() *= std_;
+        Z.col(j).array() *= std_;
 
-        //ZPZdiag[j] = sqn;
+        ZPZdiag[j] = sqn;
 
         if (++snp == numSnps) break;
     }
