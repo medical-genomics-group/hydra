@@ -80,3 +80,29 @@ void LinPred::predict_genetic_values(uint N, uint M, uint I, string outfile) {
         cout << "Predictions written to disk" << std::endl;
     }
 }
+
+/* Computes prediction for each individual from pre-computed effect estimates
+ * using a single process
+ * pre  : binary PLINK files and .bet files have been read and processed
+ * post : NxI prediction matrix is stored in pred member variable
+ */
+void LinPred::predict_genetic_values_no_MPI(string outfile) {
+    uint N = data.Z.rows();
+    uint M = data.Z.cols();
+    uint I = data.predBet.cols();
+    data.pred.resize(N, I);
+    float sum = 0.0;
+    for (uint i = 0; i < N; i++) {
+        for (uint j = 0; j < I; j++) {
+            for (uint k = 0; k < M; k++) {
+                sum += data.Z(i, k) * data.predBet(k, j);
+            }
+            data.pred(i, j) = sum;
+            sum = 0.0;
+        }
+    }
+    ofstream file(outfile.c_str());
+    file << data.pred.format(csvFormat) << std::endl;
+    file.flush();
+    cout << "Predictions written to disk" << std::endl;
+}
