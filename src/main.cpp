@@ -171,13 +171,16 @@ int main(int argc, const char * argv[]) {
         // AH: prediction
         } else if (opt.predict) {
             // configure data object
-            data.readBimFile(opt.bimFile);
-            data.readFamFile(opt.famFile);
-            data.readBedFile_noMPI(opt.bedFile);
-            data.read_train_data(opt.trainBim, opt.betLong, opt.betIterations);
+            if (rank == 0) {
+                data.readBimFile(opt.bimFile);
+                data.readFamFile(opt.famFile);
+                data.readBedFile_noMPI(opt.bedFile);
+                data.read_train_data(opt.trainBim, opt.betLong, opt.betIterations);
+            }
+            MPI_Barrier(MPI_COMM_WORLD);
             // perform prediction
             LinPred predictor(data, opt);
-            predictor.predict_genetic_values(opt.predOutDir + "/" + opt.predOutName);
+            predictor.predict_genetic_values(data.Z.rows(), data.Z.cols(), data.predBet.cols(), opt.predOutDir + "/" + opt.predOutName);
         }
         else {
             throw(" Error: Wrong analysis requested: " + opt.analysisType + " + " + opt.bayesType);

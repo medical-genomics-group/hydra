@@ -15,29 +15,13 @@ LinPred::LinPred(Data &data, Options &opt)
  * pre  : binary PLINK files and .bet files have been read and processed
  * post : NxI prediction matrix is stored in pred member variable
  */
-void LinPred::predict_genetic_values(string outfile) {
-    // initialise prediction matrix
-    data.pred.resize(data.Z.rows(), data.predBet.cols());
-
+void LinPred::predict_genetic_values(uint N, uint M, uint I, string outfile) {
     int nranks, rank;
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    // get data dimensions
-    int N = data.Z.rows();
-    int M = data.Z.cols();
-    int I = data.predBet.cols();
-    printf("INFO:   N = %d, M = %d, I = %d\n", N, M, I);
-    printf("INFO:   Z has dimension %dx%d\n", (int) data.Z.rows(), (int) data.Z.cols());
-    printf("INFO:   predBet has dimenion %dx%d\n", (int) data.predBet.rows(), (int) data.predBet.cols());
-    printf("INFO:   pred has dimension %dx%d\n", (int) data.pred.rows(), (int) data.pred.cols());
-    double a[N*M];
-    double b[M*I];
-    // map data matrices to arrays for scattering
-    // we'll scatter A, and broadcast B because we assume B is smaller
-    Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(a, N, M) = data.Z; // LHS row-major format
-    Map<MatrixXd>(b, M, I) = data.predBet; // RHS col-major format
     // assume N is divisible by number of processes
     // TODO: handle case when N is not divisible by number of processes
+    printf("INFO:   N = %d, M = %d, I = %d\n", N, M, I);
     int block_rows_a = N / nranks;
     // get number of elements per block in A, and C
     uint elem_per_proc_a = block_rows_a * M;
@@ -47,10 +31,25 @@ void LinPred::predict_genetic_values(string outfile) {
     for (uint i = 0; i < block_size; i++) {
         buff_c[i] = 0.0;
     }
-    // scatter unique blocks of A to processors
-    printf("INFO: Scattering %d elements of A to each of %d tasks\n", elem_per_proc_a, nranks);
+
+    double a[N*M];
+    double b[M*I];
+    if (rank == 0) {
+        // initialise prediction matrix
+        data.pred.resize(N, I);
+        // map data matrices to arrays for scattering
+        // we'll scatter A, and broadcast B because we assume B is smaller
+        Map<Matrix<double, Dynamic, Dynamic, RowMajor>>(a, N, M) = data.Z; // LHS row-major format
+        Map<MatrixXd>(b, M, I) = data.predBet; // RHS col-major format
+        // scatter unique blocks of A to processors
+        printf("INFO: Scattering %d elements of A to each of %d tasks\n", elem_per_proc_a, nranks);
+    }
     MPI_Scatter(a, elem_per_proc_a, MPI_DOUBLE, buff_a,
                 elem_per_proc_a, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Bcast(b, M*I, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    printf("DEBUG   : process %d received %f in buff_a[0]\n", rank, buff_a[0]);
+    printf("DEBUG   : process %d received %f in b[1]\n", rank, b[1]);
     // perform multiplication (N.B. we must use row-major, as col-major results
     // in out-of-order blocks when we perform MPIGather.
     //  TODO: parallelise loops

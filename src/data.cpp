@@ -2127,7 +2127,6 @@ void Data::read_train_data(const string &bimFile, string &betFile, uint iteratio
             } else if (a1_train == a2_test) {
                 effect = stod(tok[2]) * -1;
             }
-            printf("INFO    : after strand check %s has effect %f\n", snp.c_str(), effect);
             predBet(snpInd, iter) = effect;
         }
     }
