@@ -119,11 +119,13 @@ inline double runif(unsigned int seed){
 }
 
 double Distributions_boost::component_probs(double b2,Eigen::VectorXd pi){
+
     double sum;
     double p;
-    p=runif(seed);
-    sum= pi[0]*exp((-0.5*b2)/(5e-2))/sqrt(5e-2)+pi[1]*exp((-0.5*b2));
-    if(p<=(pi[0]*exp((-0.5*b2)/(5e-2))/sqrt(5e-2))/sum)
+    p   = runif(seed);
+    sum = pi[0]*exp((-0.5*b2)/(5e-2))/sqrt(5e-2)+pi[1]*exp((-0.5*b2));
+
+    if (p<=(pi[0]*exp((-0.5*b2)/(5e-2))/sqrt(5e-2))/sum)
         return 5e-2;
     else
         return 1;
