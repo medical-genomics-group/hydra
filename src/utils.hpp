@@ -11,13 +11,24 @@
 #include "data.hpp"
 
 
-inline double mysecond() {
+inline
+double mysecond() {
     struct timeval  tp;
     struct timezone tzp;
     int i;
     i = gettimeofday(&tp, &tzp);
     return ( (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6 );
 }
+
+
+inline
+void errorCheck(int err){
+	if(err>0){
+		cout << "Error code = " << err << endl;
+		exit(1);
+	}
+}
+
 
 
 void check_malloc(const void* ptr, const int linenumber, const char* filename);
