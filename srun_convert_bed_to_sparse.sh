@@ -4,25 +4,14 @@
 
 module purge
 module load intel intel-mpi intel-mkl boost eigen
-module list
 
-EXE=./src/hydra
+source ./compile_code.sh $1
 
-# COMPILATION
-cd ./src
-B='-B'
-B=''
-make $B -f Makefile || exit 1;
-cd ..
 
-# DATASET
-datadir=""
-dataset=""
-sparsedir=""
-sparsebsn=""
-phen=""
+datadir=""; dataset=""; sparsedir=""; sparsebsn=""; phen=""
 
-DS=3
+
+DS=4
 
 if [ $DS == 0 ]; then 
     datadir=./test/data
@@ -49,6 +38,12 @@ elif [ $DS == 3 ]; then
     phen=BMI_noNA.phen
     sparsedir=$datadir
     sparsebsn=${dataset}_test2
+elif [ $DS == 4 ]; then
+    datadir=/work/ext-unil-ctgg/etienne/test_bw
+    dataset=t_M50K_N5K
+    phen=$dataset
+    sparsedir=$datadir
+    sparsebsn=${dataset}
 fi
 
 echo datadir: $datadir
