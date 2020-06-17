@@ -1,6 +1,8 @@
 #include <cstdlib>
+#include <stdio.h>
+#include <omp.h>
+#include "sparse.hpp"
 #include "dense.hpp"
-
 
 void sparse_set(double*       __restrict__ vec,
                 const double               val,
@@ -40,18 +42,92 @@ double sparse_partial_sum(const double* __restrict__ vec,
                           const uint*   __restrict__ IX,
                           const size_t               NXS,
                           const size_t               NXL) {
-    double sum = 0.0;
 #ifdef __INTEL_COMPILER
     __assume_aligned(vec, 64);
     __assume_aligned(IX,  64);
 #endif
+
+    double sum = 0.0;
+
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+: sum)
-#endif
+
+    double partial_sum = 0.0;
+    
+#pragma omp parallel default(none) firstprivate(partial_sum) shared(sum, vec, IX, NXS, NXL)
+    {
+        //int ID = omp_get_thread_num();
+        
+#pragma omp for schedule(static)
+        for (size_t i=NXS; i < NXS + NXL; i++) {
+            partial_sum += vec[IX[i]];
+        }
+        
+#pragma omp for ordered schedule(static,1)
+        for (int t=0; t<omp_get_num_threads(); ++t) {
+            //assert( t==ID );
+#pragma omp ordered
+            {
+                sum += partial_sum;
+            }
+        }
+    }
+    
+#else
+
     for (size_t i=NXS; i < NXS + NXL; i++) {
         sum += vec[IX[i]];
     }
+
+#endif
+
     return sum;
+}
+
+
+// Function that finds the sum across the sum across individuals who have marker with specified value
+double sparse_partial_sum(const long double* __restrict__ vec,
+                          const uint*        __restrict__ IX,
+                          const size_t                    NXS,
+                          const size_t                    NXL) {
+#ifdef __INTEL_COMPILER
+    __assume_aligned(vec, 64);
+    __assume_aligned(IX,  64);
+#endif
+
+    long double sum = 0.0;
+
+#ifdef _OPENMP
+
+    long double partial_sum = 0.0;
+    
+#pragma omp parallel default(none) firstprivate(partial_sum) shared(sum, vec, IX, NXS, NXL)
+    {
+        //int ID = omp_get_thread_num();
+        
+#pragma omp for schedule(static)
+        for (size_t i=NXS; i < NXS + NXL; i++) {
+            partial_sum += vec[IX[i]];
+        }
+        
+#pragma omp for ordered schedule(static,1)
+        for (int t=0; t<omp_get_num_threads(); ++t) {
+            //assert( t==ID );
+#pragma omp ordered
+            {
+                sum += partial_sum;
+            }
+        }
+    }
+    
+#else
+
+    for (size_t i=NXS; i < NXS + NXL; i++) {
+        sum += vec[IX[i]];
+    }
+
+#endif
+
+    return (double) sum;
 }
 
 
@@ -108,6 +184,8 @@ double partial_sparse_dotprod(const double* __restrict__ vec,
     }
 
     dp *= fac;
+
+    //printf("dp = %20.16f\n", dp);
 
     return dp;
 }

@@ -17,6 +17,10 @@ double sparse_partial_sum(const double* __restrict__ vec,
                           const uint*   __restrict__ IX,
                           const size_t               NXS,
                           const size_t               NXL);
+double sparse_partial_sum(const long double* __restrict__ vec,
+                          const uint*        __restrict__ IX,
+                          const size_t                    NXS,
+                          const size_t                    NXL);
 
 
 double partial_sparse_dotprod(const double* __restrict__ vec,
