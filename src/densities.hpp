@@ -16,30 +16,6 @@ double mu_dens(double x, void *norm_data)
 };
 
 
-// Function for the log density of some "fixed" covariate effect (gamma denoted by x here
-//inline
-double gamma_dens2(double x, void *norm_data) {
-
-    double sum = 0.0;
-
-    pars p = *(static_cast<pars *>(norm_data));
-
-#ifdef __INTEL_COMPILER
-    __assume_aligned(&p.epsilon, 64);
-    __assume_aligned(&p.X_j, 64);
-#endif
-#ifdef _OPENMP
-#pragma omp parallel for reduction(+: sum)
-#endif
-    for (size_t i=0; i < p.epsilon.size(); i++) {
-        sum += exp((p.epsilon[i] - p.X_j[i] * x)* p.alpha - EuMasc);
-    }
-
-    /* cast voided pointer into pointer to struct norm_parm */
-    return -p.alpha * x * p.sum_failure - sum - x*x/(2*p.sigma_mu); // Prior is the same currently for intercepts and fixed effects
-};
-
-
 // Function for the log density of some "fixed" covariate effect
 //inline 
 double gamma_dens(double x, void *norm_data)
