@@ -1,15 +1,14 @@
 #ifndef HYDRA_CONSTANTS_HPP_
 #define HYDRA_CONSTANTS_HPP_
 
+#include <math.h>
 
-#define PI 3.14159265359
+const double PI         = M_PI;
 
-#define PI_squared 9.86960440109
+const double PI_squared = M_PI * M_PI;
 
-#define PI2 6.28318530718
+const double sqrtPI     = sqrt(M_PI);
 
-#define sqrtPI 1.77245385090552
-
-#define EuMasc 0.577215664901532
+const double EuMasc     = 0.577215664901532;
 
 #endif
