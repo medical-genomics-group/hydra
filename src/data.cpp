@@ -87,9 +87,6 @@ void Data::read_mcmc_output_idx_file(const string      mcmcOut,
 
     // No rank dependency for bayesW
     string fp = mcmcOut + "." + ext + "." + std::to_string(rank);
-    if (bayesType == "bayesWMPI")
-        fp = mcmcOut + "." + ext;
-
     check_mpi(MPI_File_open(MPI_COMM_SELF, fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
 
     // 1. get and validate iteration number that we are about to read
