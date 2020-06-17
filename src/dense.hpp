@@ -18,7 +18,8 @@ void copy_array(double*       __restrict__ dest,
                 const int N);
 
 
-double sum_array_elements(const double* __restrict__ array, const int N);
+double sum_array_elements(const      double* __restrict__ array, const int N);
+double sum_array_elements(const long double* __restrict__ array, const int N);
 
 
 void add_arrays(double*       __restrict__ out,

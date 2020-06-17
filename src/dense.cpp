@@ -1,5 +1,6 @@
 #include <math.h>
-
+#include <omp.h>
+#include <cassert>
 
 // Add offset to each element of the array
 //
@@ -56,19 +57,84 @@ void copy_array(double*       __restrict__ dest,
 
 double sum_array_elements(const double* __restrict__ array, const int N) {
 
-    double sum = 0.0;
-
 #ifdef __INTEL_COMPILER
     __assume_aligned(array, 64);
 #endif
+
+    double sum = 0.0;
+
 #ifdef _OPENMP
-#pragma omp parallel for reduction(+: sum)
-#endif
+
+#pragma omp parallel default(none) shared(sum, array, N)
+    {
+        //int ID = omp_get_thread_num();
+        double partial_sum = 0.0;
+        
+#pragma omp for schedule(static)
+        for (int i=0; i<N; i++) {
+            partial_sum += array[i];
+        }
+        
+#pragma omp for ordered schedule(static,1)
+        for (int t=0; t<omp_get_num_threads(); ++t) {
+            //assert( t==ID );
+#pragma omp ordered
+            {
+                sum += partial_sum;
+            }
+        }
+    }
+    
+#else
+
     for (int i=0; i<N; i++) {
         sum += array[i];
     }
 
+#endif
+
     return sum;
+}
+
+double sum_array_elements(const long double* __restrict__ array, const int N) {
+
+#ifdef __INTEL_COMPILER
+    __assume_aligned(array, 64);
+#endif
+
+    long double sum = 0.0;
+
+#ifdef _OPENMP
+
+#pragma omp parallel default(none) shared(sum, array, N)
+    {
+        //int ID = omp_get_thread_num();
+        long double partial_sum = 0.0;
+        
+#pragma omp for schedule(static)
+        for (int i=0; i<N; i++) {
+            partial_sum += array[i];
+        }
+        
+#pragma omp for ordered schedule(static,1)
+        for (int t=0; t<omp_get_num_threads(); ++t) {
+            //assert( t==ID );
+#pragma omp ordered
+            {
+                sum += partial_sum;
+            }
+        }
+    }
+    
+#else
+
+    for (int i=0; i<N; i++) {
+        sum += array[i];
+    }
+
+#endif
+
+    return (double) sum;
 }
 
 
