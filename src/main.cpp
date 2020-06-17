@@ -19,8 +19,8 @@ int main(int argc, const char * argv[]) {
 
     Gadget::Timer timer;
     timer.setTime();
-    cout << "\nAnalysis started: " << timer.getDate();
-
+    if (rank == 0)
+        cout << "\nAnalysis started: " << timer.getDate();
 
     if (argc < 2){
         cerr << " \nDid you forget to give the input parameters?\n" << endl;
@@ -179,8 +179,11 @@ int main(int argc, const char * argv[]) {
     MPI_Finalize();
 
     timer.getTime();
-    cout << "\nAnalysis finished: " << timer.getDate();
-    cout << "Computational time: "  << timer.format(timer.getElapse()) << endl;
-    
+
+    if (rank == 0) {
+        cout << "\nAnalysis finished: " << timer.getDate();
+        cout << "Computational time: "  << timer.format(timer.getElapse()) << endl;
+    }
+
     return 0;
 }
