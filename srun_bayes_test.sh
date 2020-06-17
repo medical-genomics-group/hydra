@@ -59,12 +59,18 @@ EXE_OPTS="\
     --save               5"
 
 
-srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16 | grep RESULT | tail -n 1
-srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length  6 > /dev/null 2>&1
-srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16 | grep RESULT | tail -n 1
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16            |  grep RESULT  |  tail -n 1
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length  6            >  /dev/null 2>&1
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16 --restart  |  grep RESULT  |  tail -n 1
 
 echo "@@@ Switching to REF @@@"
 
 EXE=./src/hydra_ref
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16            |  grep RESULT  |  tail -n 1
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length  6            >  /dev/null 2>&1
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16 --restart  |  grep RESULT  |  tail -n 1
 
-srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16 | grep RESULT | tail -n 1
+EXE=./src/hydra_master
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16            |  grep RESULT  |  tail -n 1
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length  6            >  /dev/null 2>&1
+srun $SRUN_OPTS $EXE $EXE_OPTS --chain-length 16 --restart  |  grep RESULT  |  tail -n 1
