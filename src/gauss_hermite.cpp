@@ -247,6 +247,7 @@ double gauss_hermite_adaptive_integral(double C_k,
             w11 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 
 	} else if (n == "13") {
+
 		double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12;
 		double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13; //These are adjusted weights
 
@@ -310,7 +311,9 @@ double gauss_hermite_adaptive_integral(double C_k,
             w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w13 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
-	}else if(n == "15"){
+
+	} else if (n == "15") {
+
 		double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14;//,x11;
 		double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15; //These are adjusted weights
 
@@ -382,7 +385,9 @@ double gauss_hermite_adaptive_integral(double C_k,
             w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w15 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
-	}else if(n == "17"){
+
+	} else if (n == "17") {
+
         double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16;//,x17;
         double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15,w16,w17; //These are adjusted weights
 
@@ -462,7 +467,9 @@ double gauss_hermite_adaptive_integral(double C_k,
             w15 * gh_integrand_adaptive(x15,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w16 * gh_integrand_adaptive(x16,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w17 ;//* gh_integrand_adaptive(0,...)= 1
-    }else if(n == "25"){
+
+    } else if (n == "25") {
+
         double x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24;
         double w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11,w12,w13,w14,w15,w16,w17,w18,w19,w20,w21,w22,w23,w24,w25; //These are adjusted weights
 
@@ -577,8 +584,10 @@ double gauss_hermite_adaptive_integral(double C_k,
             w23 * gh_integrand_adaptive(x23,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w24 * gh_integrand_adaptive(x24,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
             w25 ;//* gh_integrand_adaptive(0,...)= 1
-    }else{
-        std::cout << "Possible number of quad_points = 3,5,7,9,11,13,15,17,25" << std::endl;
+
+    } else {
+
+        std::cout << "Possible number of quad_points = 3,5,7,9,11,13,15,17,25 but got " << n << std::endl;
 		exit(1);
 	}
 
