@@ -23,6 +23,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             restart = true;
             ss << "--restart " << "\n";
         }
+        else if (!strcmp(argv[i], "--verbosity")) {
+            verbosity = atoi(argv[++i]);
+            ss << "--verbosity " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--ignore-xfiles")) {
             useXfilesInRestart = false;
             ss << "--ignore-xfiles " << "\n";

@@ -21,8 +21,8 @@ class Options {
 public:
 
     unsigned shuffleMarkers      = 1;
-    string   groupIndexFile    = "";
-    string   groupMixtureFile  = "";
+    string   groupIndexFile      = "";
+    string   groupMixtureFile    = "";
     bool     restart             = false;
     bool     useXfilesInRestart  = true;
     bool     sparseSync          = false;
@@ -44,6 +44,8 @@ public:
     unsigned thin;                       // save every this th sampled value in MCMC
     unsigned save;                       // sampling rate of the epsilon vector
     vector<double> S;                    // variance components
+
+    unsigned verbosity           = 0;
  
     //marion : include annotation variables
     unsigned int numGroups;
