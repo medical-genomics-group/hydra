@@ -11,6 +11,9 @@
 #include "data.hpp"
 #include "options.hpp"
 #include "distributions_boost.hpp"
+#include <map>
+#include <vector>
+#include <string>
 
 #include <Eigen/Eigen>
 
@@ -92,8 +95,13 @@ class BayesRRm
     VectorXd y;
     VectorXd Cx;
 
-    double epsilonsum;
-    double ytildesum;
+    string   lstfp, rngfp;
+
+    string   acufp,  betfp,  cpnfp,  epsfp;
+    string   gamfp,  mrkfp,  musfp,  outfp;
+    string   xbetfp, xcpnfp, xivfp;
+
+    string   fh_lam_fp;
 
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();
@@ -105,15 +113,46 @@ class BayesRRm
     int  runGibbs();
 
     void init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntotc,
-                             const int* MrankS, const int* MrankL, const bool use_xbet);
+                           const int* MrankS, const int* MrankL, const bool use_xbet);
     
     void init_from_scratch();
+
+    void set_output_filepaths(const string, const std::string);
+
+    void set_local_filehandler(MPI_File&, const std::string);
+
+    MPI_File get_fh(const std::string fp);
+
+    bool is_world_file(const string filepath);
+
+    bool is_self_file(const string filepath);
+
+    void open_output_files();
+    void open_output_files_(const std::vector<string>);
+
+    void close_output_files();
+    void close_output_files_(const std::vector<string>);
+
+    void delete_output_files();
+
+    void set_list_of_files_to_tar(const string mcmcOut, const int nranks);
 
     int  checkRamUsage();
 
     int  runMpiGibbs();
 
     int  runMpiGibbsMultiTraits();
+
+
+ private:
+    
+    std::vector<std::string> world_files;
+    
+    std::vector<std::string> self_files;
+
+    std::map<std::string, MPI_File> file_handlers;
+
 };
+
 
 #endif /* SRC_BAYESRRM_H_ */

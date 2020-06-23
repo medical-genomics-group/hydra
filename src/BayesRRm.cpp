@@ -169,8 +169,6 @@ int BayesRRm::runMpiGibbs() {
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File   outfh,  betfh, epsfh, gamfh, cpnfh, acufh, mrkfh, xivfh, musfh;
-    MPI_File   xbetfh, xcpnfh;
     MPI_Status status;
     MPI_Info   info;
 
@@ -299,20 +297,7 @@ int BayesRRm::runMpiGibbs() {
 
     // Invariant initializations (from scratch / from restart)
     // -------------------------------------------------------
-    string lstfp  = opt.mcmcOut + ".lst";
-    string outfp  = opt.mcmcOut + ".csv";
-    string betfp  = opt.mcmcOut + ".bet";
-    string xbetfp = opt.mcmcOut + ".xbet";
-    string cpnfp  = opt.mcmcOut + ".cpn";
-    string xcpnfp = opt.mcmcOut + ".xcpn";
-    string acufp  = opt.mcmcOut + ".acu";
-    string rngfp  = opt.mcmcOut + ".rng." + std::to_string(rank);
-    string mrkfp  = opt.mcmcOut + ".mrk." + std::to_string(rank);
-    string xivfp  = opt.mcmcOut + ".xiv." + std::to_string(rank);
-    string epsfp  = opt.mcmcOut + ".eps." + std::to_string(rank);
-    string gamfp  = opt.mcmcOut + ".gam." + std::to_string(rank);
-    string musfp  = opt.mcmcOut + ".mus." + std::to_string(rank);
-
+    set_output_filepaths(opt.mcmcOut, std::to_string(rank));
 
     priorPi.resize(numGroups,K);
     priorPi.setZero();
@@ -349,22 +334,21 @@ int BayesRRm::runMpiGibbs() {
     Beta.setZero();
 
 
-    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FH
-    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FH
-    //----------- FHDT parameters
-    double v0L = opt.v0L;
-    double v0t = opt.v0t;
-    double v0c = opt.v0c;
-    double s02c = opt.s02c;
-    double hypTau;
+    // FHDT parameters
+    const double v0L  = opt.v0L;
+    const double v0t  = opt.v0t;
+    const double v0c  = opt.v0c;
+    const double s02c = opt.s02c;
+    const double tau0 = opt.tau0;
+
+    double   hypTau     = 0.0;
+    double   tau        = 0.0;
+    double   scaledBSQN = 0.0;
+
     VectorXd lambda_var(Beta.size());
     VectorXd nu_var(Beta.size());
-    double tau;
-    double tau0 = opt.tau0;
     VectorXd c_slab(numGroups);
-    double scaledBSQN;
     
-    tau=0;
     c_slab.setZero();;
     lambda_var.setZero();
     nu_var.setZero();
@@ -387,8 +371,6 @@ int BayesRRm::runMpiGibbs() {
     std::cout << "INFO Sampling initial lambda with values: "<< c_slab.sum()/(double)Mtot<<"\n";
     lambda_var.array() = c_slab.sum()/(double)Mtot;
     std::cout << "<------------ FH initialisation finished -------------------->\n";
-    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FH
-    //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FH
     
 
     components.resize(M);
@@ -430,22 +412,9 @@ int BayesRRm::runMpiGibbs() {
         dist.read_rng_state_from_file(rngfp);
 
         // Rename output files so that we do not erase from failed job!
-        //EO: add a function, to update both Nam and Dir!
         opt.mcmcOutNam += "_rs";
         opt.mcmcOut = opt.mcmcOutDir + "/" + opt.mcmcOutNam;
-        lstfp  = opt.mcmcOut + ".lst";
-        outfp  = opt.mcmcOut + ".csv";
-        betfp  = opt.mcmcOut + ".bet";
-        xbetfp = opt.mcmcOut + ".xbet"; // Last saved iteration of bet; .bet has full history
-        cpnfp  = opt.mcmcOut + ".cpn";  
-        xcpnfp = opt.mcmcOut + ".xcpn"; // Idem
-        acufp  = opt.mcmcOut + ".acu";
-        rngfp  = opt.mcmcOut + ".rng." + std::to_string(rank);
-        mrkfp  = opt.mcmcOut + ".mrk." + std::to_string(rank);
-        xivfp  = opt.mcmcOut + ".xiv." + std::to_string(rank);
-        epsfp  = opt.mcmcOut + ".eps." + std::to_string(rank);
-        gamfp  = opt.mcmcOut + ".gam." + std::to_string(rank);
-        musfp  = opt.mcmcOut + ".mus." + std::to_string(rank);
+        set_output_filepaths(opt.mcmcOut, std::to_string(rank));
 
     } else {
 
@@ -465,61 +434,18 @@ int BayesRRm::runMpiGibbs() {
     for (int i=0; i<numGroups; i++)
         if (MtotGrp[i] == 0)  sigmaG[i] = 0.0;
 
-    //cout << "sigmaG = " << sigmaG << endl;
 
-
-    // Build a list of the files to tar
-    // --------------------------------
+    //TODO@EO: check need for the barriers
     MPI_Barrier(MPI_COMM_WORLD);
-    ofstream listFile;
-    listFile.open(lstfp);
-    listFile << outfp  << "\n";
-    listFile << xbetfp << "\n"; // Only tar the last saved iteration, no need for full history
-    listFile << xcpnfp << "\n"; // Idem
-    listFile << acufp  << "\n";
-    for (int i=0; i<nranks; i++) {
-        listFile << opt.mcmcOut + ".rng." + std::to_string(i) << "\n";
-        listFile << opt.mcmcOut + ".mrk." + std::to_string(i) << "\n";
-        listFile << opt.mcmcOut + ".xiv." + std::to_string(i) << "\n";
-        listFile << opt.mcmcOut + ".eps." + std::to_string(i) << "\n";
-        listFile << opt.mcmcOut + ".gam." + std::to_string(i) << "\n";
-        listFile << opt.mcmcOut + ".mus." + std::to_string(i) << "\n";
-    }
-    listFile.close();
+
+    set_list_of_files_to_tar(opt.mcmcOut, nranks);
     MPI_Barrier(MPI_COMM_WORLD);
 
 
-    // Delete old files (fp appended with "_rs" in case of restart, so that
-    // original files are kept untouched) and create new ones
-    // --------------------------------------------------------------------
-    if (rank == 0) {
-        MPI_File_delete(outfp.c_str(),  MPI_INFO_NULL);
-        MPI_File_delete(betfp.c_str(),  MPI_INFO_NULL);
-        MPI_File_delete(xbetfp.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(cpnfp.c_str(),  MPI_INFO_NULL);
-        MPI_File_delete(xcpnfp.c_str(), MPI_INFO_NULL);
-        MPI_File_delete(acufp.c_str(),  MPI_INFO_NULL);
-    }
-    MPI_File_delete(epsfp.c_str(), MPI_INFO_NULL);
-    MPI_File_delete(mrkfp.c_str(), MPI_INFO_NULL);
-    MPI_File_delete(xivfp.c_str(), MPI_INFO_NULL);
-    MPI_File_delete(gamfp.c_str(), MPI_INFO_NULL);
-    MPI_File_delete(musfp.c_str(), MPI_INFO_NULL);
-
+    delete_output_files();
     MPI_Barrier(MPI_COMM_WORLD);
 
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, outfp.c_str(),  MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &outfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, betfp.c_str(),  MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &betfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, xbetfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xbetfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, cpnfp.c_str(),  MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &cpnfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, xcpnfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xcpnfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_WORLD, acufp.c_str(),  MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &acufh),  __LINE__, __FILE__);
-    
-    check_mpi(MPI_File_open(MPI_COMM_SELF,  epsfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &epsfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_SELF,  mrkfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &mrkfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_SELF,  xivfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xivfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_SELF,  gamfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &gamfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_open(MPI_COMM_SELF,  musfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &musfh), __LINE__, __FILE__);
+    open_output_files();
 
 
     // First element of the .bet, .xbet, .cpn, .xcpn, and .acu files is the
@@ -527,11 +453,11 @@ int BayesRRm::runMpiGibbs() {
     // -----------------------------------------------------
     MPI_Offset offset = 0;
     if (rank == 0) {
-        check_mpi(MPI_File_write_at(betfh,  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        check_mpi(MPI_File_write_at(xbetfh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        check_mpi(MPI_File_write_at(cpnfh,  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        check_mpi(MPI_File_write_at(xcpnfh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        check_mpi(MPI_File_write_at(acufh,  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_write_at(get_fh(betfp),  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_write_at(get_fh(xbetfp), offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_write_at(get_fh(cpnfp),  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_write_at(get_fh(xcpnfp), offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+        check_mpi(MPI_File_write_at(get_fh(acufp),  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -849,8 +775,6 @@ int BayesRRm::runMpiGibbs() {
         stats_dis = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(stats_dis,  __LINE__, __FILE__);
     }
 
-
-    // FH
     if (opt.bayesType == "bayesFHMPI") {
         assert(lambda_var.size() > 0);
         assert(lambda_var.size() == Beta.size());
@@ -858,6 +782,9 @@ int BayesRRm::runMpiGibbs() {
 
 
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
+
+
+        //printf("###### ##### #### ## #  ITERATION %d\n", iteration);
 
         double start_it = MPI_Wtime();
         double it_sync_ar1  = 0.0;
@@ -915,42 +842,44 @@ int BayesRRm::runMpiGibbs() {
                 double sigG_E  = sigmaG[groups[MrankS[rank] + marker]] / sigmaE;
                 double i_2sigE = 1.0 / (2.0 * sigmaE);
 
-		//@@@@@@@ FH
-		double lambda_tilde = 0.0;
-		if (opt.bayesType == "bayesFHMPI") {
-		  // Now the variance per mixture changes
-		  nu_var(marker) =  dist.inv_gamma_rate_rng(0.5+0.5*v0L,v0L/lambda_var[marker] +1);//sample nu_var in case needed
-		  lambda_tilde = tau*c_slab[groups[MrankS[rank] + marker]]/(tau+c_slab[groups[MrankS[rank] + marker]]*lambda_var[marker]);
-#ifdef DEBUG
-		  std::cout<< "marker:" << marker <<"\n";
-		  std::cout << "tau: " << tau << "\n";
-		  std::cout << "c: " << c_slab << "\n";
-		  std::cout << "local: "<< lambda_var[marker] << "\n";
-		  std::cout << "lambda_tilde: "<< lambda_tilde << "\n";
-#endif 
-		}
+                double lambda_tilde = 0.0;
 
-                if (adaV[marker]) {
+                if (opt.bayesType == "bayesFHMPI") {
+
+                    // Now the variance per mixture changes
+                    nu_var(marker) = dist.inv_gamma_rate_rng(0.5 + 0.5 * v0L, v0L / lambda_var[marker] + 1.0);//sample nu_var in case needed
                     
-                    //we compute the denominator in the variance expression to save computations
-                    //denom = dNm1 + sigE_G * cVaI.segment(1, km1).array();
-                    for (int i=1; i<=km1; ++i) {
+                    lambda_tilde   = tau * c_slab[groups[MrankS[rank] + marker]] / (tau + c_slab[groups[MrankS[rank] + marker]] * lambda_var[marker]);
 
-		        //@@@@@@@ FH
-		      	if (opt.bayesType == "bayesFHMPI") {
-			  denom(i-1) = dNm1 + sigmaE/lambda_tilde;
-			} else {
-			  denom(i-1) = dNm1 + sigE_G * cVaI(groups[MrankS[rank] + marker], i);
-			}
+                    if (opt.verbosity > 2) {
+                        printf("iteration %d, marker %d, tau = %20.15f\n", iteration, marker, tau);
+                        //std::cout << "marker      : " << marker <<"\n";
+                        //std::cout << "tau         : " << tau    << "\n";
+                        //std::cout << "c_slab      : " << c_slab << "\n";
+                        //std::cout << "local       : " << lambda_var[marker] << "\n";
+                        //std::cout << "lambda_tilde: " << lambda_tilde << "\n";
+                    }
+                }
+
+                
+                if (adaV[marker]) {
+
+                    for (int i=1; i<=km1; ++i) {
+                        
+                        if (opt.bayesType == "bayesFHMPI") {
+                            denom(i-1) = dNm1 + sigmaE / lambda_tilde;
+                        } else {
+                            denom(i-1) = dNm1 + sigE_G * cVaI(groups[MrankS[rank] + marker], i);
+                        }
                         //printf("it %d, rank %d, m %d: denom[%d] = %20.15f, cvai = %20.15f\n", iteration, rank, marker, i-1, denom(i-1), cVaI(groups[MrankS[rank] + marker], i));
                     }
-
+                    
                     double num  = 0.0;
- 
+                    
                     if (USEBED[marker]) {
                         
                         const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&I1[N1S[marker]]);                            
-                            
+                        
                         const int dp_version = 1;
                         //const int dp_version = 2;  // Replicates exactly original sparse_dotprod
                         
@@ -1002,7 +931,7 @@ int BayesRRm::runMpiGibbs() {
                             num = mstd[marker] * (s1 - mave[marker] * s2);
 
                         } else if (dp_version == 2) {
-
+                            
                             throw("need to adapt if Ntot%4 != 0");
                             exit(1);
                             double c1  = 0.0, c2 = 0.0;
@@ -1031,7 +960,7 @@ int BayesRRm::runMpiGibbs() {
                             
                             throw("FATAL  : something wrong with your selection");
                         }
-
+                        
                     } else {
                         
                         num = sparse_dotprod(epsilon,
@@ -1058,17 +987,20 @@ int BayesRRm::runMpiGibbs() {
 
                     // Update the log likelihood for each component
                     for (int i=1; i<1+km1; i++) {
-		        //@@@@@ FH
-		        if (opt.bayesType == "bayesFHMPI") {
-			    logL[i] = logL[i]
-			      - 0.5 * log((lambda_tilde / sigmaE) * dNm1 + 1.0)
-			      + muk[i] * num * i_2sigE;
-			} else {
-			    logL[i] = logL[i]
-			      - 0.5 * log(sigG_E * dNm1 * cVa(groups[MrankS[rank] + marker], i) + 1.0)
-			      +  muk[i] * num * i_2sigE;
-			}
-		    }
+
+                        if (opt.bayesType == "bayesFHMPI") {
+
+                            logL[i] = logL[i]
+                                - 0.5 * log((lambda_tilde / sigmaE) * dNm1 + 1.0)
+                                + muk[i] * num * i_2sigE;
+
+                        } else {
+                            
+                            logL[i] = logL[i]
+                                - 0.5 * log(sigG_E * dNm1 * cVa(groups[MrankS[rank] + marker], i) + 1.0)
+                                +  muk[i] * num * i_2sigE;
+                        }
+                    }
 
                     double prob = dist.unif_rng();
                     //printf("%d/%d/%d  prob = %15.10f\n", iteration, rank, j, prob);
@@ -1079,6 +1011,7 @@ int BayesRRm::runMpiGibbs() {
                     } else{
                         acum = 1.0 / ((logL.array()-logL[0]).exp().sum());
                     }
+                    
                     //printf("it %d, marker %d, acum = %20.15f, prob = %20.15f\n", iteration, marker, acum, prob);
                     //continue;
 
@@ -1112,48 +1045,42 @@ int BayesRRm::runMpiGibbs() {
                             }
                         }
                     }
-
-		} else { // end of adapative if daniel
+                    
+                } else { // end of adapative if daniel
                     Beta(marker) = 0.0;
                     Acum(marker) = 1.0; // probability of beta being 0 equals 1.0
                 }
-
+                
                 fflush(stdout);
 
-
+                
                 double betaOld = beta;
                 beta           = Beta(marker);
                 deltaBeta      = betaOld - beta;
-                //printf("deltaBeta = %20.15f\n", deltaBeta);
+                //printf("iteration %3d, marker %5d: deltaBeta = %20.15f\n", iteration, marker, deltaBeta);
                 
-
-		//@@@@@@@@@@@ FH
-		//---- FHDT sample horseshoe local parameters
-		// this does not depend on other betas, and the rest of the loop does
-		// not depend on the results of this, so could be done in a different
-		// thread
-		if (opt.bayesType == "bayesFHMPI") {
-#ifdef DEBUG
-		  std::cout << "<----- sampling local variance -------->\n";
-		  std::cout << "tau: "<< tau << "\n";
-		  std::cout << "c: " << c << "\n";
-		  std::cout << "beta^2: " << beta*beta <<"\n";
-#endif
-		  //if doing newtonian montecarlo use this
-		  // lambda_var(marker) =
-		  //   lambdaSampler.sampleLocalVar(10, tau, c, beta*beta );
-		  lambda_var(marker)=  dist.inv_gamma_rate_rng(0.5+0.5*v0L,0.5*beta*beta/tau + v0L/nu_var(marker));
-#ifdef DEBUG
-		  std::cout << "lambda_var: " << lambda_var(marker) << "\n"; 
-		  
-#endif
-		}
-
-
-
-                //continue;
+                // FHDT sample horseshoe local parameters
+                // this does not depend on other betas, and the rest of the loop does
+                // not depend on the results of this, so could be done in a different
+                // thread
+                if (opt.bayesType == "bayesFHMPI") {
+                    
+                    if (opt.verbosity > 2) {
+                        //std::cout << "<----- sampling local variance -------->" << std::endl;
+                        //std::cout << "tau   : " << tau       << std::endl;
+                        //std::cout << "c_slab: " << c_slab    << std::endl;
+                        //std::cout << "beta^2: " << beta*beta << std::endl;
+                    }
+                    
+                    // If doing newtonian montecarlo use this:
+                    //lambda_var(marker) = lambdaSampler.sampleLocalVar(10, tau, c, beta*beta );
+                    lambda_var(marker) = dist.inv_gamma_rate_rng(0.5 + 0.5 * v0L, 0.5 * beta * beta / tau + v0L / nu_var(marker));
+                    
+                    //if (opt.verbosity > 2) 
+                    //    cout << "lambda_var: " << lambda_var(marker) << std::endl;
+                }
                 
-
+                    
                 // Compute delta epsilon
                 if (deltaBeta != 0.0) {
 
@@ -1647,7 +1574,6 @@ int BayesRRm::runMpiGibbs() {
                     } else {
 
                         check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-
                     }
 
                     add_arrays(epsilon, tmpEps, deltaSum, Ntot);
@@ -1660,7 +1586,6 @@ int BayesRRm::runMpiGibbs() {
 
                 } else { // case nranks == 1
 
-                    //cout << "COME HERE" << endl;
                     add_arrays(epsilon, tmpEps, dEpsSum, Ntot);
                 }
 
@@ -1670,10 +1595,8 @@ int BayesRRm::runMpiGibbs() {
                 // Store epsilon state at last synchronization
                 copy_array(tmpEps, epsilon, Ntot);
 
-                // Reset local sum of delta epsilon
                 set_array(dEpsSum, 0.0, Ntot);
 
-                // Reset cumulated sum of delta betas
                 cumSumDeltaBetas       = 0.0;
                 task_sum_abs_deltabeta = 0.0;
                 
@@ -1693,15 +1616,15 @@ int BayesRRm::runMpiGibbs() {
         //printf("rank %d it %d  beta_squaredNorm = %15.10f\n", rank, iteration, beta_squaredNorm);
         //printf("==> after eps sync it %d, rank %d, epsilon[0] = %15.10f %15.10f\n", iteration, rank, epsilon[0], epsilon[Ntot-1]);
 
-	//@@@@@@@ FH
-	// Scaled sum of squares
-	double scaledBSQN = 0.0;
-	if (opt.bayesType == "bayesFHMPI") {
-	    for (int i = 0; i < M; i++) {
-	        scaledBSQN +=  Beta[i] * Beta[i] / lambda_var[i];
-	    }
-	}
 
+        // Scaled sum of squares
+        double scaledBSQN = 0.0;
+        if (opt.bayesType == "bayesFHMPI") {
+            for (int i = 0; i < M; i++) {
+                scaledBSQN +=  Beta[i] * Beta[i] / lambda_var[i];
+            }
+        }
+        
 
         // Transfer global to local
         // ------------------------
@@ -1747,31 +1670,32 @@ int BayesRRm::runMpiGibbs() {
             }
            
 
-	    if (opt.bayesType == "bayesFHMPI") {
-	        //----------------------------FHDT sample hyper parameters
-	        hypTau    = dist.inv_gamma_rate_rng(0.5 + 0.5 * v0t, 1.0 / (tau0 * tau0) + 1.0 / tau);
-		tau       = dist.inv_gamma_rate_rng(0.5 * (m0[i] + v0t), v0t / hypTau + (0.5 * scaledBSQN));
-		c_slab[i] = dist.inv_scaled_chisq_rng(v0c + (double)m0[i],
-						      (beta_squaredNorm[i] * (double)m0[i] + v0c * s02G) / (v0c + (double)m0[i]));
-		//--------------------------------
-		
-		sigmaG[i] = beta_squaredNorm[i];
-		
-		//DT scaling for ishwaran rao
-		// sigmaG[i] = SamplerV.sampleGroupVar(1, (double)m0[i] * beta_squaredNorm[i], (double)m0[i], i);
-	    } else {
-	      sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
-	    }         
-
+            if (opt.bayesType == "bayesFHMPI") {
+                // FHDT sample hyper parameters
+                hypTau    = dist.inv_gamma_rate_rng(0.5 + 0.5 * v0t, 1.0 / (tau0 * tau0) + 1.0 / tau);
+                tau       = dist.inv_gamma_rate_rng(0.5 * (m0[i] + v0t), v0t / hypTau + (0.5 * scaledBSQN));
+                c_slab[i] = dist.inv_scaled_chisq_rng(v0c + (double)m0[i], (beta_squaredNorm[i] * (double)m0[i] + v0c * s02G) / (v0c + (double)m0[i]));
+                
+                sigmaG[i] = beta_squaredNorm[i];
+                
+                //DT scaling for ishwaran rao
+                // sigmaG[i] = SamplerV.sampleGroupVar(1, (double)m0[i] * beta_squaredNorm[i], (double)m0[i], i);
+                
+            } else {
+                
+                sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
+                
+            }         
+            
             //printf("???? %d: %d, bs %20.15f, m0 %d -> sigmaG[i] = %20.15f, call(%20.15f, %20.15f)\n", rank, i, beta_squaredNorm[i], m0[i], sigmaG[i], v0G + (double) m0[i],  (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
-
+            
             //we moved the pi update here to use the same loop
             VectorXd dirin = cass.row(i).transpose().array().cast<double>() + dirc.array();
             estPi.row(i) = dist.dirichlet_rng(dirin);
         }
-
+        
         //fflush(stdout);
-
+        
         //printf("rank %d own sigmaG[0] = %20.15f with Mtot = %d and m0[0] = %d\n", rank, sigmaG[0], Mtot, int(m0[0]));
 
         // Broadcast sigmaG of rank 0
@@ -1798,6 +1722,7 @@ int BayesRRm::runMpiGibbs() {
                 printf("\n");
             }
         }
+
         fflush(stdout);
 
 
@@ -1847,19 +1772,20 @@ int BayesRRm::runMpiGibbs() {
         //printf("e_sqn = %20.15f, v0E = %20.15f, s02E = %20.15f\n", e_sqn, v0E, s02E);
 
         //EO: sample sigmaE and broadcast the one from rank 0 to all the others
-	sigmaE  = dist.inv_scaled_chisq_rng(v0E+dN, (e_sqn + v0E*s02E)/(v0E+dN));
-
-	//@@@@@@@ FH
-	//DT needs to check here
-	//EO: do we need the #idef? sigmaE not updated here so leave sigmaE outside for now
-	if (opt.bayesType == "bayesFHMPI") {
+        sigmaE  = dist.inv_scaled_chisq_rng(v0E+dN, (e_sqn + v0E*s02E)/(v0E+dN));
+        
+        
+        //@@@@@@@ FH
+        //DT needs to check here
+        //EO: do we need the #idef? sigmaE not updated here so leave sigmaE outside for now
+        if (opt.bayesType == "bayesFHMPI") {
 #ifdef NEWTONIAN
-	  //DT scaling like in ishwaran and rao
-	  // sigmaE = SamplerE.sampleEpsVar(1, e_sqn);
+            //DT scaling like in ishwaran and rao
+            // sigmaE = SamplerE.sampleEpsVar(1, e_sqn);
 #endif
-	} else {
-	  // 
-	}
+        } else {
+            // 
+        }
 
 
         check_mpi(MPI_Bcast(&sigmaE, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -1891,6 +1817,8 @@ int BayesRRm::runMpiGibbs() {
         check_mpi(MPI_Bcast(estPi.data(), estPi.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
 
+        
+
         // Write output files
         // ------------------
         if (iteration%opt.thin == 0) {
@@ -1921,34 +1849,34 @@ int BayesRRm::runMpiGibbs() {
                 assert(cx >= 0 && cx < LENBUF - strlen(buff));
 
                 offset = size_t(n_thinned_saved) * strlen(buff);
-                check_mpi(MPI_File_write_at(outfh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(outfp), offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
 
                 
                 // Write iteration number in .bet, acu, cpn
                 offset = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double));
-                check_mpi(MPI_File_write_at(betfh,  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-                check_mpi(MPI_File_write_at(acufh,  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(betfp),  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(acufp),  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
 
                 offset = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int));
-                check_mpi(MPI_File_write_at(cpnfh,  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(cpnfp),  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             }
             
             offset = sizeof(uint) + sizeof(uint) 
                 + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double))
                 + size_t(MrankS[rank]) * sizeof(double);
-            check_mpi(MPI_File_write_at_all(betfh,  offset,  Beta.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
-            check_mpi(MPI_File_write_at_all(acufh,  offset,  Acum.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at_all(get_fh(betfp),  offset,  Beta.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at_all(get_fh(acufp),  offset,  Acum.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
 
             offset = sizeof(uint) + sizeof(uint)
                 + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int))
                 + size_t(MrankS[rank]) * sizeof(int);
-            check_mpi(MPI_File_write_at_all(cpnfh,  offset,  components.data(), M, MPI_INTEGER, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at_all(get_fh(cpnfp),  offset,  components.data(), M, MPI_INTEGER, &status), __LINE__, __FILE__);
             
             //EO: only iteration number and mu value (double) for the task-wise mus files
             offset  = size_t(n_thinned_saved) * ( sizeof(uint) + sizeof(double) );
-            check_mpi(MPI_File_write_at(musfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(musfp), offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             offset += sizeof(uint);
-            check_mpi(MPI_File_write_at(musfh, offset, &mu,        1, MPI_DOUBLE,   &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(musfp), offset, &mu,        1, MPI_DOUBLE,   &status), __LINE__, __FILE__);
 
             n_thinned_saved += 1;
         }
@@ -1965,38 +1893,37 @@ int BayesRRm::runMpiGibbs() {
             dist.write_rng_state_to_file(rngfp);
 
             offset = 0;
-            check_mpi(MPI_File_write_at(epsfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-            check_mpi(MPI_File_write_at(mrkfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(epsfp), offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(mrkfp), offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             if (opt.covariates) {
-                check_mpi(MPI_File_write_at(gamfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-                check_mpi(MPI_File_write_at(xivfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(gamfp), offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(xivfp), offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             }
 
             offset = sizeof(uint);
-            check_mpi(MPI_File_write_at(epsfh,  offset, &Ntot,      1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-            check_mpi(MPI_File_write_at(mrkfh,  offset, &M,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-            check_mpi(MPI_File_write_at(xbetfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);                
-            check_mpi(MPI_File_write_at(xcpnfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(epsfp),  offset, &Ntot,      1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(mrkfp),  offset, &M,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(xbetfp), offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);                
+            check_mpi(MPI_File_write_at(get_fh(xcpnfp), offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
 
             if (opt.covariates) {
-                check_mpi(MPI_File_write_at(gamfh, offset, &gamma_length, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-                check_mpi(MPI_File_write_at(xivfh, offset, &gamma_length, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(gamfp), offset, &gamma_length, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(xivfp), offset, &gamma_length, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             }
             
             offset = sizeof(uint) + sizeof(uint);
-            check_mpi(MPI_File_write_at(epsfh, offset, epsilon,        Ntot,           MPI_DOUBLE, &status), __LINE__, __FILE__);
-            check_mpi(MPI_File_write_at(mrkfh, offset, markerI.data(), markerI.size(), MPI_INT,    &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(epsfp), offset, epsilon,        Ntot,           MPI_DOUBLE, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(get_fh(mrkfp), offset, markerI.data(), markerI.size(), MPI_INT,    &status), __LINE__, __FILE__);
             if (opt.covariates) {
-                check_mpi(MPI_File_write_at(gamfh, offset, gamma.data(),   gamma_length,  MPI_DOUBLE, &status), __LINE__, __FILE__);
-                check_mpi(MPI_File_write_at(xivfh, offset, xI.data(),      gamma_length,  MPI_INT,    &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(gamfp), offset, gamma.data(),   gamma_length,  MPI_DOUBLE, &status), __LINE__, __FILE__);
+                check_mpi(MPI_File_write_at(get_fh(xivfp), offset, xI.data(),      gamma_length,  MPI_INT,    &status), __LINE__, __FILE__);
             }
 
             offset = sizeof(uint) + sizeof(uint) + size_t(MrankS[rank]) * sizeof(double);
-            check_mpi(MPI_File_write_at_all(xbetfh, offset, Beta.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
-
+            check_mpi(MPI_File_write_at_all(get_fh(xbetfp), offset, Beta.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
+            
             offset = sizeof(uint) + sizeof(uint) + size_t(MrankS[rank]) * sizeof(int);
-            check_mpi(MPI_File_write_at_all(xcpnfh, offset, components.data(), M, MPI_INTEGER, &status), __LINE__, __FILE__);
-
+            check_mpi(MPI_File_write_at_all(get_fh(xcpnfp), offset, components.data(), M, MPI_INTEGER, &status), __LINE__, __FILE__);
 
 
             //if (iteration == 0) {
@@ -2028,7 +1955,7 @@ int BayesRRm::runMpiGibbs() {
                        tar, opt.mcmcOutDir.c_str(), lstfp.c_str());
                 //std::system(("ls " + opt.mcmcOut + ".*").c_str());
                 //string cmd = "tar -czf " + opt.mcmcOutDir + "/tarballs/" + targz + " -T " + lstfp;
-                string cmd = "tar -cf " + opt.mcmcOutDir + "/tarballs/" + tar + " -T " + lstfp;
+                string cmd = "tar -cf " + opt.mcmcOutDir + "/tarballs/" + tar + " -T " + lstfp + " 2>/dev/null";
                 //cout << "cmd >>" << cmd << "<<" << endl;
                 std::system(cmd.c_str());
             }
@@ -2041,18 +1968,8 @@ int BayesRRm::runMpiGibbs() {
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
-    // Close output files
-    check_mpi(MPI_File_close(&outfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&betfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&xbetfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&epsfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&cpnfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&xcpnfh), __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&acufh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&mrkfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&xivfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&gamfh),  __LINE__, __FILE__);
-    check_mpi(MPI_File_close(&musfh),  __LINE__, __FILE__);
+
+    close_output_files();
 
 
     // Release memory
@@ -2094,6 +2011,176 @@ int BayesRRm::runMpiGibbs() {
                tot_nsync_ar1, tot_nsync_ar2);
 
     return 0;
+}
+
+
+
+void BayesRRm::set_output_filepaths(const string mcmcOut, const string rank_str) {
+
+    lstfp  = mcmcOut + ".lst";
+
+    outfp  = mcmcOut + ".csv";
+    betfp  = mcmcOut + ".bet";
+    xbetfp = mcmcOut + ".xbet";
+    cpnfp  = mcmcOut + ".cpn";
+    xcpnfp = mcmcOut + ".xcpn";
+    acufp  = mcmcOut + ".acu";
+
+    rngfp  = mcmcOut + ".rng." + rank_str;
+    mrkfp  = mcmcOut + ".mrk." + rank_str;
+    xivfp  = mcmcOut + ".xiv." + rank_str;
+    epsfp  = mcmcOut + ".eps." + rank_str;
+    gamfp  = mcmcOut + ".gam." + rank_str;
+    musfp  = mcmcOut + ".mus." + rank_str;
+
+
+    world_files.clear();
+
+    world_files.push_back(outfp);
+    world_files.push_back(betfp);
+    world_files.push_back(xbetfp);
+    world_files.push_back(cpnfp);
+    world_files.push_back(xcpnfp);
+    world_files.push_back(acufp);
+
+    self_files.clear();
+
+    self_files.push_back(rngfp);
+    self_files.push_back(mrkfp);
+    self_files.push_back(xivfp);
+    self_files.push_back(epsfp);
+    self_files.push_back(gamfp);
+    self_files.push_back(musfp);
+
+}
+
+void BayesRRm::open_output_files() {
+
+    file_handlers.clear();
+
+    open_output_files_(world_files);
+    open_output_files_(self_files);
+
+}
+
+void BayesRRm::open_output_files_(const std::vector<string> files) {
+
+    for (auto&& f: files) {
+
+        MPI_File fh;
+        MPI_Comm comm = MPI_COMM_WORLD;
+
+        if (is_self_file(f)) comm = MPI_COMM_SELF;
+
+        check_mpi(MPI_File_open(comm,
+                                f.c_str(),  
+                                MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL,
+                                MPI_INFO_NULL,
+                                &fh)
+                  ,  __LINE__, __FILE__);
+        
+        file_handlers.insert({f, fh});
+    }
+}
+
+
+void BayesRRm::close_output_files() {
+
+    close_output_files_(world_files);
+    close_output_files_(self_files);
+}
+
+
+void BayesRRm::close_output_files_(const std::vector<string> files) {
+
+    for (auto&& f: files) {
+        fh_it fit = file_handlers.find(f);
+        if (fit == file_handlers.end()) {
+            cout << "*FATAL*: file " << f << " not found in file_handlers map!" << endl;
+            MPI_Abort(MPI_COMM_WORLD, 1);
+        }
+        check_mpi(MPI_File_close(&fit->second),  __LINE__, __FILE__);
+    }
+}
+
+
+void::BayesRRm::delete_output_files() {
+
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    if (rank == 0) {
+        for (auto&& f: world_files) {
+            std::cout << "deleting WORLD file: " << f << '\n';
+            MPI_File_delete(f.c_str(), MPI_INFO_NULL);
+        }
+    }
+
+    for (auto&& f: self_files) {
+        std::cout << "deleting SELF file: " << f << '\n';
+        MPI_File_delete(f.c_str(), MPI_INFO_NULL);
+    }
+}
+
+
+void BayesRRm::set_local_filehandler(MPI_File &fh, const std::string fp) {
+    
+    fh_it fit = file_handlers.find(fp);
+
+    if (fit != file_handlers.end()) {
+        fh = fit->second;
+        cout << "found fh for file " << fp << ", " << fit->first << endl;
+    } else {
+        printf("*FATAL*: file %s not found in file_handlers map", fp.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+}
+
+MPI_File BayesRRm::get_fh(const std::string fp) {
+
+    fh_it fit = file_handlers.find(fp);
+    
+    if (fit == file_handlers.end()) {
+        printf("*FATAL*: file %s not found in file_handlers map", fp.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+     
+    return fit->second;
+}
+
+
+bool BayesRRm::is_world_file(const string fp) {
+
+    return std::find(world_files.begin(), world_files.end(), fp) != world_files.end();
+}
+
+
+bool BayesRRm::is_self_file(const string fp) {
+
+    return std::find(self_files.begin(), self_files.end(), fp) != self_files.end();
+}
+
+
+void BayesRRm::set_list_of_files_to_tar(const string mcmcOut, const int nranks) {
+    
+    ofstream listFile;
+    
+    listFile.open(lstfp);
+    listFile << outfp  << "\n";
+    listFile << xbetfp << "\n"; // Only tar the last saved iteration, no need for full history
+    listFile << xcpnfp << "\n"; // Idem
+    listFile << acufp  << "\n";
+
+    for (int i=0; i<nranks; i++) {
+        listFile << mcmcOut + ".rng." + std::to_string(i) << "\n";
+        listFile << mcmcOut + ".mrk." + std::to_string(i) << "\n";
+        listFile << mcmcOut + ".xiv." + std::to_string(i) << "\n";
+        listFile << mcmcOut + ".eps." + std::to_string(i) << "\n";
+        listFile << mcmcOut + ".gam." + std::to_string(i) << "\n";
+        listFile << mcmcOut + ".mus." + std::to_string(i) << "\n";
+    }
+
+    listFile.close();
 }
 
 
