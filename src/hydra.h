@@ -2,6 +2,10 @@
 #define HYDRA_H
 
 #include <cstddef>
+#include <mpi.h>
+#include <map>
+#include <vector>
+#include <string>
 
 
 #ifdef __GNUG__
@@ -15,5 +19,8 @@ typedef unsigned int uint;
 const size_t LENBUF  = 50000;
 
 
+using fp_it = std::vector<std::string>::iterator;
+
+using fh_it = std::map<std::string, MPI_File>::iterator;
 
 #endif
