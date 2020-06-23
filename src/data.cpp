@@ -1493,6 +1493,9 @@ void Data::readBedFile_noMPI(const string &bedFile){
         float sqn = Z.col(j).squaredNorm() - numInds * mean * mean;
         Z.col(j).array() -= mean;
         float std_ = 1.f / (sqrt(sqn / float(numInds)));
+        if (std_ == 0.0 || std::isnan(std_)) {
+            std_ = 1.0;
+        }
 
         Z.col(j).array() *= std_;
 
@@ -2102,7 +2105,7 @@ void Data::read_train_data(const string &bimFile, string &betFile, uint iteratio
     get_common_snps(betFile, iter); // match SNP IDs between .bed and .bet files
     printf("INFO    : got %d common SNPs for iteration %d\n", (int) commonSnps.size(), iter);
     while (getline(in, line)) {
-        tok.getTokens(line, " ");
+        tok.getTokens(line, ",");
         if (stoi(tok[0]) >= iterations) {
             break;
         } else if (stoi(tok[0]) > iter) {
@@ -2152,7 +2155,7 @@ void Data::get_common_snps(const string& betFile, const uint iter) {
     uint currentIter;
     while (true) {
         getline(in, line);
-        tok.getTokens(line, " ");
+        tok.getTokens(line, ",");
         currentIter = stoi(tok[0]);
         if (currentIter > iter) {
             break;
@@ -2185,7 +2188,7 @@ void Data::get_common_snps(const string& file) {
     vector<uint> snpInds;
     while (true) {
         getline(in, line);
-        tok.getTokens(line, " ");
+        tok.getTokens(line, ",");
         if (stoi(tok[0]) != firstIter) break;
         snp = "rs" + tok[1]; // TODO: is prepending "rs" necessary?
         if (std::find(bedSnps.begin(), bedSnps.end(), snp) != bedSnps.end()) {
