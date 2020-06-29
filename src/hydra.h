@@ -16,11 +16,12 @@ typedef unsigned int uint;
 #endif
 
 
-const size_t LENBUF  = 50000;
+const size_t LENBUF = 50000;
 
 
 using fp_it = std::vector<std::string>::iterator;
 
-using fh_it = std::map<std::string, MPI_File>::iterator;
+typedef std::map<std::string, MPI_File>            fh_map;
+typedef std::map<std::string, MPI_File>::iterator  fh_it;
 
 #endif

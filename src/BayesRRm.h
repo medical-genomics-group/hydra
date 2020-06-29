@@ -11,9 +11,11 @@
 #include "data.hpp"
 #include "options.hpp"
 #include "distributions_boost.hpp"
+#include "hydra.h"
 #include <map>
 #include <vector>
 #include <string>
+
 
 #include <Eigen/Eigen>
 
@@ -117,11 +119,11 @@ class BayesRRm
     
     void init_from_scratch();
 
+    MPI_File fh(const std::string fp);
+
     void set_output_filepaths(const string, const std::string);
 
     void set_local_filehandler(MPI_File&, const std::string);
-
-    MPI_File get_fh(const std::string fp);
 
     bool is_world_file(const string filepath);
 
@@ -150,7 +152,7 @@ class BayesRRm
     
     std::vector<std::string> self_files;
 
-    std::map<std::string, MPI_File> file_handlers;
+    fh_map file_handlers;
 
 };
 

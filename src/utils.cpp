@@ -3,10 +3,10 @@
 #include <climits>
 #include <cassert>
 #include <sys/stat.h>
+#include "hydra.h"
 #include "options.hpp"
 #include "data.hpp"
 #include "utils.hpp"
-
 
 
 // Check malloc in MPI context
@@ -44,6 +44,19 @@ int check_int_overflow(const size_t n, const int linenumber, const char* filenam
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
     return static_cast<int>(n);
+}
+
+
+MPI_File get_fh(fh_map file_handlers, std::string fp) {
+
+    fh_it fit = file_handlers.find(fp);
+    
+    if (fit == file_handlers.end()) {
+        printf("*FATAL*: file %s not found in file_handlers map", fp.c_str());
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+     
+    return fit->second;
 }
 
 
