@@ -361,7 +361,7 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut,           const uint 
     MPI_Status status;
 
     MPI_File betfh;
-    //cout << betfp.c_str() << endl;
+
     check_mpi(MPI_File_open(MPI_COMM_WORLD, betfp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &betfh), __LINE__, __FILE__);
 
     // 1. first element of the .bet, .cpn and .acu files is the total number of processed markers
@@ -378,7 +378,6 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut,           const uint 
     assert(n_skip >= 0);
     assert(n_skip % opt_thin == 0);
     n_skip /= opt_thin;
-    //cout << "number of lines to skip  = " << n_skip << endl;
 
     betoff = sizeof(uint) + size_t(n_skip) * (sizeof(uint) + size_t(Mtot_) * sizeof(double));
     if (use_xfiles) betoff = sizeof(uint);
