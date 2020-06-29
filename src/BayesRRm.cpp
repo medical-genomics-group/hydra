@@ -441,24 +441,10 @@ int BayesRRm::runMpiGibbs() {
     set_list_of_files_to_tar(opt.mcmcOut, nranks);
     MPI_Barrier(MPI_COMM_WORLD);
 
-
     delete_output_files();
     MPI_Barrier(MPI_COMM_WORLD);
 
     open_output_files();
-
-
-    MPI_Offset offset = 0;
-
-    // First element of the .bet, .xbet, .cpn, .xcpn, and .acu files is the
-    // total number of processed markers
-    // -----------------------------------------------------
-
-    if (rank == 0) {
-        check_mpi(MPI_File_write_at(fh(betfp),  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        check_mpi(MPI_File_write_at(fh(cpnfp),  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        check_mpi(MPI_File_write_at(fh(acufp),  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-    }
 
     MPI_Barrier(MPI_COMM_WORLD);
     const auto st2 = std::chrono::high_resolution_clock::now();
@@ -1843,35 +1829,15 @@ int BayesRRm::runMpiGibbs() {
                 cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), "\n");
                 assert(cx >= 0 && cx < LENBUF - strlen(buff));
 
-                offset = size_t(n_thinned_saved) * strlen(buff);
+                MPI_Offset offset = size_t(n_thinned_saved) * strlen(buff);
                 check_mpi(MPI_File_write_at(fh(outfp), offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
-
-                
-                // Write iteration number in .bet, acu, cpn
-                offset = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double));
-                check_mpi(MPI_File_write_at(fh(betfp),  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-                check_mpi(MPI_File_write_at(fh(acufp),  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-
-                offset = sizeof(uint) + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int));
-                check_mpi(MPI_File_write_at(fh(cpnfp),  offset,  &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             }
             
-            offset = sizeof(uint) + sizeof(uint) 
-                + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(double))
-                + size_t(MrankS[rank]) * sizeof(double);
-            check_mpi(MPI_File_write_at_all(fh(betfp),  offset,  Beta.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
-            check_mpi(MPI_File_write_at_all(fh(acufp),  offset,  Acum.data(), M, MPI_DOUBLE, &status), __LINE__, __FILE__);
+            write_ofile_h1(fh(betfp), rank, Mtot, iteration, n_thinned_saved, MrankS[rank], M, Beta.data(),       MPI_DOUBLE);
+            write_ofile_h1(fh(acufp), rank, Mtot, iteration, n_thinned_saved, MrankS[rank], M, Acum.data(),       MPI_DOUBLE);
+            write_ofile_h1(fh(cpnfp), rank, Mtot, iteration, n_thinned_saved, MrankS[rank], M, components.data(), MPI_INTEGER);
 
-            offset = sizeof(uint) + sizeof(uint)
-                + size_t(n_thinned_saved) * (sizeof(uint) + size_t(Mtot) * sizeof(int))
-                + size_t(MrankS[rank]) * sizeof(int);
-            check_mpi(MPI_File_write_at_all(fh(cpnfp),  offset,  components.data(), M, MPI_INTEGER, &status), __LINE__, __FILE__);
-            
-            //EO: only iteration number and mu value (double) for the task-wise mus files
-            offset  = size_t(n_thinned_saved) * ( sizeof(uint) + sizeof(double) );
-            check_mpi(MPI_File_write_at(fh(musfp), offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-            offset += sizeof(uint);
-            check_mpi(MPI_File_write_at(fh(musfp), offset, &mu,        1, MPI_DOUBLE,   &status), __LINE__, __FILE__);
+            write_ofile_s1(fh(musfp), iteration, n_thinned_saved, mu, MPI_DOUBLE);
 
             n_thinned_saved += 1;
         }
