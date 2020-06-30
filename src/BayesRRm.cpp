@@ -162,7 +162,6 @@ int BayesRRm::runMpiGibbs() {
 
     typedef Matrix<bool, Dynamic, 1> VectorXb;
 
-    char   buff[LENBUF]; 
     int    nranks, rank, name_len, result;
     double dalloc = 0.0;
 
@@ -1797,40 +1796,13 @@ int BayesRRm::runMpiGibbs() {
         // Broadcast estPi from rank 0
         check_mpi(MPI_Bcast(estPi.data(), estPi.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-
         
-
-        // Write output files
-        // ------------------
+        // Write output files with full history written at modulo opt.thin
         if (iteration%opt.thin == 0) {
 
-            //TODO adjust for multiple sigmaG and matrix PI
-            //EO: now only global parameters to out
             if (rank == 0) {
-
-                int cx = snprintf(buff, LENBUF, "%5d, %4d", iteration, (int) sigmaG.size());
-                assert(cx >= 0 && cx < LENBUF);
-
-                for(int jj = 0; jj < sigmaG.size(); ++jj){
-                    cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %20.15f", sigmaG(jj));
-                    assert(cx >= 0 && cx < LENBUF - strlen(buff));
-                }
-                
-                cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %20.15f, %20.15f, %7d, %4d, %2d",  sigmaE, sigmaG.sum()/(sigmaE+sigmaG.sum()), m0.sum(), int(estPi.rows()), int(estPi.cols()));
-                assert(cx >= 0 && cx < LENBUF - strlen(buff));
-
-                for (int ii=0; ii<estPi.rows(); ++ii) {
-                    for(int kk = 0; kk < estPi.cols(); ++kk) {
-                        cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %20.15f", estPi(ii,kk));
-                        assert(cx >= 0 && cx < LENBUF - strlen(buff));
-                    }
-                }
-
-                cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), "\n");
-                assert(cx >= 0 && cx < LENBUF - strlen(buff));
-
-                MPI_Offset offset = size_t(n_thinned_saved) * strlen(buff);
-                check_mpi(MPI_File_write_at(fh(outfp), offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+                write_ofile_csv(fh(csvfp), iteration, sigmaG, sigmaE, m0, n_thinned_saved, estPi); // txt
+                //write_ofile_out(); // bin
             }
             
             write_ofile_h1(fh(betfp), rank, Mtot, iteration, n_thinned_saved, MrankS[rank], M, Beta.data(),       MPI_DOUBLE);
@@ -1844,20 +1816,16 @@ int BayesRRm::runMpiGibbs() {
 
 
         // Single-line files overwritten at modulo opt.save
-        // 
         if (iteration > 0 && iteration%opt.save == 0) {
 
             // task-wise files
             dist.write_rng_state_to_file(rngfp);
-
             write_ofile_t1(fh(epsfp), iteration, Ntot,           epsilon,        MPI_DOUBLE);
             write_ofile_t1(fh(mrkfp), iteration, markerI.size(), markerI.data(), MPI_UNSIGNED);
-
             if (opt.covariates) {
                 write_ofile_t1(fh(gamfp), iteration, gamma_length,  gamma.data(), MPI_DOUBLE);
                 write_ofile_t1(fh(xivfp), iteration, gamma_length,  xI.data(),    MPI_DOUBLE);
             }
-
 
             // task-shared files
             write_ofile_t2(fh(xbetfp), rank, MrankS[rank], Mtot, iteration, M, Beta.data(),       MPI_DOUBLE);
@@ -1953,7 +1921,8 @@ void BayesRRm::set_output_filepaths(const string mcmcOut, const string rank_str)
 
     lstfp  = mcmcOut + ".lst";
 
-    outfp  = mcmcOut + ".csv";
+    csvfp  = mcmcOut + ".csv";
+    outfp  = mcmcOut + ".out";
     betfp  = mcmcOut + ".bet";
     xbetfp = mcmcOut + ".xbet";
     cpnfp  = mcmcOut + ".cpn";
@@ -1970,6 +1939,7 @@ void BayesRRm::set_output_filepaths(const string mcmcOut, const string rank_str)
 
     world_files.clear();
 
+    world_files.push_back(csvfp);
     world_files.push_back(outfp);
     world_files.push_back(betfp);
     world_files.push_back(xbetfp);
@@ -2088,6 +2058,7 @@ void BayesRRm::set_list_of_files_to_tar(const string mcmcOut, const int nranks) 
     ofstream listFile;
     
     listFile.open(lstfp);
+    listFile << csvfp  << "\n";
     listFile << outfp  << "\n";
     listFile << xbetfp << "\n"; // Only tar the last saved iteration, no need for full history
     listFile << xcpnfp << "\n"; // Idem

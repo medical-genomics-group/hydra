@@ -49,6 +49,7 @@ class BayesRRm
 
     Distributions_boost dist;
     Distributions_boost dist8[8];
+
     bool showDebug;
 
     MatrixXd X;         // "fixed effects" matrix.
@@ -65,19 +66,15 @@ class BayesRRm
     MatrixXi cass8;
 
     // Mean and residual variables
-    double mu;          // mean or intercept
+    double   mu;        // mean or intercept
     VectorXd sigmaG;    // genetic variance
-    double sigmaE;      // residuals variance
-    double sigmaF;      // covariates variance if using ridge;
+    double   sigmaE;    // residuals variance
+    double   sigmaF;    // covariates variance if using ridge;
 
-    //EO: for sequential
-    double   seq_mu,  seq_sigmaG, seq_sigmaE,  betasqn;
-    VectorXd seq_cVa, seq_cVaI,   seq_priorPi, seq_estPi;
-
-    double mu8[8];
-    double sigmaG8[8];
-    double sigmaE8[8];
-    double sigmaF8[8];
+    double   mu8[8];
+    double   sigmaG8[8];
+    double   sigmaE8[8];
+    double   sigmaF8[8];
 
     // Linear model variables
     //EO@@@ check for double declaration...
@@ -100,7 +97,7 @@ class BayesRRm
     string   lstfp, rngfp;
 
     string   acufp,  betfp,  cpnfp,  epsfp;
-    string   gamfp,  mrkfp,  musfp,  outfp;
+    string   gamfp,  mrkfp,  musfp,  outfp, csvfp;
     string   xbetfp, xcpnfp, xivfp;
 
     string   fh_lam_fp;

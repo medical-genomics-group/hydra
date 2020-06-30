@@ -3,6 +3,16 @@
 #include <mpi.h>
 #include "utils.hpp"
 
+// Original csv output file
+void write_ofile_csv(const MPI_File fh, const uint iteration, const VectorXd sigmaG, const double sigmaE, const VectorXi m0,
+                     const uint n_thinned_saved, const MatrixXd estPi);
+
+// Same info as in .csv but in binary format rather than text (for full precision)
+void write_ofile_out(const MPI_File fh, const uint iteration, const VectorXd sigmaG, const double sigmaE, const VectorXi m0,
+                     const uint n_thinned_saved, const MatrixXd estPi);
+
+
+
 
 // History file with layout: Mtot | [ iteration | rank_0_data ... rank_N_data ] 
 template <class T>
