@@ -45,4 +45,20 @@ void avx_bed_dot_product(uint*         I1_data,
                          const double  mstd,
                          double&       num);
 
+void bed_dot_product(uint*         I1_data, 
+                     const double* epsilon,
+                     const uint    Ntot,
+                     const size_t  snpLenByt,
+                     const double  mave,
+                     const double  mstd,
+                     double&       num);
+
+void bed_scaadd(uint*        I1_data,
+                const uint   Ntot,
+                const double deltaBeta,
+                const double mave,
+                const double mstd,
+                double*      deltaEps);
+
+
 #endif //#define HYDRA_DENSE_H

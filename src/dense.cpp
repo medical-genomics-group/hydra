@@ -296,3 +296,46 @@ void avx_bed_dot_product(uint* I1_data,
         throw("FATAL  : something wrong with your selection");
     }
 }
+
+
+void bed_scaadd(uint* I1_data,
+                const uint Ntot,
+                const double deltaBeta,
+                const double mave,
+                const double mstd,
+                double* deltaEps) {
+
+    const uint8_t* rawdata = reinterpret_cast<uint8_t*>(I1_data);
+                            
+    double c1 = 0.0, c2 = 0.0;
+                            
+    const double sigdb = mstd * deltaBeta;
+
+    const int fullb = Ntot / 4;
+
+    int idx = 0;
+
+    // main
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif                               
+    for (int ii=0; ii<fullb; ++ii) {
+        for (int iii=0; iii<4; iii++) {
+            idx = rawdata[ii] * 4 + iii;
+            c1 = dotp_lut_a[idx];
+            c2 = dotp_lut_b[idx];
+            deltaEps[ii * 4 + iii]  = (c1 - mave) * c2 * sigdb;
+        }
+    }
+                                    
+    // remainder
+    if (Ntot % 4 != 0) {
+        int ii = fullb;
+        for (int iii = 0; iii < Ntot - fullb * 4; iii++) {
+            idx = rawdata[ii] * 4 + iii;
+            c1 = dotp_lut_a[idx];
+            c2 = dotp_lut_b[idx];
+            deltaEps[ii * 4 + iii]  = (c1 - mave) * c2 * sigdb;
+        }
+    }
+}

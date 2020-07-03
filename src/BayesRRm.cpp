@@ -998,65 +998,24 @@ int BayesRRm::runMpiGibbs() {
                     
                 // Compute delta epsilon
                 if (deltaBeta != 0.0) {
-
-                    //printf("it %d, task %3d, marker %5d has non-zero deltaBeta = %15.10f (%15.10f, %15.10f) => %15.10f) 1,2,M: %lu, %lu, %lu\n", iteration, rank, marker, deltaBeta, mave[marker], mstd[marker],  deltaBeta * mstd[marker], N1L[marker], N2L[marker], NML[marker]);
-
                     if ((opt.bedSync || opt.sparseSync) && nranks > 1) {
-
                         mark2sync.push_back(marker);
                         dbet2sync.push_back(deltaBeta);
-                        
                     } else {
-
                         if (USEBED[marker]) {
-                                
-                            const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&I1[N1S[marker]]);
-                            
-                            double c1 = 0.0, c2 = 0.0;
-                            
-                            const double sigdb = mstd[marker] * deltaBeta;
-
-                            const int fullb = Ntot / 4;
-
-                            int idx = 0;
-
-                            // main
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif                               
-                            for (int ii=0; ii<fullb; ++ii) {
-                                for (int iii=0; iii<4; iii++) {
-                                    idx = rawdata[ii] * 4 + iii;
-                                    c1 = dotp_lut_a[idx];
-                                    c2 = dotp_lut_b[idx];
-                                    deltaEps[ii * 4 + iii]  = (c1 - mave[marker]) * c2 * sigdb;
-                                }
-                            }
-                                    
-                            // remainder
-                            if (Ntot % 4 != 0) {
-                                int ii = fullb;
-                                for (int iii = 0; iii < Ntot - fullb * 4; iii++) {
-                                    idx = rawdata[ii] * 4 + iii;
-                                    c1 = dotp_lut_a[idx];
-                                    c2 = dotp_lut_b[idx];
-                                    deltaEps[ii * 4 + iii]  = (c1 - mave[marker]) * c2 * sigdb;
-                                }
-                            }
-
+                            bed_scaadd(&I1[N1S[marker]], Ntot, deltaBeta, mave[marker], mstd[marker], deltaEps);
                         } else {
-                            
                             sparse_scaadd(deltaEps, deltaBeta, 
                                           I1,  N1S[marker], N1L[marker],
                                           I2,  N2S[marker], N2L[marker],
                                           IM,  NMS[marker], NML[marker],
                                           mave[marker], mstd[marker], Ntot);
                         }
-
                         // Update local sum of delta epsilon
                         add_arrays(dEpsSum, deltaEps, Ntot);
                     }
                 }
+
             }
 
             // Make the contribution of tasks beyond their last marker nill
