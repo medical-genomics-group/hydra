@@ -76,6 +76,7 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
     if (rank == 0)
         printf("RESTART: from files: %s.* files\n", opt.mcmcOut.c_str());
 
+    /*
     //EO: the .csv files is read to decide where to restart from
     data.read_mcmc_output_csv_file(opt.mcmcOut,
                                    opt.thin, opt.save,
@@ -83,10 +84,27 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
                                    iteration_to_restart_from,
                                    first_thinned_iteration,
                                    first_saved_iteration);
-
     if (rank == 0) {
+        printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
         printf("RESTART: Reading .cvs file %s\n", (opt.mcmcOut + ".csv").c_str());
         printf("RESTART: --thin %d  -- save %d\n", opt.thin, opt.save);
+        printf("RESTART: iteration_to_restart_from = %d\n", iteration_to_restart_from);
+        printf("RESTART: first_thinned_iteration   = %d\n", first_thinned_iteration);
+        printf("RESTART: first_saved_iteration     = %d\n", first_saved_iteration);
+        fflush(stdout);
+    }
+    */
+
+    data.read_mcmc_output_out_file(opt.mcmcOut,
+                                   opt.thin, opt.save,
+                                   K, sigmaG, sigmaE, estPi,
+                                   iteration_to_restart_from,
+                                   first_thinned_iteration,
+                                   first_saved_iteration);
+    if (rank == 0) {
+        printf("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@\n");
+        printf("RESTART: Reading .out file %s\n", (opt.mcmcOut + ".out").c_str());
+        printf("RESTART: --thin %d  --save %d\n", opt.thin, opt.save);
         printf("RESTART: iteration_to_restart_from = %d\n", iteration_to_restart_from);
         printf("RESTART: first_thinned_iteration   = %d\n", first_thinned_iteration);
         printf("RESTART: first_saved_iteration     = %d\n", first_saved_iteration);
@@ -1802,7 +1820,7 @@ int BayesRRm::runMpiGibbs() {
 
             if (rank == 0) {
                 write_ofile_csv(fh(csvfp), iteration, sigmaG, sigmaE, m0, n_thinned_saved, estPi); // txt
-                //write_ofile_out(); // bin
+                write_ofile_out(fh(outfp), iteration, sigmaG, sigmaE, m0, n_thinned_saved, estPi); // bin
             }
             
             write_ofile_h1(fh(betfp), rank, Mtot, iteration, n_thinned_saved, MrankS[rank], M, Beta.data(),       MPI_DOUBLE);
@@ -2015,13 +2033,13 @@ void::BayesRRm::delete_output_files() {
 
     if (rank == 0) {
         for (auto&& f: world_files) {
-            std::cout << "deleting WORLD file: " << f << '\n';
+            //std::cout << "deleting WORLD file: " << f << '\n';
             MPI_File_delete(f.c_str(), MPI_INFO_NULL);
         }
     }
 
     for (auto&& f: self_files) {
-        std::cout << "deleting SELF file: " << f << '\n';
+        //std::cout << "deleting SELF file: " << f << '\n';
         MPI_File_delete(f.c_str(), MPI_INFO_NULL);
     }
 }

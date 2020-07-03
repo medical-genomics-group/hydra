@@ -407,7 +407,119 @@ void Data::read_mcmc_output_bet_file(const string mcmcOut,           const uint 
 }
 
 
+void Data::read_mcmc_output_out_file(const string mcmcOut,
+                                     const uint optThin, const uint optSave,
+                                     const int K, VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
+                                     uint& iteration_to_restart_from,
+                                     uint& first_thinned_iteration,
+                                     uint& first_saved_iteration) {
+    
+    int nranks, rank;
+    MPI_Comm_size(MPI_COMM_WORLD, &nranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+
+    MPI_Status status;
+    MPI_File fh;
+
+    string fp = mcmcOut + ".out";
+
+    size_t recl = sizeof(uint) + (size_t)(1 + 3) * sizeof(int) + (size_t)(sigmaG.size() + 2 + pi.size()) * sizeof(double);
+
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, fp.c_str(), MPI_MODE_RDONLY, MPI_INFO_NULL, &fh), __LINE__, __FILE__);
+
+    MPI_Offset fs = 0;
+    check_mpi(MPI_File_get_size(fh, &fs), __LINE__, __FILE__);
+
+    if (fs == 0) {
+        if (rank == 0)
+            printf("*FATAL*: empty out file %s of record length %lu)\n", fp.c_str(), fs, recl);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    if (fs % recl == 0) {
+        if (rank == 0)
+            printf("INFO   : File %s contains %lu iteration records.\n",  fp.c_str(), fs / recl);
+    } else {
+        printf("*FATAL*: Something wrong with size of file %s (%lu Bytes, not a multiple of record length %lu)\n", fp.c_str(), fs, recl);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+    
+    // Read first dumped iteration as can be anything in case of (successive) restarts
+    check_mpi(MPI_File_read_at_all(fh, 0, &first_thinned_iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+
+    // Get first saved iteration
+    if (first_thinned_iteration == 0) {
+        first_saved_iteration = optSave;
+    } else {
+        if (first_thinned_iteration % optSave == 0) {
+            first_saved_iteration = (first_thinned_iteration / optSave) * optSave;
+        } else {
+            first_saved_iteration = (first_thinned_iteration / optSave + 1) * optSave;
+        }
+    }
+
+    // Read latest saved iteration (saved at modulo opt.save but not saved at 0)
+    int nrec = fs / recl;
+
+    iteration_to_restart_from = (((nrec - 1) * optThin) / optSave) * optSave;
+
+    if (iteration_to_restart_from == 0) {
+        if (rank == 0) {
+            printf("\n");
+            printf("FATAL  : No saved iteration at modulo opt.save could be found when reading %s! (iteration_to_restart_from = %d with --save=%d)!\n",
+                   fp.c_str(), iteration_to_restart_from, optSave);
+            fflush(stdout);
+        } 
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    MPI_Offset offset = (iteration_to_restart_from / optThin) * recl;
+
+    int it_ = -1;
+    check_mpi(MPI_File_read_at_all(fh, offset, &it_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (it_ != iteration_to_restart_from) {
+        if (rank == 0) {
+            printf("\n");
+            printf("FATAL  : Expected to read last saved iteration %d but read %d!\n", iteration_to_restart_from, it_);
+            fflush(stdout);
+        } 
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    offset += sizeof(uint);
+
+    int sigg_size = 0;
+    check_mpi(MPI_File_read_at_all(fh, offset, &sigg_size, 1, MPI_INTEGER, &status), __LINE__, __FILE__);
+    offset += sizeof(int);
+
+    check_mpi(MPI_File_read_at_all(fh, offset, sigmaG.data(), sigg_size, MPI_DOUBLE, &status), __LINE__, __FILE__);
+    offset += sigg_size * sizeof(double);
+
+    check_mpi(MPI_File_read_at_all(fh, offset, &sigmaE, 1, MPI_DOUBLE, &status), __LINE__, __FILE__);
+    offset += sizeof(double);
+
+    offset += sizeof(double); // skipping stuff not needed in restart
+    offset += sizeof(int);
+
+    int pi_rows_ = 0, pi_cols_ = 0;
+    check_mpi(MPI_File_read_at_all(fh, offset, &pi_rows_, 1, MPI_INTEGER, &status), __LINE__, __FILE__);
+    offset += sizeof(int);
+    check_mpi(MPI_File_read_at_all(fh, offset, &pi_cols_, 1, MPI_INTEGER, &status), __LINE__, __FILE__);
+    offset += sizeof(int);
+
+    int pi_size_ = pi_rows_ * pi_cols_;
+    assert(pi_size_ == pi.size());
+
+    check_mpi(MPI_File_read_at_all(fh, offset, pi.data(), pi.size(), MPI_DOUBLE, &status), __LINE__, __FILE__);
+
+
+    check_mpi(MPI_File_close(&fh), __LINE__, __FILE__);
+}
+
+
+
 //EO: consider moving the csv output file from ASCII to BIN
+// Note: .csv and .out are history files written at modulo optThin (with optSave % optThin = 0)
 //
 void Data::read_mcmc_output_csv_file(const string mcmcOut,
                                      const uint optThin, const uint optSave,

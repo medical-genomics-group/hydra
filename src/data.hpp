@@ -152,7 +152,15 @@ public:
                                    const int*   MrankS,  const int* MrankL, const bool use_xfiles,
                                    VectorXd&    Beta);
 
+    // ASCII
     void read_mcmc_output_csv_file(const string mcmcOut,
+                                   const uint optThin, const uint optSave,
+                                   const int K, VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
+                                   uint& iteration_to_restart_from,
+                                   uint& first_thinned_iteration,
+                                   uint& first_saved_iteration);
+    //BIN
+    void read_mcmc_output_out_file(const string mcmcOut,
                                    const uint optThin, const uint optSave,
                                    const int K, VectorXd& sigmaG, double& sigmaE, MatrixXd& pi,
                                    uint& iteration_to_restart_from,
