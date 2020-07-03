@@ -48,13 +48,6 @@ BayesRRm::BayesRRm(Data &data, Options &opt, const long memPageSize)
 BayesRRm::~BayesRRm() {}
 
 
-//EO: this to allow reduction on avx256 pd4 datatype with OpenMP
-#pragma omp declare reduction \
-    (addpd4:__m256d:omp_out+=omp_in) \
-    initializer(omp_priv=_mm256_setzero_pd())
-
-
-
 void BayesRRm::init_from_scratch() {
 
     iteration_start = 0;
@@ -881,88 +874,7 @@ int BayesRRm::runMpiGibbs() {
                     
                     if (USEBED[marker]) {
                         
-                        const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&I1[N1S[marker]]);                            
-                        
-                        const int dp_version = 1;
-                        //const int dp_version = 2;  // Replicates exactly original sparse_dotprod
-                        
-                        if (dp_version == 1) {
-                            
-                            double c1 = 0.0, c2 = 0.0;
-                            double s1 = 0.0, s2 = 0.0;
-
-                            // main + remainder to avoid a test on idx < Ntot 
-                            const int fullb = Ntot / 4;
-                            int idx = 0;
-
-                            
-                            __m256d vsum1 = _mm256_setzero_pd();
-                            __m256d vsum2 = _mm256_setzero_pd();
-#ifdef _OPENMP
-#pragma omp parallel for reduction(addpd4:vsum1,vsum2)
-#endif                              
-                            for (int ii=0; ii<fullb; ++ii) {
-
-                                __m256d p4c1  = _mm256_loadu_pd(&(dotp_lut_a[rawdata[ii] * 4]));
-                                __m256d p4c2  = _mm256_loadu_pd(&(dotp_lut_b[rawdata[ii] * 4]));
-                                __m256d p4eps = _mm256_loadu_pd(&(epsilon[ii * 4]));
-
-                                __m256d p4sum = _mm256_mul_pd(p4c2, p4eps);
-                                
-                                vsum2 = _mm256_add_pd(vsum2, p4sum);
-
-                                p4sum = _mm256_mul_pd(p4sum, p4c1);                                
-                                vsum1 = _mm256_add_pd(vsum1, p4sum);
-                            }
-
-                            //EO: to double-check but no reduction available as in avx512
-                            s1 = vsum1[0] + vsum1[1] + vsum1[2] + vsum1[3];
-                            s2 = vsum2[0] + vsum2[1] + vsum2[2] + vsum2[3];
-      
-                            // remainder
-                            if (Ntot % 4 != 0) {
-                                int ii = fullb;
-                                for (int iii = 0; iii < Ntot - fullb * 4; iii++) {
-                                    idx = rawdata[ii] * 4 + iii;
-                                    c1  = dotp_lut_a[idx];
-                                    c2  = dotp_lut_b[idx];
-                                    s1 += c1 * (c2 * epsilon[ii * 4 + iii]);
-                                    s2 +=      (c2 * epsilon[ii * 4 + iii]);
-                                }
-                            }
-
-                            num = mstd[marker] * (s1 - mave[marker] * s2);
-
-                        } else if (dp_version == 2) {
-                            
-                            throw("need to adapt if Ntot%4 != 0");
-                            exit(1);
-                            double c1  = 0.0, c2 = 0.0;
-                            double dp1 = 0.0, dp2 = 0.0, dpm = 0.0;
-                            
-                            double syt = sum_array_elements(epsilon, Ntot);
-                            
-                            for (int ii=0; ii<snpLenByt; ++ii) {
-                                for (int iii=0; iii<4; ++iii) {                                    
-                                    c1 = dotp_lut_a[rawdata[ii] * 4 + iii];
-                                    c2 = dotp_lut_b[rawdata[ii] * 4 + iii];
-                                    if (ii*4 + iii < Ntot) {
-                                        if (c1 == 1.0) dp1 +=       epsilon[ii * 4 + iii];
-                                        if (c1 == 2.0) dp2 += 2.0 * epsilon[ii * 4 + iii];
-                                        dpm  += (1.0 - c2) * epsilon[ii * 4 + iii];
-                                    }
-                                }
-                            }
-                            
-                            syt -= dpm;
-                            num  = dp1 + dp2;
-                            num -= mave[marker] * syt;
-                            num *= mstd[marker];
-                            
-                        } else {
-                            
-                            throw("FATAL  : something wrong with your selection");
-                        }
+                        avx_bed_dot_product(&I1[N1S[marker]], epsilon, Ntot, snpLenByt, mave[marker], mstd[marker], num);
                         
                     } else {
                         

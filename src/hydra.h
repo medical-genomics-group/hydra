@@ -7,7 +7,6 @@
 #include <vector>
 #include <string>
 
-
 #ifdef __GNUG__
 /* Old compatibility names for C types.  */
 typedef unsigned long int ulong;

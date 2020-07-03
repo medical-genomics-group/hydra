@@ -37,4 +37,12 @@ void center_and_scale(double* __restrict__ vec,
                       const int            N);
 
 
+void avx_bed_dot_product(uint*         I1_data, 
+                         const double* epsilon,
+                         const uint    Ntot,
+                         const size_t  snpLenByt,
+                         const double  mave,
+                         const double  mstd,
+                         double&       num);
+
 #endif //#define HYDRA_DENSE_H
