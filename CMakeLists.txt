@@ -3,18 +3,12 @@ include(CheckCXXCompilerFlag)
 project(hydra)
 
 option(ENABLE_UNIT_TESTS "Enable unit tests" OFF)
-option(AVX512 "Enable more compiler optimizations" ON)
+option(AVX512 "Enable more compiler optimizations" OFF)
 option(NATIVE "Enable more compiler optimizations" OFF)
-
-
-add_definitions("-DNEWTONIAN")
-
-
 
 
 
 set(CMAKE_CXX_STANDARD 17)
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}  -D USE_MPI")
 add_definitions("-DUSE_MPI")
 set(CMAKE_CXX_FLAGS_RELEASE "-Ofast")
 set(CMAKE_CXX_FLAGS_DEBUG "-g -DDEBUG")
@@ -82,6 +76,8 @@ endif(ZLIB_FOUND)
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_EIGEN_COMPILE_FLAGS}")
 
 
+include_directories(src)
+add_subdirectory(src)
 
 if(ENABLE_UNIT_TESTS)
   
@@ -119,11 +115,6 @@ if(ENABLE_UNIT_TESTS)
     add_subdirectory(test)
 endif()
 
-include_directories(MultiTrait/Multi-trait/src/)
-add_subdirectory(MultiTrait/Multi-trait/)
 
-
-include_directories(src)
-add_subdirectory(src)
 
 Message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
