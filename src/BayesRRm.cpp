@@ -2554,7 +2554,7 @@ int BayesRRm::runMpiGibbs() {
 	        hypTau    = dist.inv_gamma_rate_rng(0.5 + 0.5 * v0t, 1.0 / (tau0 * tau0) + 1.0 / tau);
 		tau       = dist.inv_gamma_rate_rng(0.5 * (m0[i] + v0t), v0t / hypTau + (0.5 * scaledBSQN));
 		c_slab[i] = dist.inv_scaled_chisq_rng(v0c + (double)m0[i],
-						      (beta_squaredNorm[i] * (double)m0[i] + v0c * s02G) / (v0c + (double)m0[i]));
+						      (beta_squaredNorm[i] * (double)m0[i] + v0c * s02c) / (v0c + (double)m0[i]));
 		//--------------------------------
 		
 		sigmaG[i] = beta_squaredNorm[i];
