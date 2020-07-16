@@ -149,15 +149,32 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
                                    markerI_restart);
 
     if (opt.covariates) {
-
         data.read_mcmc_output_gam_file(opt.mcmcOut, data.X.cols(),
                                        iteration_to_restart_from,
                                        gamma_restart);
-
         data.read_mcmc_output_idx_file(opt.mcmcOut, "xiv", (uint)data.X.cols(),
                                        iteration_to_restart_from, opt.bayesType,
                                        xI_restart);
     }
+
+
+    if (opt.bayesType == "bayesFHMPI") {
+        read_ofile_t1(lbvfp, iteration_to_restart_from, M, lambda_var.data(), MPI_DOUBLE);
+        read_ofile_t1(nuvfp, iteration_to_restart_from, M, nu_var.data(),     MPI_DOUBLE);
+
+        read_ofile_hsa(cslfp,
+                       iteration_to_restart_from, first_thinned_iteration, opt.thin,
+                       c_slab.size(), c_slab.data(), MPI_DOUBLE);
+
+        read_ofile_s1(taufp,
+                      iteration_to_restart_from, first_thinned_iteration, opt.thin,
+                      &tau, MPI_DOUBLE);
+
+        read_ofile_s1(htafp,
+                      iteration_to_restart_from, first_thinned_iteration, opt.thin,
+                      &hypTau, MPI_DOUBLE);
+    }
+
 
     // Adjust starting iteration number.
     iteration_start = iteration_to_restart_from + 1;
@@ -345,43 +362,38 @@ int BayesRRm::runMpiGibbs() {
 
 
     // FHDT parameters
-    const double v0L  = opt.v0L;
-    const double v0t  = opt.v0t;
-    const double v0c  = opt.v0c;
-    const double s02c = opt.s02c;
-    const double tau0 = opt.tau0;
+    hypTau     = 0.0;
+    tau        = 0.0;
+    scaledBSQN = 0.0;
 
-    double   hypTau     = 0.0;
-    double   tau        = 0.0;
-    double   scaledBSQN = 0.0;
-
-    VectorXd lambda_var(Beta.size());
-    VectorXd nu_var(Beta.size());
-    VectorXd c_slab(numGroups);
+    lambda_var.resize(Beta.size());
+    nu_var.resize(Beta.size());
+    c_slab.resize(numGroups);
     
-    c_slab.setZero();;
+    c_slab.setZero();
     lambda_var.setZero();
     nu_var.setZero();
     
-    std::cout << "INFO Sampling initial hypTau" <<"\n";
-    std::cout << "tau0: "<<tau0 << "\n";
-    hypTau = dist.inv_gamma_rate_rng(0.5,1.0/(tau0*tau0));
-    std::cout << "hypTau: "<< hypTau <<"\n";
-    std::cout << "INFO Sampling initial tau" <<"\n";
-    tau = dist.inv_gamma_rate_rng(0.5*v0t,v0t/hypTau);
-    std::cout << "tau: " << tau <<"\n";
-    std::cout << "INFO Sampling initial slab" <<"\n";
-    for(int jj=0;jj<numGroups;++jj)
-      c_slab[jj] = dist.inv_scaled_chisq_rng( v0c, s02c);
-    std::cout << "c: " << c_slab <<"\n";
-    std::cout << "v0L" << v0L << "\n";
-    //if using newtonian uncomment this
-    //SamplerLocalVar  lambdaSampler(dist,v0L,c_slab/(double)Mtot);
+    hypTau = dist.inv_gamma_rate_rng(0.5, I_TAU0SQ);
+    tau    = dist.inv_gamma_rate_rng(0.5 * v0t, v0t / hypTau);
+    for(int jj=0; jj<numGroups; ++jj)
+        c_slab[jj] = dist.inv_scaled_chisq_rng(v0c, s02c);
+    lambda_var.array() = c_slab.sum() / (double)Mtot;
     
-    std::cout << "INFO Sampling initial lambda with values: "<< c_slab.sum()/(double)Mtot<<"\n";
-    lambda_var.array() = c_slab.sum()/(double)Mtot;
-    std::cout << "<------------ FH initialisation finished -------------------->\n";
-    
+    if (rank == 0) {
+        std::cout << "INFO Sampling initial hypTau" <<"\n";
+        std::cout << "tau0: "<< tau0 << "\n";
+        std::cout << "hypTau: "<< hypTau <<"\n";
+        std::cout << "INFO Sampling initial tau" <<"\n";
+        std::cout << "tau: " << tau <<"\n";
+        std::cout << "INFO Sampling initial slab" <<"\n";
+        std::cout << "c: " << c_slab <<"\n";
+        std::cout << "v0L" << v0L << "\n";
+        //if using newtonian uncomment this
+        //SamplerLocalVar  lambdaSampler(dist,v0L,c_slab/(double)Mtot);    
+        std::cout << "INFO Sampling initial lambda with values: "<< c_slab.sum()/(double)Mtot<<"\n";
+        std::cout << "<------------ FH initialisation finished -------------------->\n";
+    }
 
     components.resize(M);
     components.setZero();
@@ -455,6 +467,11 @@ int BayesRRm::runMpiGibbs() {
     MPI_Barrier(MPI_COMM_WORLD);
 
     open_output_files();
+
+
+    // CHECK
+    printf("rank %d, tau = %20.15f, hypTau = %20.15f\n", rank, tau, hypTau);
+
 
     MPI_Barrier(MPI_COMM_WORLD);
     const auto st2 = std::chrono::high_resolution_clock::now();
@@ -722,12 +739,7 @@ int BayesRRm::runMpiGibbs() {
         for (int i=0; i<Ntot; ++i)  epsilon[i] = y[i];
         sigmaE = 0.0;
         for (int i=0; i<Ntot; ++i)  sigmaE += epsilon[i] * epsilon[i];
-        //printf("<sigmaE = %15.13f\n", sigmaE);
         sigmaE = sigmaE / dN * 0.5;
-
-        //EO: no need to broacast here, sigmaE is the same over all tasks as we start from phenotype data
-        //EO: broadcast sigmaE from rank 0 to all the others
-        //check_mpi(MPI_Bcast(&sigmaE, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
     }
     //printf("sigmaE = %20.15f\n", sigmaE);
     //printf("mu = %20.15f\n", mu);
@@ -779,8 +791,7 @@ int BayesRRm::runMpiGibbs() {
 
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
 
-
-        //printf("###### ##### #### ## #  ITERATION %d\n", iteration);
+        //printf("@@@### ITERATION %5d\n", iteration);
 
         double start_it = MPI_Wtime();
         double it_sync_ar1  = 0.0;
@@ -797,6 +808,7 @@ int BayesRRm::runMpiGibbs() {
         // update mu
         mu = dist.norm_rng(epssum / dN, sigmaE / dN);
         //printf("it %d, rank %d: mu = %20.15f with dN = %10.1f, sigmaE = %20.15f\n", iteration, rank, mu, dN, sigmaE);
+        //printf("it %d, rank %d: c_slab[0] = %20.15f\n", iteration, rank, c_slab[0]);
 
         // We substract again now epsilon =Y-mu-X*beta
         for (int i=0; i<Ntot; ++i) epsilon[i] -= mu;
@@ -830,13 +842,11 @@ int BayesRRm::runMpiGibbs() {
 
             if (j < M) {
 
-                const int marker  = markerI[j];
-
-                double beta    = Beta(marker);
-
-                double sigE_G  = sigmaE / sigmaG[groups[MrankS[rank] + marker]];
-                double sigG_E  = sigmaG[groups[MrankS[rank] + marker]] / sigmaE;
-                double i_2sigE = 1.0 / (2.0 * sigmaE);
+                const int marker = markerI[j];
+                double beta      = Beta(marker);
+                double sigE_G    = sigmaE / sigmaG[groups[MrankS[rank] + marker]];
+                double sigG_E    = sigmaG[groups[MrankS[rank] + marker]] / sigmaE;
+                double i_2sigE   = 1.0 / (2.0 * sigmaE);
 
                 double lambda_tilde = 0.0;
 
@@ -869,23 +879,18 @@ int BayesRRm::runMpiGibbs() {
                         }
                         //printf("it %d, rank %d, m %d: denom[%d] = %20.15f, cvai = %20.15f\n", iteration, rank, marker, i-1, denom(i-1), cVaI(groups[MrankS[rank] + marker], i));
                     }
-                    
+
+                    // Compute dot product
                     double num  = 0.0;
-                    
                     if (USEBED[marker]) {
-                        
                         avx_bed_dot_product(&I1[N1S[marker]], epsilon, Ntot, snpLenByt, mave[marker], mstd[marker], num);
-                        
                     } else {
-                        
                         num = sparse_dotprod(epsilon,
                                              I1, N1S[marker], N1L[marker],
                                              I2, N2S[marker], N2L[marker],
                                              IM, NMS[marker], NML[marker],
                                              mave[marker],    mstd[marker], Ntot, marker);
                     }
-                    
-                    //if (j < 10)  printf("it %2d, rank %2d, m %3d: num = %22.15f  USEBED=%d\n", iteration, rank, marker, num, USEBED[marker]);
                     
                     //continue;
                     
@@ -902,15 +907,11 @@ int BayesRRm::runMpiGibbs() {
 
                     // Update the log likelihood for each component
                     for (int i=1; i<1+km1; i++) {
-
                         if (opt.bayesType == "bayesFHMPI") {
-
                             logL[i] = logL[i]
                                 - 0.5 * log((lambda_tilde / sigmaE) * dNm1 + 1.0)
                                 + muk[i] * num * i_2sigE;
-
                         } else {
-                            
                             logL[i] = logL[i]
                                 - 0.5 * log(sigG_E * dNm1 * cVa(groups[MrankS[rank] + marker], i) + 1.0)
                                 +  muk[i] * num * i_2sigE;
@@ -1487,18 +1488,18 @@ int BayesRRm::runMpiGibbs() {
         for (int i=0; i<M; i++) {
             beta_squaredNorm[groups[MrankS[rank] + i]] += Beta[i] * Beta[i];
         }
-        //printf("rank %d it %d  beta_squaredNorm = %15.10f\n", rank, iteration, beta_squaredNorm);
-        //printf("==> after eps sync it %d, rank %d, epsilon[0] = %15.10f %15.10f\n", iteration, rank, epsilon[0], epsilon[Ntot-1]);
+        //printf("iteration %d, rank %d: beta_squaredNorm[0] = %20.15f\n", iteration, rank, beta_squaredNorm[0]);
 
 
         // Scaled sum of squares
         double scaledBSQN = 0.0;
         if (opt.bayesType == "bayesFHMPI") {
+#pragma novector
             for (int i = 0; i < M; i++) {
-                scaledBSQN +=  Beta[i] * Beta[i] / lambda_var[i];
+                scaledBSQN +=  (Beta[i] * Beta[i]);// / lambda_var[i];
             }
+            //printf("iteration %d, rank %d: scaledBSQN = %20.15f\n", iteration, rank, scaledBSQN);
         }
-        
 
         // Transfer global to local
         // ------------------------
@@ -1546,19 +1547,15 @@ int BayesRRm::runMpiGibbs() {
 
             if (opt.bayesType == "bayesFHMPI") {
                 // FHDT sample hyper parameters
-                hypTau    = dist.inv_gamma_rate_rng(0.5 + 0.5 * v0t, 1.0 / (tau0 * tau0) + 1.0 / tau);
+                hypTau    = dist.inv_gamma_rate_rng(0.5 + 0.5 * v0t, I_TAU0SQ + 1.0 / tau);
                 tau       = dist.inv_gamma_rate_rng(0.5 * (m0[i] + v0t), v0t / hypTau + (0.5 * scaledBSQN));
                 c_slab[i] = dist.inv_scaled_chisq_rng(v0c + (double)m0[i], (beta_squaredNorm[i] * (double)m0[i] + v0c * s02G) / (v0c + (double)m0[i]));
-                
                 sigmaG[i] = beta_squaredNorm[i];
                 
                 //DT scaling for ishwaran rao
                 // sigmaG[i] = SamplerV.sampleGroupVar(1, (double)m0[i] * beta_squaredNorm[i], (double)m0[i], i);
-                
-            } else {
-                
+            } else {                
                 sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
-                
             }         
             
             //printf("???? %d: %d, bs %20.15f, m0 %d -> sigmaG[i] = %20.15f, call(%20.15f, %20.15f)\n", rank, i, beta_squaredNorm[i], m0[i], sigmaG[i], v0G + (double) m0[i],  (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
@@ -1568,7 +1565,7 @@ int BayesRRm::runMpiGibbs() {
             estPi.row(i) = dist.dirichlet_rng(dirin);
         }
         
-        //fflush(stdout);
+        fflush(stdout);
         
         //printf("rank %d own sigmaG[0] = %20.15f with Mtot = %d and m0[0] = %d\n", rank, sigmaG[0], Mtot, int(m0[0]));
 
@@ -1693,12 +1690,18 @@ int BayesRRm::runMpiGibbs() {
                 write_ofile_csv(fh(csvfp), iteration, sigmaG, sigmaE, m0, n_thinned_saved, estPi); // txt
                 write_ofile_out(fh(outfp), iteration, sigmaG, sigmaE, m0, n_thinned_saved, estPi); // bin
             }
-            
+
             write_ofile_h1(fh(betfp), rank, Mtot, iteration, n_thinned_saved, MrankS[rank], M, Beta.data(),       MPI_DOUBLE);
             write_ofile_h1(fh(acufp), rank, Mtot, iteration, n_thinned_saved, MrankS[rank], M, Acum.data(),       MPI_DOUBLE);
             write_ofile_h1(fh(cpnfp), rank, Mtot, iteration, n_thinned_saved, MrankS[rank], M, components.data(), MPI_INTEGER);
 
-            write_ofile_s1(fh(musfp), iteration, n_thinned_saved, mu, MPI_DOUBLE);
+            write_ofile_s1(fh(musfp), iteration, n_thinned_saved, mu,     MPI_DOUBLE);
+            write_ofile_s1(fh(taufp), iteration, n_thinned_saved, tau,    MPI_DOUBLE);
+            write_ofile_s1(fh(htafp), iteration, n_thinned_saved, hypTau, MPI_DOUBLE);
+
+            //printf("writing tau at it %d, rank %d = %20.15f - %20.15f\n", iteration, rank, tau, hypTau);
+
+            write_ofile_hsa(fh(cslfp), iteration, n_thinned_saved, c_slab.size(), c_slab.data(), MPI_DOUBLE);
 
             n_thinned_saved += 1;
         }
@@ -1715,6 +1718,11 @@ int BayesRRm::runMpiGibbs() {
                 write_ofile_t1(fh(gamfp), iteration, gamma_length,  gamma.data(), MPI_DOUBLE);
                 write_ofile_t1(fh(xivfp), iteration, gamma_length,  xI.data(),    MPI_DOUBLE);
             }
+            if (opt.bayesType == "bayesFHMPI") {
+                write_ofile_t1(fh(lbvfp), iteration, M, lambda_var.data(), MPI_DOUBLE);
+                write_ofile_t1(fh(nuvfp), iteration, M, nu_var.data(),     MPI_DOUBLE);
+            }
+
 
             // task-shared files
             write_ofile_t2(fh(xbetfp), rank, MrankS[rank], Mtot, iteration, M, Beta.data(),       MPI_DOUBLE);
@@ -1744,6 +1752,7 @@ int BayesRRm::runMpiGibbs() {
                 //cout << "cmd >>" << cmd << "<<" << endl;
                 std::system(cmd.c_str());
             }
+
             MPI_Barrier(MPI_COMM_WORLD);
         }
 
@@ -1824,7 +1833,12 @@ void BayesRRm::set_output_filepaths(const string mcmcOut, const string rank_str)
     epsfp  = mcmcOut + ".eps." + rank_str;
     gamfp  = mcmcOut + ".gam." + rank_str;
     musfp  = mcmcOut + ".mus." + rank_str;
-
+    lbvfp  = mcmcOut + ".lbv." + rank_str;
+    nuvfp  = mcmcOut + ".nuv." + rank_str;
+    cslfp  = mcmcOut + ".csl." + rank_str;
+    taufp  = mcmcOut + ".tau." + rank_str;
+    htafp  = mcmcOut + ".hta." + rank_str;
+    
 
     world_files.clear();
 
@@ -1844,7 +1858,11 @@ void BayesRRm::set_output_filepaths(const string mcmcOut, const string rank_str)
     self_files.push_back(epsfp);
     self_files.push_back(gamfp);
     self_files.push_back(musfp);
-
+    self_files.push_back(lbvfp);
+    self_files.push_back(nuvfp);
+    self_files.push_back(cslfp);
+    self_files.push_back(taufp);
+    self_files.push_back(htafp);
 }
 
 void BayesRRm::open_output_files() {

@@ -90,17 +90,36 @@ class BayesRRm
     VectorXd         gamma_restart;   //   idem for gamma vector found in .gam* file
     std::vector<int> xI_restart;      //   idem for xI vector found in .xiv
     double           mu_restart;      //   to store task-wise mu read back from .mus.rank file
-
+    
     VectorXd y;
     VectorXd Cx;
 
+
+    // FHDT parameters
+    const double v0L  = opt.v0L;
+    const double v0t  = opt.v0t;
+    const double v0c  = opt.v0c;
+    const double s02c = opt.s02c;
+    const double tau0 = opt.tau0;
+    
+    const double I_TAU0SQ = 1.0 / (tau0 * tau0);
+
+    VectorXd lambda_var;
+    VectorXd nu_var;
+    VectorXd c_slab;
+
+    double   hypTau     = 0.0;
+    double   tau        = 0.0;
+    double   scaledBSQN = 0.0;
+
+
+
     string   lstfp, rngfp;
-
-    string   acufp,  betfp,  cpnfp,  epsfp;
-    string   gamfp,  mrkfp,  musfp,  outfp, csvfp;
+    string   acufp,  betfp,  cpnfp, epsfp;
+    string   gamfp,  mrkfp,  musfp, outfp, csvfp;
     string   xbetfp, xcpnfp, xivfp;
+    string   lbvfp,  nuvfp,  cslfp, taufp, htafp;
 
-    string   fh_lam_fp;
 
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();

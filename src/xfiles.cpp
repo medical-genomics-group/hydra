@@ -1,5 +1,6 @@
 #include "xfiles.h"
 
+
 // CSV out file
 void write_ofile_csv(const MPI_File fh, const uint iteration, const VectorXd sigmaG, const double sigmaE, const VectorXi m0,
                      const uint n_thinned_saved, const MatrixXd estPi) {
@@ -32,6 +33,7 @@ void write_ofile_csv(const MPI_File fh, const uint iteration, const VectorXd sig
     MPI_Offset offset = size_t(n_thinned_saved) * strlen(buff);
     check_mpi(MPI_File_write_at(fh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
 }
+
 
 // BIN out file
 // Same info as in .csv but in binary format rather than text (for full precision)
