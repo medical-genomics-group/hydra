@@ -24,10 +24,9 @@ class BayesRRm
     
  public:
 
-    Data               &data;            // data matrices
+    Data               &data;
     Options            &opt;
-    const string       bedFile;          // bed file
-    const long         memPageSize;      // size of memory
+    const string       bedFile;
     const unsigned int seed;
     const unsigned int max_iterations;
     const unsigned int burn_in;
@@ -121,7 +120,7 @@ class BayesRRm
     string   lbvfp,  nuvfp,  cslfp, taufp, htafp;
 
 
-    BayesRRm(Data &data, Options &opt, const long memPageSize);
+    BayesRRm(Data &data, Options &opt);
     virtual ~BayesRRm();
 
     void setDebugEnabled(bool enabled) { showDebug = enabled; }

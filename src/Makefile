@@ -50,7 +50,7 @@ CCASFLAGS=-no-multibyte-chars
 
 #SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 #//EO@@@ remove multi-trait version for now
-SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp dense.cpp sparse.cpp gauss_hermite.cpp utils.cpp bed_to_sparse.cpp xfiles.cpp
+SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp dense.cpp sparse.cpp gauss_hermite.cpp utils.cpp bed_to_sparse.cpp xfiles.cpp depsx.cpp
 #SOURCES = main.cpp data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
 
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))

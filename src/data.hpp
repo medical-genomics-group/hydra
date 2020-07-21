@@ -98,14 +98,6 @@ public:
 
     VectorXd fail;           // Failure indicator
 
-    //EO MRG
-    //VectorXf ZPZdiag;        // Z'Z diagonal
-    //VectorXf snp2pq;         // 2pq of SNPs
-    //VectorXf se;             // se from GWAS summary data
-    //VectorXf tss;            // total ss (ypy) for every SNP
-    //VectorXf b;              // beta from GWAS summary data
-    //VectorXf n;              // sample size for each SNP in GWAS
-
     vector<SnpInfo*> snpInfoVec;
     vector<IndInfo*> indInfoVec;
 
@@ -197,10 +189,10 @@ public:
 
 
     void get_bed_marker_from_sparse(char* bed,
-                                    const int    Ntot,
+                                    const int Ntot,
                                     const size_t S1, const size_t L1, const uint* I1,
                                     const size_t S2, const size_t L2, const uint* I2,
-                                    const size_t SM, const size_t LM, const uint* IM);
+                                    const size_t SM, const size_t LM, const uint* IM) const;
 
  
     void load_data_from_mixed_representations(const string bedfp,         const string sparseOut,

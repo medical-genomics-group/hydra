@@ -23,4 +23,12 @@ using fp_it = std::vector<std::string>::iterator;
 typedef std::map<std::string, MPI_File>            fh_map;
 typedef std::map<std::string, MPI_File>::iterator  fh_it;
 
+struct sparse_info_t {
+    size_t *N1S, *N1L;
+    size_t *N2S, *N2L;
+    size_t *NMS, *NML;
+    uint *I1, *I2, *IM;
+};
+
+
 #endif

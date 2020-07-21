@@ -943,7 +943,7 @@ void Data::get_bed_marker_from_sparse(char* bdat,
                                       const int    Ntot,
                                       const size_t S1, const size_t L1, const uint* I1,
                                       const size_t S2, const size_t L2, const uint* I2,
-                                      const size_t SM, const size_t LM, const uint* IM) {
+                                      const size_t SM, const size_t LM, const uint* IM) const {
 
 
     // Length of a marker in [byte] in BED representation (1 ind is 2 bits, so 1 byte is 4 inds)
@@ -1344,7 +1344,6 @@ void Data::sparse_data_fill_indices(const char* rawdata,
                                     size_t* N1S, size_t* N1L, uint* I1,
                                     size_t* N2S, size_t* N2L, uint* I2,
                                     size_t* NMS, size_t* NML, uint* IM) const {
-    
     
     assert(numInds - NA <= NB * 4);
 

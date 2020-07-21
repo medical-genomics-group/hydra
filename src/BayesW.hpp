@@ -47,7 +47,7 @@ public:
     VectorXd vi;
     
 
-    BayesW(Data &data, Options &opt, const long memPageSize) : BayesRRm(data, opt, memPageSize)
+    BayesW(Data &data, Options &opt) : BayesRRm(data, opt)
 	{
 	};
 

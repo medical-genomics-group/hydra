@@ -42,7 +42,7 @@ int main(int argc, const char * argv[]) {
             data.readFamFile(opt.bedFile + ".fam");
             data.readBimFile(opt.bedFile + ".bim");
 
-            BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+            BayesRRm analysis(data, opt);
 
             if (opt.bedToSparse) {
                 write_sparse_data_files(opt.blocksPerRank, data, opt);
@@ -156,12 +156,12 @@ int main(int argc, const char * argv[]) {
 
             } else if (opt.bayesType == "bayesWMPI") {
 
-                BayesW analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+                BayesW analysis(data, opt);
                 analysis.runMpiGibbs_bW();
 
             } else {
 
-                BayesRRm analysis(data, opt, sysconf(_SC_PAGE_SIZE));
+                BayesRRm analysis(data, opt);
                 analysis.runMpiGibbs();
             }
 
