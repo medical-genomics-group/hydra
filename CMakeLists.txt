@@ -81,6 +81,10 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${GCC_EIGEN_COMPILE_FLAGS}")
 
 
 
+include_directories(src)
+add_subdirectory(src)
+
+
 if(ENABLE_UNIT_TESTS)
   
   # Download and unpack googletest at configure time
@@ -116,12 +120,5 @@ if(ENABLE_UNIT_TESTS)
 
     add_subdirectory(test)
 endif()
-
-include_directories(MultiTrait/Multi-trait/src/)
-add_subdirectory(MultiTrait/Multi-trait/)
-
-
-include_directories(src)
-add_subdirectory(src)
 
 Message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
