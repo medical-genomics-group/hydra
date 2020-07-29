@@ -1246,20 +1246,6 @@ int BayesRRm::runMpiGibbs() {
         //EO: sample sigmaE and broadcast the one from rank 0 to all the others
         sigmaE  = dist.inv_scaled_chisq_rng(v0E+dN, (e_sqn + v0E*s02E)/(v0E+dN));
         
-        
-        //@@@@@@@ FH
-        //DT needs to check here
-        //EO: do we need the #idef? sigmaE not updated here so leave sigmaE outside for now
-        if (opt.bayesType == "bayesFHMPI") {
-#ifdef NEWTONIAN
-            //DT scaling like in ishwaran and rao
-            // sigmaE = SamplerE.sampleEpsVar(1, e_sqn);
-#endif
-        } else {
-            // 
-        }
-
-
         check_mpi(MPI_Bcast(&sigmaE, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         //printf("sigmaE = %20.15f\n", sigmaE);
 
