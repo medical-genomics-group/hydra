@@ -982,12 +982,7 @@ int BayesRRm::runMpiGibbs() {
                 // not depend on the results of this, so could be done in a different
                 // thread
                 if (opt.bayesType == "bayesFHMPI") {                   
-                    
                     lambda_var(marker) = dist.inv_gamma_rate_rng(0.5 + 0.5 * v0L, 0.5 * beta * beta / tau + v0L / nu_var(marker));
-                    
-                    // If doing newtonian montecarlo use this:
-                    //lambda_var(marker) = lambdaSampler.sampleLocalVar(10, tau, c, beta*beta );
-
                 }
                 
                     
@@ -1152,16 +1147,13 @@ int BayesRRm::runMpiGibbs() {
                 tau       = dist.inv_gamma_rate_rng(0.5 * (m0[i] + v0t), v0t / hypTau + (0.5 * scaledBSQN));
                 c_slab[i] = dist.inv_scaled_chisq_rng(v0c + (double)m0[i], (beta_squaredNorm[i] * (double)m0[i] + v0c * s02c) / (v0c + (double)m0[i]));
                 sigmaG[i] = beta_squaredNorm[i];
-                
-                //DT scaling for ishwaran rao
-                // sigmaG[i] = SamplerV.sampleGroupVar(1, (double)m0[i] * beta_squaredNorm[i], (double)m0[i], i);
             } else {                
                 sigmaG[i] = dist.inv_scaled_chisq_rng(v0G + (double) m0[i], (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
             }         
             
             //printf("???? %d: %d, bs %20.15f, m0 %d -> sigmaG[i] = %20.15f, call(%20.15f, %20.15f)\n", rank, i, beta_squaredNorm[i], m0[i], sigmaG[i], v0G + (double) m0[i],  (beta_squaredNorm[i] * (double) m0[i] + v0G * s02G) / (v0G + (double) m0[i]));
             
-            //we moved the pi update here to use the same loop
+            // we moved the pi update here to use the same loop
             VectorXd dirin = cass.row(i).transpose().array().cast<double>() + dirc.array();
             estPi.row(i) = dist.dirichlet_rng(dirin);
         }
@@ -1232,7 +1224,7 @@ int BayesRRm::runMpiGibbs() {
                     //cout << "adding " << (gamma_old - gamma(xI[i])) * data.X(k, xI[i]) << endl;
                 }
             }
-            //the next line should be uncommented if we want to use ridge for the other cvoariates.
+            //the next line should be uncommented if we want to use a prior for the ridge parameter.
             //sigmaF = inv_scaled_chisq_rng(0.001 + F, (gamma.squaredNorm() + 0.001)/(0.001+F));
             sigmaF = s02F;
         }
