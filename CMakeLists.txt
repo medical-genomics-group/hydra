@@ -3,7 +3,7 @@ include(CheckCXXCompilerFlag)
 project(hydra)
 
 option(ENABLE_UNIT_TESTS "Enable unit tests" OFF)
-option(AVX512 "Enable more compiler optimizations" OFF)
+option(AVX512 "Enable more compiler optimizations" ON)
 option(NATIVE "Enable more compiler optimizations" OFF)
 
 
