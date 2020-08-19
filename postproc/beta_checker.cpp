@@ -1,3 +1,7 @@
+/*
+ * Check beta values, created by EO
+ *
+ */
 #include <stdio.h>
 #include <stdlib.h>
 
