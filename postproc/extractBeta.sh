@@ -1,12 +1,13 @@
 #!/bin/bash
+# script to extract nonzero betas from .bet for a single run, created by MP
 
-# script to extract nonzero betas from a single run, created by MP
 # arguments:
 #  parsingFolder - folder where output will be saved
 #  folder_name - folder name where the specific run will be stored
 #  file_name - name of .bet file for the run
 #  THIN -  thinning of the original chain
 #  path - path to the files containing the runs.
+
 parsingFolder=$1 
 folder_name=$2
 file_name=$3
