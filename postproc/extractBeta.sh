@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# script to extract nonzero betas from a single rum, created by MP
+# script to extract nonzero betas from a single run, created by MP
 # arguments:
 #  parsingFolder - folder where output will be saved
 #  folder_name - folder name where the specific run will be stored
