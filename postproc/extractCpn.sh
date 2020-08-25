@@ -1,17 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=extrCpn
-#SBATCH --mem=40G
-#SBATCH --nodes=1
-#SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=1
-#SBATCH --time 0-03:00:00
-#SBATCH --partition=parallel
-#SBATCH --account=ext-unil-ctgg
+# script to extract nonzero betas from .cpn for a single run, created by MP
 
-parsingFolder=$1
+# arguments:
+#  parsingFolder - folder where output will be saved
+#  folder_name - folder name where the specific run will be stored
+#  file_name - name of .bet file for the run
+#  THIN -  thinning of the original chain
+#  path - path to the files containing the runs.
+
+parsingFolder=$1 
 folder_name=$2
 file_name=$3
-THIN=$4
+THIN=$4 
 path=$5
 
 parsingScriptLocation=/work/ext-unil-ctgg/common_software/PostProcessing/extract_non_zero_cpnAll
