@@ -1,5 +1,5 @@
 #!/bin/bash
-# script to extract nonzero betas from .bet for a single run, created by MP
+# script to extract nonzero betas from .bet for a single chain, created by MP
 
 # arguments:
 #  parsingFolder - folder where output will be saved
