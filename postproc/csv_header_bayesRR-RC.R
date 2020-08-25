@@ -1,3 +1,4 @@
+#Rscrip to add header to .csv from BayesRR-RC
 require(tidyverse)
 read_hyper <- function(csv_file){
     hyper_file <- read_csv(
