@@ -107,10 +107,9 @@ class BayesRRm
     VectorXd nu_var;
     VectorXd c_slab;
 
-    double   hypTau     = 0.0;
-    double   tau        = 0.0;
-    double   scaledBSQN = 0.0;
-
+    VectorXd hypTau;
+    VectorXd tau;
+    VectorXd scaledBSQN;
 
 
     string   lstfp, rngfp;
