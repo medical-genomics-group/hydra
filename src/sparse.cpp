@@ -52,8 +52,9 @@ double sparse_partial_sum(const double* __restrict__ vec,
 #ifdef _OPENMP
 
     double partial_sum = 0.0;
-    
-#pragma omp parallel default(none) firstprivate(partial_sum) shared(sum, vec, IX, NXS, NXL)
+    //EO: see https://gcc.gnu.org/gcc-9/porting_to.html#ompdatasharing
+    //#pragma omp parallel default(none) firstprivate(partial_sum) shared(sum, vec, IX, NXS, NXL)
+#pragma omp parallel default(none) firstprivate(partial_sum, NXS, NXL) shared(sum, vec, IX)
     {
         //int ID = omp_get_thread_num();
         
@@ -100,7 +101,8 @@ double sparse_partial_sum(const long double* __restrict__ vec,
 
     long double partial_sum = 0.0;
     
-#pragma omp parallel default(none) firstprivate(partial_sum) shared(sum, vec, IX, NXS, NXL)
+    //#pragma omp parallel default(none) firstprivate(partial_sum) shared(sum, vec, IX, NXS, NXL)
+#pragma omp parallel default(none) firstprivate(partial_sum, NXS, NXL) shared(sum, vec, IX)
     {
         //int ID = omp_get_thread_num();
         

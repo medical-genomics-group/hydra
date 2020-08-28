@@ -68,7 +68,9 @@ double sum_array_elements(const double* __restrict__ array, const int N) {
 
 #ifdef _OPENMP
 
-#pragma omp parallel default(none) shared(sum, array, N)
+    //#pragma omp parallel default(none) shared(sum, array, N)
+    //EO: see https://gcc.gnu.org/gcc-9/porting_to.html#ompdatasharing
+#pragma omp parallel default(none) shared(sum, array) firstprivate(N)
     {
         //int ID = omp_get_thread_num();
         double partial_sum = 0.0;
@@ -108,8 +110,9 @@ double sum_array_elements(const long double* __restrict__ array, const int N) {
     long double sum = 0.0;
 
 #ifdef _OPENMP
-
-#pragma omp parallel default(none) shared(sum, array, N)
+    //EO: see https://gcc.gnu.org/gcc-9/porting_to.html#ompdatasharing
+    //#pragma omp parallel default(none) shared(sum, array, N)
+#pragma omp parallel default(none) shared(sum, array) firstprivate(N)
     {
         //int ID = omp_get_thread_num();
         long double partial_sum = 0.0;
@@ -263,7 +266,9 @@ void avx_bed_dot_product(uint* I1_data,
         //num = mstd[marker] * (s1 - mave[marker] * s2);
         num = mstd * (s1 - mave * s2);
 
-    } else if (dp_version == 2) {
+    } 
+    /*
+    else if (dp_version == 2) {
                             
         throw("need to adapt if Ntot%4 != 0");
         exit(1);
@@ -291,7 +296,9 @@ void avx_bed_dot_product(uint* I1_data,
         num -= mave * syt;
         num *= mstd;
                             
-    } else {
+    } 
+    */
+    else {
                             
         throw("FATAL  : something wrong with your selection");
     }
