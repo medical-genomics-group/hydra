@@ -1,13 +1,12 @@
 .PHONY: all clean help info
 
 SOURCEDIR = ./src
+BINDIR    = ./bin
 
 SOURCES  := $(wildcard $(SOURCEDIR)/*.cpp)
 
 SRC_EXCL  =  $(SOURCEDIR)/BayesRRm_mt.cpp
 SRC_EXCL +=  $(SOURCEDIR)/mk_lut.cpp
-SRC_EXCL +=  $(SOURCEDIR)/samplewriter.cpp
-SRC_EXCL +=  $(SOURCEDIR)/compression.cpp
 
 SOURCES  := $(filter-out $(SRC_EXCL),$(SOURCES))
 
@@ -21,17 +20,17 @@ INCLUDE  += -I$(BOOST_ROOT)/include
 
 ifeq ($(CXX),g++)
 
-EXEC     ?= hydra_G
+EXEC     ?= hydra_g
 CXX       = mpic++
-BUILDDIR  = test_build_GCC
+BUILDDIR  = build_gcc
 CXXFLAGS += -fopenmp
 CXXFLAGS += -march=native
 
 else ifeq ($(CXX),icpc)
 
-EXEC     ?= hydra_I
+EXEC     ?= hydra_i
 CXX       = mpiicpc
-BUILDDIR  = test_build_Intel
+BUILDDIR  = build_intel
 CXXFLAGS += -qopenmp
 CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 #CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
@@ -52,9 +51,9 @@ OBJ      := $(patsubst $(SOURCEDIR)/%.cpp,$(BUILDDIR)/%.o,$(SOURCES))
 LIBS      = -lz
 
 
-all: dir $(BUILDDIR)/$(EXEC)
+all: dir $(BINDIR)/$(EXEC)
 
-$(BUILDDIR)/$(EXEC): $(OBJ)
+$(BINDIR)/$(EXEC): $(OBJ)
 	$(CXX) $(CXXFLAGS) $(LIBS) $^ -o $@
 
 $(OBJ): $(BUILDDIR)/%.o : $(SOURCEDIR)/%.cpp
@@ -62,9 +61,10 @@ $(OBJ): $(BUILDDIR)/%.o : $(SOURCEDIR)/%.cpp
 
 dir:
 	mkdir -p $(BUILDDIR)
+	mkdir -p $(BINDIR)
 
 clean:
-	rm -vf $(BUILDDIR)/*.o $(BUILDDIR)/$(EXEC)
+	rm -vf $(BUILDDIR)/*.o $(BINDIR)/$(EXEC)
 
 help:
 	@echo "Usage: make [ all | clean | help ]"
