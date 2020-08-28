@@ -10,3 +10,6 @@
 slurm-*.out
 bayesOutput_??.*
 src/mpi_gibbs*
+bin/
+build_*/
+eo/
