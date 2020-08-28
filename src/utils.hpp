@@ -8,9 +8,6 @@
 #include <sys/time.h>
 #include "hydra.h"
 #include "options.hpp"
-#include "data.hpp"
-#include "utils.hpp"
-
 
 inline
 double mysecond() {

@@ -14,7 +14,6 @@
 #include "data.hpp"
 #include "distributions_boost.hpp"
 #include "options.hpp"
-#include "samplewriter.h"
 #include <chrono>
 #include <numeric>
 #include <random>
