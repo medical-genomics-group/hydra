@@ -245,6 +245,7 @@ public:
         if (NREADS == 0) return;
         
         int SPLIT_ON = check_int_overflow(size_t(ceil(double(N)/double(NREADS))), __LINE__, __FILE__);
+
         int count = SPLIT_ON;
         
         double totime = 0.0;
