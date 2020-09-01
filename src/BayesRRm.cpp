@@ -166,12 +166,12 @@ void BayesRRm::init_from_restart(const int K, const uint M, const uint  Mtot, co
                        c_slab.size(), c_slab.data(), MPI_DOUBLE);
 	
         read_ofile_hsa(taufp,
-                      iteration_to_restart_from, first_thinned_iteration, opt.thin,
-		       tau.size(), tau.data(), MPI_DOUBLE);
+                       iteration_to_restart_from, first_thinned_iteration, opt.thin,
+                       tau.size(), tau.data(), MPI_DOUBLE);
 
         read_ofile_hsa(htafp,
-                      iteration_to_restart_from, first_thinned_iteration, opt.thin,
-		       hypTau.size(), hypTau.data(), MPI_DOUBLE);
+                       iteration_to_restart_from, first_thinned_iteration, opt.thin,
+                       hypTau.size(), hypTau.data(), MPI_DOUBLE);
     }
 
 
@@ -821,12 +821,14 @@ int BayesRRm::runMpiGibbs() {
         // We substract again now epsilon =Y-mu-X*beta
         for (int i=0; i<Ntot; ++i) epsilon[i] -= mu;
 
+
         //EO: watch out, std::shuffle is not portable, so do no expect identical
         //    results between Intel and GCC when shuffling the markers is on!!
         //------------------------------------------------------------------------
+        boost::uniform_int<> unii(0, M-1);
+        boost::variate_generator< boost::mt19937&, boost::uniform_int<> > generator(dist.rng, unii);
         if (opt.shuffleMarkers) {
-            std::shuffle(markerI.begin(), markerI.end(), dist.rng);
-            //std::random_shuffle(markerI.begin(), markerI.end());
+            boost::range::random_shuffle(markerI, generator);
         }
 
         m0.setZero();
@@ -851,7 +853,7 @@ int BayesRRm::runMpiGibbs() {
             if (j < M) {
 	        
                 const int marker = markerI[j];
-		int abs_mark_pos = MrankS[rank] + marker;  // absolute marker position
+                int abs_mark_pos = MrankS[rank] + marker;  // absolute marker position
                 double beta      = Beta(marker);
                 double sigE_G    = sigmaE / sigmaG[groups[abs_mark_pos]];
                 double sigG_E    = sigmaG[groups[abs_mark_pos]] / sigmaE;
@@ -867,7 +869,7 @@ int BayesRRm::runMpiGibbs() {
                     lambda_tilde   = tau[groups[abs_mark_pos]] * c_slab[groups[abs_mark_pos]] / (tau[groups[abs_mark_pos]] + c_slab[groups[abs_mark_pos]] * lambda_var[marker]);
 
                     if (opt.verbosity > 2) {
-		      printf("iteration %d, marker %d, tau = %20.15f\n", iteration, marker, tau[groups[abs_mark_pos]]);
+                        printf("iteration %d, marker %d, tau = %20.15f\n", iteration, marker, tau[groups[abs_mark_pos]]);
                         //std::cout << "marker      : " << marker <<"\n";
                         //std::cout << "tau         : " << tau    << "\n";
                         //std::cout << "c_slab      : " << c_slab << "\n";
