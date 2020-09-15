@@ -99,25 +99,24 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
         data.readmSFile(opt.groupMixtureFile);
     }
 
-    printf("numGroups = %d, data.groups.size() = %lu, Mtot = %d\n", data.numGroups, data.groups.size(), Mtot);
+    //printf("numGroups = %d, data.groups.size() = %lu, Mtot = %d\n", data.numGroups, data.groups.size(), Mtot);
 
     numGroups = data.numGroups;
-    K  = int(data.mS.cols()) + 1;  //Mixtures + 0th component. 
+    K  = int(data.mS.cols()) ;  //Mixtures + 0th component. 
     km1 = K - 1;		    //Just mixtures
     sigmaG.resize(numGroups);
     sigmaG.setZero();
 
     assert(data.groups.size() == Mtot);
     groups     = data.groups;
-    cVa.resize(numGroups, km1);    // component-specific variance
-
+    cVa.resize(numGroups, km1);    // component-specific variance   //SEO : Added -1 so that we only store non-zero mixtures
     //Populate cVa. We store only km1 values for mixtures
     for (int i=0; i < numGroups; i++) {
-        cVa.row(i) = data.mS.row(i).segment(0,km1);
+        cVa.row(i) = data.mS.row(i).segment(1,km1);			//SEO: Take the segment from 1 (not 0) to exclude the 0th
     }
-	
+
     // Component variables
-    pi_L.resize(numGroups,K);                        // prior mixture probabilities
+    pi_L.resize(numGroups,K);                        // prior mixture probabilities (also the 0th)
     marginal_likelihoods = VectorXd(K);  // likelihood for each mixture component
 
     // Vector to store the 0th component of the marginal likelihood for each group  
@@ -168,15 +167,24 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
     xI_restart.resize(fixedCount);
 
 	/* Prior value selection for the variables */
-	/* At the moment we set them to be weakly informative (in .hpp file) */
-	/* alpha */
-	used_data_alpha.alpha_0 = alpha_0;
-	used_data_alpha.kappa_0 = kappa_0;
-	/* mu */
-	used_data.sigma_mu = sigma_mu;
-	/* sigmaG */
-	used_data.alpha_sigma = alpha_sigma;
-	used_data.beta_sigma = beta_sigma;
+	/* We set them to be weakly informative (in .hpp file) by default */
+	if (opt.hypPriorsFile == "") {
+		/* alpha */
+        	used_data_alpha.alpha_0 = alpha_0;
+        	used_data_alpha.kappa_0 = kappa_0;
+        	/* mu */
+        	used_data.sigma_mu = sigma_mu;
+                /* covariates */
+                used_data.sigma_covariate = sigma_covariate;
+	}else{
+ 		/* alpha */
+                used_data_alpha.alpha_0 = data.sigmaEPriors(0);
+                used_data_alpha.kappa_0 = data.sigmaEPriors(1);
+                /* mu */
+                used_data.sigma_mu = data.muPrior;
+                /* covariates */
+                used_data.sigma_covariate = data.covarPrior;
+	}
 
 	// Save the number of events
 	used_data.d = used_data_alpha.failure_vector.array().sum();
@@ -377,6 +385,13 @@ int BayesW::runMpiGibbs_bW() {
     }
     cass.resize(numGroups,K); //rows are groups columns are mixtures
     MatrixXi sum_cass(numGroups,K);  // To store the sum of cass elements over all ranks
+
+    // Initialise the vector of prior inclusion probability (pi) hyperparameters
+    VectorXd dirc(K);
+    dirc.array() = 1.0;
+
+    // Define sumSigmaG for creating "safe limit"
+    double sumSigmaG = sigmaG.sum();
 
     // Build global repartition of markers over the groups
     VectorXi MtotGrp(numGroups);
@@ -708,7 +723,6 @@ int BayesW::runMpiGibbs_bW() {
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
             (used_data.epsilon)[mu_ind] = epsilon[mu_ind] + mu;// we add to epsilon =Y+mu-X*beta
         }
-
         // Use ARS to sample mu (with density mu_dens, using parameters from used_data)
         err = arms(xinit,    ninit,  &xl,   &xr,   mu_dens, &used_data, &convex, npoint,
                    dometrop, &xprev, xsamp, nsamp, qcent,   xcent,      ncent,   &neval, dist);
@@ -776,7 +790,6 @@ int BayesW::runMpiGibbs_bW() {
 
         ////////// End sampling gamma
 
-
         // ARS parameters
         neval = 0;
         xsamp[0] = 0;
@@ -811,7 +824,6 @@ int BayesW::runMpiGibbs_bW() {
 
         MPI_Barrier(MPI_COMM_WORLD);
 
-
         // Calculate the vector of exponent of the adjusted residuals
         for (int i = 0; i < Ntot; ++i) {
             vi[i] = expl((long double)(used_data.alpha * epsilon[i] - EuMasc));
@@ -839,9 +851,9 @@ int BayesW::runMpiGibbs_bW() {
         }
         //Set the sum of beta squared 0
         beta_squaredNorm.setZero();
-
         // Loop over (shuffled) markers
         // ----------------------------
+
         for (int j = 0; j < lmax; j++) {
             sinceLastSync += 1; 
             
@@ -887,14 +899,14 @@ int BayesW::runMpiGibbs_bW() {
                     vi_sum = sum_array_elements(tmp_vi, Ntot);
                     vi_2 = sparse_partial_sum(tmp_vi, I2, N2S[marker], N2L[marker]);
                     vi_1 = sparse_partial_sum(tmp_vi, I1, N1S[marker], N1L[marker]);
-                    printf("iter %3d  A: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
+                    //printf("iter %3d  A: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
 
                 } else {
                     // Calculate the sums of vi elements
                     vi_sum = sum_array_elements(vi, Ntot);
                     vi_2 = sparse_partial_sum(vi, I2, N2S[marker], N2L[marker]);
                     vi_1 = sparse_partial_sum(vi, I1, N1S[marker], N1L[marker]);
-                    printf("iter %3d  B: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
+                    //printf("iter %3d  B: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
                 }
 
                 double vi_0 = vi_sum - vi_1 - vi_2;
@@ -934,6 +946,8 @@ int BayesW::runMpiGibbs_bW() {
                             used_data_beta.sd = mstd[marker];
                             used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
                             //used_data_beta.used_mixture = k-1;
+
+		
                             used_data_beta.mixture_value = cVa(cur_group, k-1); //k-1 because cVa stores only non-zero in bW
 
                             used_data_beta.vi_0 = vi_0;
@@ -942,8 +956,8 @@ int BayesW::runMpiGibbs_bW() {
 
                             // double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_classes(k-1));
 
-                            //printf("safe_limit: 2.0 * sqrt(%20.17f * %20.17f)\n", used_data_beta.sigmaG, used_data_beta.mixture_value);
-                            double safe_limit = 2.0 * std::sqrt(used_data_beta.sigmaG * used_data_beta.mixture_value); // Need to think is this safe enough if we have groups
+                            //printf("safe_limit: 2.0 * sqrt(%20.17f * %20.17f)\n", sumSigmaG, used_data_beta.mixture_value);
+                            double safe_limit = 2.0 * std::sqrt(sumSigmaG * used_data_beta.mixture_value); // Need to think is this safe enough 
                             // ARS parameters
                             neval    = 0;
                             xsamp[0] = 0.0;
@@ -1000,7 +1014,7 @@ int BayesW::runMpiGibbs_bW() {
                 //continue;
 
                 if (deltaBeta != 0.0)
-                    printf("deltaBeta = %20.16f\n", deltaBeta);
+                    //printf("deltaBeta = %20.16f\n", deltaBeta);
 
 
                 // Compute delta epsilon
@@ -1290,25 +1304,31 @@ int BayesW::runMpiGibbs_bW() {
         // ------------------------
         for(int gg = 0; gg < numGroups ; gg++){
 	        m0[gg] = MtotGrp[gg] - cass(gg,0);
+		if (opt.priorsFile != "") {
+		       // Prior parameters for sigmaG
+                       alpha_sigma = data.priors(gg, 0);   //First column is for alpha_sigma, second for beta_sigma hyperparameter
+                       beta_sigma = data.priors(gg, 1);
+                }
+
+		if (opt.dPriorsFile != "") {
+                       // get vector of parameters for the current group
+                       dirc = data.dPriors.row(gg).transpose().array();
+                }
+		// 4. Sample sigmaG
+		sigmaG[gg]  = dist.inv_gamma_rng((double) (alpha_sigma + 0.5 * m0[gg]),(double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
+
+		// 5. Sample prior mixture component probability from Dirichlet distribution
+                VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
+   		pi_L.row(gg) = dist.dirichlet_rng(dirin);
         }
 
         MPI_Barrier(MPI_COMM_WORLD);
- 
-        // 4. Sample sigmaG
-        for(int gg=0; gg < numGroups ; gg++){
-            sigmaG[gg]  = dist.inv_gamma_rng((double) (used_data.alpha_sigma + 0.5 * m0[gg]),(double)(used_data.beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
-        }
+
+	// Synchronise the global parameters  
         check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
-      	
-        // 5. Sample prior mixture component probability from Dirichlet distribution
-       
-        for(int gg =0; gg < numGroups; gg++){
-            VectorXi dirin = cass.row(gg).array() + 1;  //For now use +1 as prior
-            pi_L.row(gg) = dist.dirichlet_rng(dirin);
-
-        }
-
         check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+	sumSigmaG = sigmaG.sum();  // Keep in memory for safe limit calculations
 
         //Print results
         //if(rank == 0){

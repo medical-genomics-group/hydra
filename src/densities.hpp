@@ -26,7 +26,7 @@ double gamma_dens(double x, void *norm_data)
 
 	// Cast voided pointer into pointer to struct norm_parm
     // Prior is the same currently for intercepts and fixed effects
-	return -p.alpha * x * p.sum_failure - (((p.epsilon -  p.X_j * x)* p.alpha).array() - EuMasc).exp().sum() - x*x/(2*p.sigma_mu);
+	return -p.alpha * x * p.sum_failure - (((p.epsilon -  p.X_j * x)* p.alpha).array() - EuMasc).exp().sum() - x*x/(2*p.sigma_covariate);
 
 };
 

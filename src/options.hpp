@@ -57,6 +57,7 @@ public:
     string quad_points;
     string priorsFile;
     string dPriorsFile;
+    string hypPriorsFile;
 
     string title;
     string bayesType;

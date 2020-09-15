@@ -2191,3 +2191,47 @@ void Data::read_dirichlet_priors(const string& file){
         cout << "Dirichlet parameters read from file" << endl;
     }
 }
+
+
+/*
+ * Reads priors  for sigmaE/alpha, mu, fixed effects from file
+ * in : path to file (expected format as "par1,par2; par1; par1")
+ * out: void
+ */
+void Data::read_hyperparameter_priors(const string& file){
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    try {
+        ifstream in(file);
+        string whole_text{ istreambuf_iterator<char>(in), istreambuf_iterator<char>() };
+
+        Gadget::Tokenizer strvec;
+        Gadget::Tokenizer strT;
+        // get element sizes to instantiate result vector
+        strvec.getTokens(whole_text, ";");
+
+        sigmaEPriors = Eigen::VectorXd(2);  // We need to pass two values
+        for (unsigned j=0; j<strvec.size(); ++j) {
+            if(j == 0){
+	        strT.getTokens(strvec[j], ",");
+                for (unsigned k=0; k<2; ++k) {
+                    sigmaEPriors(k) = stod(strT[k]);
+                }
+	    }else if(j == 1){
+		strT.getTokens(strvec[j], ",");
+	        muPrior = stod(strT[0]);
+	    }else if(j == 2){
+ 	        strT.getTokens(strvec[j], ",");
+                covarPrior = stod(strT[0]);
+	    }
+        }
+    } catch (const ifstream::failure& e) {
+        cout<<"Error opening the file"<< endl;
+    }
+    if (rank == 0) {
+        cout << "Hyperparameters for intercept and error variance read from file" << endl;
+    }
+}
+
+
+

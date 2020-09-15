@@ -28,8 +28,8 @@ struct pars {
 	// Mu-specific variables
 	double sigma_mu;
 
-	// sigma_b-specific variables
-	double alpha_sigma, beta_sigma;
+	// Covariate-specific variables
+	double sigma_covariate;
 
 	// Number of events (sum of failure indicators)
 	double d;
