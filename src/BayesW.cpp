@@ -740,12 +740,18 @@ int BayesW::runMpiGibbs_bW() {
         if(opt.covariates){
 
             double gamma_old = 0;
-            std::shuffle(xI.begin(), xI.end(), dist.rng);    
+            //std::shuffle(xI.begin(), xI.end(), dist.rng);    
+	    boost::uniform_int<> unii(0, numFixedEffects - 1);
+            boost::variate_generator< boost::mt19937&, boost::uniform_int<> > generator(dist.rng, unii);
+            if (opt.shuffleMarkers) {
+                 boost::range::random_shuffle(xI, generator);
+            }
 
-    		//Use only rank 0 shuffling
+
+   	    //Use only rank 0 shuffling
             check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-	        MPI_Barrier(MPI_COMM_WORLD);
+	    MPI_Barrier(MPI_COMM_WORLD);
 
 
             for(int fix_i = 0; fix_i < numFixedEffects; fix_i++){
@@ -778,13 +784,13 @@ int BayesW::runMpiGibbs_bW() {
                 errorCheck(err);
 
                 //Use only rank 0
-		        check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+		check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 		
                 gamma(xI[fix_i]) = xsamp[0];  // Save the new result
                 for(int k = 0; k < Ntot; k++){
                     epsilon[k] = (used_data.epsilon)[k] - used_data.X_j[k] * gamma(xI[fix_i]);// we adjust the residual with the respect to the previous gamma value
                 }
-		        MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(MPI_COMM_WORLD);
             }
         }
 
@@ -829,9 +835,12 @@ int BayesW::runMpiGibbs_bW() {
             vi[i] = expl((long double)(used_data.alpha * epsilon[i] - EuMasc));
         }
 
+ 	boost::uniform_int<> unii(0, M-1);
+        boost::variate_generator< boost::mt19937&, boost::uniform_int<> > generator(dist.rng, unii);
         if (opt.shuffleMarkers) {
-            std::shuffle(markerI.begin(), markerI.end(), dist.rng);
-        }
+            //std::shuffle(markerI.begin(), markerI.end(), dist.rng);
+            boost::range::random_shuffle(markerI, generator);
+	}
 
         m0.setZero();
 
@@ -926,7 +935,6 @@ int BayesW::runMpiGibbs_bW() {
 
                 // Calculate the probability that marker is 0
                 double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
-                //acum = 0.50000;
 
                 //Loop through the possible mixture classes
                 for (int k = 0; k < K; k++) {
@@ -945,7 +953,6 @@ int BayesW::runMpiGibbs_bW() {
                             used_data_beta.mean = mave[marker];
                             used_data_beta.sd = mstd[marker];
                             used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
-                            //used_data_beta.used_mixture = k-1;
 
 		
                             used_data_beta.mixture_value = cVa(cur_group, k-1); //k-1 because cVa stores only non-zero in bW
