@@ -264,6 +264,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             dPriorsFile = argv[++i];
             ss << "--dPriorsFile" << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--hypPriorsFile")) {
+            hypPriorsFile = argv[++i];
+            ss << "--hypPriorsFile" << argv[i] << "\n";
+        }
         else if(!strcmp(argv[i], "--covariates")) {
             covariates = true;
             covariatesFile = argv[++i];

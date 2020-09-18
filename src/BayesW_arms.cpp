@@ -348,7 +348,7 @@ void sample(ENVELOPE *env, POINT *p, Distributions_boost &dist)
 
     /* sample a uniform */
     prob = u_random(dist);
-    printf("  prob = %20.16f\n", prob);
+    //printf("  prob = %20.16f\n", prob);
 
     /* get x-value correponding to a cumulative probability prob */
     invert(prob,env,p);

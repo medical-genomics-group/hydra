@@ -22,9 +22,11 @@ class BayesW : public BayesRRm
 public:
     const double	alpha_0      = 0.01;
     const double	kappa_0      = 0.01;
-    const double    sigma_mu     = 100;
-    const double    alpha_sigma  = 1;
-    const double    beta_sigma   = 0.0001;
+    const double      sigma_mu     = 100;
+    const double      sigma_covariate = 100;
+
+    double    alpha_sigma  = 1;
+    double    beta_sigma   = 0.0001;
     const string 	quad_points  = opt.quad_points;   // Number of Gaussian quadrature points
     unsigned int 	K            = opt.S.size() + 1;  // Number of mixtures + 0 class
     unsigned int    km1          = opt.S.size();      // Number of mixtures 

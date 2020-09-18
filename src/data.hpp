@@ -95,6 +95,9 @@ public:
     MatrixXd mS;			 // mixtures in groups
     MatrixXd priors;         // group priors v0, s0
     MatrixXd dPriors;        // group priors of dirichlet distribution
+    VectorXd sigmaEPriors;   // Priors for sigmaE or alpha
+    double muPrior = 100;    // Prior for mu
+    double covarPrior = 100; // Prior for the covariates
 
     VectorXd fail;           // Failure indicator
 
@@ -343,10 +346,13 @@ public:
     void readmSFile(const string& mSfile);
     void printGroupMixtureComponents();
     
-    //bW var
+    // bW var
     void readFailureFile(const string &failureFile);
+    
+    // prior reading files
     void read_group_priors(const string& file);
     void read_dirichlet_priors(const string& file);
+    void read_hyperparameter_priors(const string& file);
 };
 
 #endif /* data_hpp */

@@ -149,6 +149,10 @@ int main(int argc, const char * argv[]) {
                 data.read_dirichlet_priors(opt.dPriorsFile);
             }
 
+            if (opt.hypPriorsFile != "") {
+                data.read_hyperparameter_priors(opt.hypPriorsFile);
+            }
+
             if (opt.multi_phen) {
                 throw("EO: Disabled for now");
                 //BayesRRm_mt analysis(data, opt, sysconf(_SC_PAGE_SIZE));
@@ -158,7 +162,6 @@ int main(int argc, const char * argv[]) {
 
                 BayesW analysis(data, opt);
                 analysis.runMpiGibbs_bW();
-
             } else {
 
                 BayesRRm analysis(data, opt);
@@ -175,9 +178,7 @@ int main(int argc, const char * argv[]) {
     catch (const char *err_msg) {
         cerr << "\n" << err_msg << endl;
     }
-    
     MPI_Finalize();
-
     timer.getTime();
 
     if (rank == 0) {
