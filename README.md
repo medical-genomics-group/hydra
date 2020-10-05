@@ -36,13 +36,13 @@ sudo apt-get install libeigen3-dev libboost-all-dev cmake
 Clone
 
 ```
-git clone https://github.com/https://github.com/medical-genomics-group/hydra.git
+git clone https://github.com/medical-genomics-group/hydra
 ```
 
 or Download
 
 ```
-wget https://github.com/https://github.com/medical-genomics-group/hydra/archive/master.zip
+wget https://github.com/medical-genomics-group/hydra/archive/master.zip
 unzip master.zip
 mv hydra-master hydra
 ```
