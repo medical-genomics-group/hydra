@@ -246,6 +246,8 @@ void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, cons
 //-------------
 int BayesW::runMpiGibbs_bW() {
 
+	const double tau = 40.0; // Later we need to read from the data what is the breaking point
+
 	const unsigned int numFixedEffects(data.numFixedEffects);
 
     char   buff[LENBUF];
@@ -279,8 +281,10 @@ int BayesW::runMpiGibbs_bW() {
         }
     }
 
+    //TODO: Write new functions for Ntot1 and Ntot2 to read from different epochs
+    uint Ntot1       = data.set_Ntot1(rank, opt);
+    uint Ntot2       = data.set_Ntot2(rank, opt);
 
-    uint Ntot       = data.set_Ntot(rank, opt);
     const uint Mtot = data.set_Mtot(rank, opt);
 
     //Reset the dist
@@ -467,7 +471,6 @@ int BayesW::runMpiGibbs_bW() {
         check_mpi(MPI_File_write_at(xbetfh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
         check_mpi(MPI_File_write_at(cpnfh,  offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
         check_mpi(MPI_File_write_at(xcpnfh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
-        // check_mpi(MPI_File_write_at(acufh, offset, &Mtot, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
     }
 
     MPI_Barrier(MPI_COMM_WORLD);
@@ -477,6 +480,7 @@ int BayesW::runMpiGibbs_bW() {
 
     // Read the data (from sparse representation by default)
     // -----------------------------------------------------
+    // SEO: Now do it by two bed files (in one people had the event in epoch one and in the other one they had it in epoch two)
     size_t *N1S, *N1L,  *N2S, *N2L,  *NMS, *NML;
     N1S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
     N1L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
@@ -484,7 +488,16 @@ int BayesW::runMpiGibbs_bW() {
     N2L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
     NMS = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
     NML = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
-    dalloc += 6.0 * double(M) * sizeof(size_t) / 1E9;
+//    dalloc += 6.0 * double(M) * sizeof(size_t) / 1E9;
+
+    size_t *N1S_2, *N1L_2,  *N2S_2, *N2L_2,  *NMS_2, *NML_2;
+    N1S_2 = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1S_2, __LINE__, __FILE__);
+    N1L_2 = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1L_2, __LINE__, __FILE__);
+    N2S_2 = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2S_2, __LINE__, __FILE__);
+    N2L_2 = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2L_2, __LINE__, __FILE__);
+    NMS_2 = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NMS_2, __LINE__, __FILE__);
+    NML_2 = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NML_2, __LINE__, __FILE__);
+    dalloc += 12.0 * double(M) * sizeof(size_t) / 1E9; //SEO: Is this correct?
 
 
     // Boolean mask for using BED representation or not (SPARSE otherwise)
@@ -499,16 +512,26 @@ int BayesW::runMpiGibbs_bW() {
 
 
     uint *I1, *I2, *IM;
+    uint *I1_2, *I2_2, *IM_2; //For epoch 2
+
     size_t taskBytes = 0;
 
     if (opt.readFromBedFile) {
-        data.load_data_from_bed_file(opt.bedFile, Ntot, M, rank, MrankS[rank],
+ 	//Read the data sets for two epochs
+        data.load_data_from_bed_file1(opt.bedFile1, Ntot1, M, rank, MrankS[rank],
                                      N1S, N1L, I1,
                                      N2S, N2L, I2,
                                      NMS, NML, IM,
                                      taskBytes);
-    } else {
-        string sparseOut = opt.get_sparse_output_filebase(rank);
+	data.load_data_from_bed_file2(opt.bedFile2, Ntot2, M, rank, MrankS[rank],
+                                     N1S_2, N1L_2, I1_2,
+                                     N2S_2, N2L_2, I2_2,
+                                     NMS_2, NML_2, IM_2,
+                                     taskBytes);
+    } else {  //TODO : Implement two epochs for sparse solution
+        cout << "Sparse solution not yet implemented for two epochs" << endl;
+	exit(1000);
+	string sparseOut = opt.get_sparse_output_filebase(rank);
         data.load_data_from_sparse_files(rank, nranks, M, MrankS, MrankL, sparseOut,
                                          N1S, N1L, I1,
                                          N2S, N2L, I2,
@@ -528,6 +551,7 @@ int BayesW::runMpiGibbs_bW() {
 
     // Correct each marker for individuals with missing phenotype
     // ----------------------------------------------------------
+    //TODO: Implement NA correction for two epochs
     if (data.numNAs > 0) {
 
         if (rank == 0)
@@ -549,8 +573,8 @@ int BayesW::runMpiGibbs_bW() {
     // Compute statistics (from sparse info)
     // -------------------------------------
     //if (rank == 0) printf("INFO   : start computing statistics on Ntot = %d individuals\n", Ntot);
-    double dN   = (double) Ntot;
-    double dNm1 = (double)(Ntot - 1);
+    double dN   = (double) (Ntot1 + Ntot2);
+    double dNm1 = (double)(Ntot1 + Ntot2 - 1);
     double *mave, *mstd, *sum_failure, *sum_failure_fix; 
 
     mave = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mave, __LINE__, __FILE__);
@@ -563,17 +587,19 @@ int BayesW::runMpiGibbs_bW() {
 
     double tmp0, tmp1, tmp2;
     double temp_fail_sum = used_data_alpha.failure_vector.array().sum();
-    for (int i=0; i<M; ++i) {
+    for (int i=0; i < M; ++i) {
         // For now use the old way to compute means
-        mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
+        mave[i] = (double(N1L[i]) + double(N1L_2[i])  + 2.0 * (double(N2L[i]) + double(N2L_2[i])  )  )  / (dN - double(NML[i] - double(NML_2[i]));        
 
-        tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
-        tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
-        tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
+        tmp1 = (double(N1L[i]) + double(N1L_2[i])) * (1.0 - mave[i]) * (1.0 - mave[i]);
+        tmp2 = (double(N2L[i]) + double(N2L_2[i])) * (2.0 - mave[i]) * (2.0 - mave[i]);
+        tmp0 = double(Ntot1 + Ntot2 - N1L[i] - N1L_2[i] - N2L[i] - N2L_2[i] - NML[i] - NML_2[i])) * (0.0 - mave[i]) * (0.0 - mave[i]);
         //TODO At some point we need to turn sd to 1/sd for speed
         //mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
-        mstd[i] = sqrt( (tmp0+tmp1+tmp2)/double(Ntot - 1));
+        mstd[i] = sqrt( (tmp0+tmp1+tmp2)/double(Ntot1 + Ntot2 - 1));
 
+
+//TODO: This part has to be thought through
         int temp_sum = 0;
         for(size_t ii = N1S[i]; ii < (N1S[i] + N1L[i]) ; ii++){
             temp_sum += used_data_alpha.failure_vector(I1[ii]);
@@ -581,11 +607,13 @@ int BayesW::runMpiGibbs_bW() {
         for(size_t ii = N2S[i]; ii < (N2S[i] + N2L[i]) ; ii++){
             temp_sum += 2*used_data_alpha.failure_vector(I2[ii]);
         }
+
         sum_failure[i] = (temp_sum - mave[i] * temp_fail_sum) / mstd[i];
 
         //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
     //If there are fixed effects, find the same values for them
+//TODO: Implement covariates later for the two epochs
     if(opt.covariates){
         for(int fix_i=0; fix_i < numFixedEffects; fix_i++){
             sum_failure_fix[fix_i] = ((data.X.col(fix_i).cast<double>()).array() * used_data_alpha.failure_vector.array()).sum();
@@ -611,8 +639,9 @@ int BayesW::runMpiGibbs_bW() {
     // ---------------
     const auto st3 = std::chrono::high_resolution_clock::now();
 
+    //First epoch has the individuals that experienced event there
     double *y, *tmpEps, *deltaEps, *dEpsSum, *deltaSum, *epsilon , *tmpEps_vi, *tmp_deltaEps;
-    const size_t NDB = size_t(Ntot) * sizeof(double);
+    const size_t NDB = size_t(Ntot1) * sizeof(double);
     y            = (double*)_mm_malloc(NDB, 64);  check_malloc(y,            __LINE__, __FILE__);
     epsilon      = (double*)_mm_malloc(NDB, 64);  check_malloc(epsilon,      __LINE__, __FILE__);
     tmpEps_vi    = (double*)_mm_malloc(NDB, 64);  check_malloc(tmpEps_vi,    __LINE__, __FILE__);
@@ -622,23 +651,44 @@ int BayesW::runMpiGibbs_bW() {
     dEpsSum      = (double*)_mm_malloc(NDB, 64);  check_malloc(dEpsSum,      __LINE__, __FILE__);
     deltaSum     = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaSum,     __LINE__, __FILE__);
 
+    //We also keep in memory the second residual (coming from tau)
+    double *tmpEps_2, *deltaEps_2, *dEpsSum_2, *deltaSum_2, *epsilon_2 , *tmpEps_vi_2, *tmp_deltaEps_2;
+    const size_t NDB_2 = size_t(Ntot2) * sizeof(double);
+    epsilon_2      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(epsilon_2,      __LINE__, __FILE__);
+    tmpEps_vi_2    = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps_vi_2,    __LINE__, __FILE__);
+    tmpEps_2       = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps_2,       __LINE__, __FILE__);
+    tmp_deltaEps_2 = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmp_deltaEps_2, __LINE__, __FILE__);
+    deltaEps_2     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaEps_2,     __LINE__, __FILE__);
+    dEpsSum_2      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(dEpsSum_2,      __LINE__, __FILE__);
+    deltaSum_2     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaSum_2,     __LINE__, __FILE__);
+
+
     cout << "sizeof(double) = " << sizeof(double) << " vs sizeof(long double) = " << sizeof(long double) << endl;
 
-    const size_t NLDB = size_t(Ntot) * sizeof(long double);
+    const size_t NLDB = size_t(Ntot1) * sizeof(long double);
+    const size_t NLDB_2 = size_t(Ntot2) * sizeof(long double);
+
     long double* tmp_vi = (long double*)_mm_malloc(NLDB, 64);  check_malloc(tmp_vi,   __LINE__, __FILE__);
     long double* vi     = (long double*)_mm_malloc(NLDB, 64);  check_malloc(vi,       __LINE__, __FILE__);
 
+    long double* tmp_vi_2 = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(tmp_vi_2,   __LINE__, __FILE__);
+    long double* vi_2     = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(vi_2,       __LINE__, __FILE__);
+
     dalloc += NDB * 10 / 1E9;
+    dalloc += NDB_2 * 10 / 1E9;
 
     double totalloc = 0.0;
     MPI_Reduce(&dalloc, &totalloc, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
     if (rank == 0)
         printf("INFO   : overall allocation %.3f GB\n", totalloc);
 
-    set_array(dEpsSum, 0.0, Ntot);
+    set_array(dEpsSum, 0.0, Ntot1);
+    set_array(dEpsSum_2, 0.0, Ntot2);
+
 
     // Copy, center and scale phenotype observations
     // In bW we are not scaling and centering phenotypes
+//TODO: Fix the restart for two epochs
     if (opt.restart) {
 
         for (int i=0; i<Ntot; ++i){
@@ -657,6 +707,7 @@ int BayesW::runMpiGibbs_bW() {
         for (int i=0; i<Ntot; ++i) {
             y[i]       = data.y(i);
             epsilon[i] = y[i] - mu;
+	    epsilon_2[i] = tau - mu; 
         }
     }
 
@@ -694,6 +745,7 @@ int BayesW::runMpiGibbs_bW() {
     const int nsamp  = 1;
     const int ncent  = 4;
 
+//TODO: Add additional density functions mu, alpha, beta so that we could sample from the first epoch
 
     //Set iteration_start=0
     for (uint iteration=iteration_start; iteration<opt.chainLength; iteration++) {
@@ -833,6 +885,8 @@ int BayesW::runMpiGibbs_bW() {
         // Calculate the vector of exponent of the adjusted residuals
         for (int i = 0; i < Ntot; ++i) {
             vi[i] = expl((long double)(used_data.alpha * epsilon[i] - EuMasc));
+            vi_2[i] = expl((long double)(used_data.alpha * epsilon_2[i] - EuMasc));  
+
         }
 
  	boost::uniform_int<> unii(0, M-1);
