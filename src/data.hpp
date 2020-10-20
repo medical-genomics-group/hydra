@@ -100,6 +100,10 @@ public:
     double covarPrior = 100; // Prior for the covariates
 
     VectorXd fail;           // Failure indicator
+    
+    //For the second epoch
+    VectorXd fail2;          
+    VectorXd y2;
 
     vector<SnpInfo*> snpInfoVec;
     vector<IndInfo*> indInfoVec;
@@ -120,6 +124,7 @@ public:
 
 
     uint set_Ntot(const int rank, const Options opt);
+    uint set_Ntot2(const int rank, const Options opt);
 
     uint set_Mtot(const int rank, Options opt);
 

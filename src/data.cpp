@@ -35,6 +35,22 @@ uint Data::set_Ntot(const int rank, const Options opt) {
     return Ntot;
 }
 
+uint Data::set_Ntot2(const int rank, const Options opt) {
+
+    uint Ntot = opt.numberIndividuals2;
+
+    if (Ntot == 0) {
+        printf("FATAL  : opt.numberIndividuals2 is zero! Set it via --number-individuals2 in call.");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+//TODO: Deal with NAs for two epochs separately
+    if (Ntot != numInds - numNAs) {
+        if (rank == 0)
+            printf("WARNING: opt.numberIndividuals2 set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot, numInds, numNAs, numInds - numNAs);
+    }
+
+    return Ntot;
+}
 
 uint Data::set_Mtot(const int rank, Options opt) {
 

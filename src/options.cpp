@@ -88,6 +88,11 @@ void Options::inputOptions(const int argc, const char* argv[]){
             bedFile         = argv[++i];
             ss << "--bfile " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--bfile2")) {
+            readFromBedFile = true;
+            bedFile2         = argv[++i];
+            ss << "--bfile2 " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--betaA")) {
             betaA = atof(argv[++i]);
             ss << "--betaA " << argv[i] << "\n";
@@ -162,11 +167,22 @@ void Options::inputOptions(const int argc, const char* argv[]){
             //for (int i=0; i<nphen; i++)
             //    cout << " " << i << ": " << phenotypeFiles[i] << endl;
         }
+
+	else if (!strcmp(argv[i], "--pheno2")) {
+            phenotypeFile2 = argv[++i];
+            ss << "--pheno2 " << argv[i] << "\n";
+	    multi_phen = false;
+        }
+
         // Failure vector file
         else if (!strcmp(argv[i], "--failure")) {
         	failureFile = argv[++i];
         	ss << "--failure " << argv[i] << "\n";
-		}
+	}
+        else if (!strcmp(argv[i], "--failure2")) {
+                failureFile2 = argv[++i];
+                ss << "--failure2 " << argv[i] << "\n";
+        }
         //Number of quadrature points        
         else if (!strcmp(argv[i], "--quad_points")) {
         	quad_points = argv[++i];
@@ -212,6 +228,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if (!strcmp(argv[i], "--number-individuals")) {    //EO
             numberIndividuals = atoi(argv[++i]);
             ss << "--number-individuals " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--number-individuals2")) {    //EO
+            numberIndividuals2 = atoi(argv[++i]);
+            ss << "--number-individuals2 " << argv[i] << "\n";
         }
         else if (!strcmp(argv[i], "--chain-length")) {
             chainLength = atoi(argv[++i]);
@@ -271,8 +291,12 @@ void Options::inputOptions(const int argc, const char* argv[]){
         else if(!strcmp(argv[i], "--covariates")) {
             covariates = true;
             covariatesFile = argv[++i];
-            //cout << "covariatesFile = " << covariatesFile << endl;
             ss << "--covariates " << argv[i] << "\n";
+        }
+        else if(!strcmp(argv[i], "--covariates2")) {
+            covariates = true;
+            covariatesFile2 = argv[++i];
+            ss << "--covariates2 " << argv[i] << "\n";
         }
         else {
             stringstream errmsg;

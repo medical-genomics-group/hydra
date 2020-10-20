@@ -27,7 +27,7 @@
 #include <iomanip>
 #include <ctime>
 #include <mm_malloc.h>
-#include <mpi.h>
+//#include <mpi.h>
 #include <omp.h>
 #include <cmath>
 #include "BayesW_arms.h"
@@ -43,8 +43,10 @@ BayesW::~BayesW() {}
 
 
 // Pass the vector post_marginals of marginal likelihoods by reference
+//TODO - Redefine the function
 void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n,
                                           double vi_sum, double vi_2, double vi_1, double vi_0,
+                                          double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
                                           double mean, double sd,
                                           double mean_sd_ratio, unsigned int group_index,
                                           const pars_beta_sparse used_data_beta) {
@@ -53,15 +55,15 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
 
 	for (int i=0; i < km1; i++) {
 		//Calculate the sigma for the adaptive G-H
-		double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG * cVa(group_index, i) * exp_sum);
+		//double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG * cVa(group_index, i) * exp_sum);
 
         //(i+1) because 0th is already pre-calculated
-		post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index,i), sigma, n, vi_sum,  vi_2,  vi_1,  vi_0, mean, sd, mean_sd_ratio, used_data_beta);
+		//post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index,i), sigma, n, vi_sum,  vi_2,  vi_1,  vi_0, mean, sd, mean_sd_ratio, used_data_beta);
 	}
 }
 
 
-void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int fixedCount)
+void BayesW::init(unsigned int individualCount, unsigned int individualCount2, unsigned int Mtot, unsigned int fixedCount)
 {
 	// Read the failure indicator vector
 	if(individualCount != (data.fail).size()){
@@ -74,14 +76,33 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 
 	//phenotype vector
 	y = VectorXd();
+    y2 = VectorXd();
 
-	//residual vector
-	epsilon = VectorXd();
+
+	//residual vectors
+	epsilon = VectorXd(); //Summing done across first epoch individuals
+    epsilon2 = VectorXd(); //For the rest we sum across second epoch individuals
+    epsilon3 = VectorXd();
+    epsilon4 = VectorXd();
+
 
 	// Resize the vectors in the structure
 	used_data.X_j = VectorXd(individualCount);
+    used_data.X_j2 = VectorXd(individualCount2);
+
+	//Four residual vectors
 	used_data.epsilon.resize(individualCount);
 	used_data_alpha.epsilon.resize(individualCount);
+
+	used_data.epsilon2.resize(individualCount2);
+    used_data_alpha.epsilon2.resize(individualCount2);
+
+	used_data.epsilon3.resize(individualCount2);
+    used_data_alpha.epsilon3.resize(individualCount2);
+
+	used_data.epsilon4.resize(individualCount2);
+    used_data_alpha.epsilon4.resize(individualCount2);
+
 
 	//Init the group variables
     data.groups.resize(Mtot);
@@ -121,6 +142,8 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 
     // Vector to store the 0th component of the marginal likelihood for each group  
     marginal_likelihood_0 = VectorXd(numGroups);
+    marginal_likelihood2_0 = VectorXd(numGroups);
+
 
 	//set priors for pi parameters
 	//Give only the first mixture some initial probability of entering
@@ -128,34 +151,67 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	pi_L.col(0).array() = 0.99;
 	pi_L.col(1).array() = 1 - pi_L.col(0).array() - (km1 - 1)/Mtot;
 
+    // Second epoch
+    pi_L2.setConstant(1.0/Mtot);
+	pi_L2.col(0).array() = 0.99;
+	pi_L2.col(1).array() = 1 - pi_L.col(0).array() - (km1 - 1)/Mtot;
+
 	marginal_likelihoods.setOnes();   //Initialize with just ones
     marginal_likelihood_0.setOnes();
 
 	Beta.setZero();
+    Beta2.setZero();
+
 	gamma.setZero();
 
 	//initialize epsilon vector as the phenotype vector
 	y = data.y.cast<double>().array();
+        y2 = data.y.cast<double>().array();
+
 
 	epsilon = y;
+        epsilon2 = y2;
+        epsilon3 = y2;
+        epsilon4 = y2;
+
+
 	mu = y.mean();       // mean or intercept
 	// Initialize the variables in structures
 	//Save variance classes
 
 	//Store the vector of failures only in the structure used for sampling alpha
 	used_data_alpha.failure_vector = data.fail.cast<double>();
+        used_data_alpha.failure_vector2 = data.fail2.cast<double>();
 
 	double denominator = (6 * ((y.array() - mu).square()).sum()/(y.size()-1));
 	used_data.alpha = PI/sqrt(denominator);    // The shape parameter initial value
 	used_data_beta.alpha = PI/sqrt(denominator);    // The shape parameter initial value
 
 
+	//Initialise epoch 1 individuals
 	for(int i=0; i<(y.size()); ++i){
 		(used_data.epsilon)[i] = y[i] - mu ; // Initially, all the BETA elements are set to 0, XBeta = 0
 		epsilon[i] = y[i] - mu;
 	}
+	// and epoch 2 individuals
+	for(int i=0; i<(y2.size()); ++i){
+                (used_data.epsilon2)[i] = y2[i] - mu ; // Initially, all the BETA elements are set to 0, XBeta = 0
+                epsilon2[i] = y2[i] - mu;
+        	
+		        (used_data.epsilon3)[i] = tau - mu ; 
+                epsilon3[i] = tau - mu;
+
+                (used_data.epsilon4)[i] = y[i] - mu ;
+                epsilon4[i] = tau - mu;
+    }
+
+
+
 	// Use h2 = 0.5 for the inital estimate// divided  by the number of groups
 	sigmaG.array() = PI_squared/ (6 * pow(used_data_beta.alpha,2))/numGroups;
+    //Also initialise similarly for the second epoch
+	sigmaG2.array() = PI_squared/ (6 * pow(used_data_beta.alpha,2))/numGroups;
+
 
     //Restart variables
     epsilon_restart.resize(individualCount);
@@ -192,14 +248,15 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 }
 
 
-void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot, const uint fixtot,
+void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot1, const uint Ntot2, const uint fixtot,
                                const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart) {
     //Use the regular bW initialisation
-    init(Ntot,Mtot, fixtot);    
+    init(Ntot1, Ntot2,Mtot, fixtot);    
 
-    //TODO @@@DT change this function to read the csv file from restart in groups 
-    data.read_mcmc_output_csv_file_bW(opt.mcmcOut, opt.thin, opt.save, K, mu, sigmaG, used_data.alpha, pi_L,
-                                      iteration_to_restart_from, first_thinned_iteration, first_saved_iteration);
+
+    //TODO SEO - fix for epoch restarts
+   // data.read_mcmc_output_csv_file_bW(opt.mcmcOut, opt.thin, opt.save, K, mu, sigmaG, used_data.alpha, pi_L,
+   //                                   iteration_to_restart_from, first_thinned_iteration, first_saved_iteration);
     
     // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
     //@@@EO srand(opt.seed + iteration_to_restart_from);
@@ -218,9 +275,9 @@ void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, cons
                                    Mtot, iteration_to_restart_from, first_thinned_iteration, opt.thin,
                                    MrankS, MrankL, use_xfiles_in_restart,
                                    components);
-
-    data.read_mcmc_output_eps_file(opt.mcmcOut, Ntot, iteration_to_restart_from,
-                                   epsilon_restart);
+//TODO - Fix restart
+ //   data.read_mcmc_output_eps_file(opt.mcmcOut, Ntot, iteration_to_restart_from,
+ //                                  epsilon_restart);
 
     cout << opt.mcmcOut <<  ".mrk" << endl;
 
@@ -246,9 +303,7 @@ void BayesW::init_from_restart(const int K, const uint M, const uint  Mtot, cons
 //-------------
 int BayesW::runMpiGibbs_bW() {
 
-	const double tau = 40.0; // Later we need to read from the data what is the breaking point
-
-	const unsigned int numFixedEffects(data.numFixedEffects);
+    const unsigned int numFixedEffects(data.numFixedEffects);
 
     char   buff[LENBUF];
     char   buff_gamma[LENBUF_gamma];
@@ -282,7 +337,7 @@ int BayesW::runMpiGibbs_bW() {
     }
 
     //TODO: Write new functions for Ntot1 and Ntot2 to read from different epochs
-    uint Ntot1       = data.set_Ntot1(rank, opt);
+    uint Ntot1       = data.set_Ntot(rank, opt);
     uint Ntot2       = data.set_Ntot2(rank, opt);
 
     const uint Mtot = data.set_Mtot(rank, opt);
@@ -292,7 +347,7 @@ int BayesW::runMpiGibbs_bW() {
 
 	
     if (rank == 0)
-        printf("INFO   : Full dataset includes Mtot=%d markers and Ntot=%d individuals.\n", Mtot, Ntot);
+        printf("INFO   : Full dataset includes Mtot=%d markers and Ntot1=%d epoch 1 individuals, Ntot2=%d epoch 2 individuals.\n", Mtot, Ntot1, Ntot2);
 
 
     // Define global marker indexing
@@ -312,13 +367,19 @@ int BayesW::runMpiGibbs_bW() {
     //       hence the correction in the call
     // --------------------------------------------------------------------
     int IrankS[nranks], IrankL[nranks];
-    define_blocks_of_markers(Ntot - data.numNAs, IrankS, IrankL, nranks);
+    define_blocks_of_markers(Ntot1 + Ntot2 - data.numNAs, IrankS, IrankL, nranks); //TODO: SEO - rethink
 
     Beta.resize(M);
     Beta.setZero();
 
+    //Similarly for the second epoch
+    Beta2.resize(M);
+    Beta2.setZero();
+
     components.resize(M);
     components.setZero();
+    components2.resize(M);
+    components2.setZero();
 
     std::vector<int>    markerI;
 
@@ -359,7 +420,8 @@ int BayesW::runMpiGibbs_bW() {
     string epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
 
     if(opt.restart){
-        init_from_restart(K, M, Mtot, Ntot - data.numNAs, numFixedEffects, MrankS, MrankL, opt.useXfilesInRestart);
+        //TODO: Fix restart
+        init_from_restart(K, M, Mtot, Ntot1, Ntot2 , numFixedEffects, MrankS, MrankL, opt.useXfilesInRestart);
         if (rank == 0)
             data.print_restart_banner(opt.mcmcOut.c_str(),  iteration_to_restart_from, iteration_start);
 
@@ -384,11 +446,14 @@ int BayesW::runMpiGibbs_bW() {
     }else{
         // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
         //@@@EO srand(opt.seed);
-
-        init(Ntot - data.numNAs, Mtot,numFixedEffects);
+        //TODO: SEO - fix NAs
+        init(Ntot1,  Ntot2 , Mtot,numFixedEffects); //- data.numNAs
     }
     cass.resize(numGroups,K); //rows are groups columns are mixtures
+    cass2.resize(numGroups,K); 
+
     MatrixXi sum_cass(numGroups,K);  // To store the sum of cass elements over all ranks
+    MatrixXi sum_cass2(numGroups,K);  // To store the sum of cass elements over all ranks
 
     // Initialise the vector of prior inclusion probability (pi) hyperparameters
     VectorXd dirc(K);
@@ -396,6 +461,8 @@ int BayesW::runMpiGibbs_bW() {
 
     // Define sumSigmaG for creating "safe limit"
     double sumSigmaG = sigmaG.sum();
+    double sumSigmaG2 = sigmaG2.sum(); // For epoch 2
+
 
     // Build global repartition of markers over the groups
     VectorXi MtotGrp(numGroups);
@@ -404,6 +471,8 @@ int BayesW::runMpiGibbs_bW() {
         MtotGrp[groups[i]] += 1;
     }
     VectorXi m0(numGroups); // non-zero elements per group
+    VectorXi m0_2(numGroups); // non-zero elements per group (in epoch 2)
+
 
     std::vector<unsigned int> xI(data.X.cols());
     std::iota(xI.begin(), xI.end(), 0);
@@ -518,19 +587,19 @@ int BayesW::runMpiGibbs_bW() {
 
     if (opt.readFromBedFile) {
  	//Read the data sets for two epochs
-        data.load_data_from_bed_file1(opt.bedFile1, Ntot1, M, rank, MrankS[rank],
+        data.load_data_from_bed_file(opt.bedFile, Ntot1, M, rank, MrankS[rank],
                                      N1S, N1L, I1,
                                      N2S, N2L, I2,
                                      NMS, NML, IM,
                                      taskBytes);
-	data.load_data_from_bed_file2(opt.bedFile2, Ntot2, M, rank, MrankS[rank],
+	    data.load_data_from_bed_file(opt.bedFile2, Ntot2, M, rank, MrankS[rank],
                                      N1S_2, N1L_2, I1_2,
                                      N2S_2, N2L_2, I2_2,
                                      NMS_2, NML_2, IM_2,
                                      taskBytes);
     } else {  //TODO : Implement two epochs for sparse solution
         cout << "Sparse solution not yet implemented for two epochs" << endl;
-	exit(1000);
+	    exit(1000);
 	string sparseOut = opt.get_sparse_output_filebase(rank);
         data.load_data_from_sparse_files(rank, nranks, M, MrankS, MrankL, sparseOut,
                                          N1S, N1L, I1,
@@ -565,9 +634,9 @@ int BayesW::runMpiGibbs_bW() {
         if (rank == 0) printf("INFO   : finished applying NA corrections.\n");
 
         // Adjust N upon number of NAs
-        Ntot -= data.numNAs;
+        //Ntot -= data.numNAs; //TODO - Fix NA-s
         if (rank == 0 && data.numNAs > 0)
-            printf("INFO   : Ntot adjusted by -%d to account for NAs in phenotype file. Now Ntot=%d\n", data.numNAs, Ntot);
+            printf("INFO   : Ntot adjusted by -%d to account for NAs in phenotype file. Now Ntot=%d\n", data.numNAs, Ntot1+Ntot2);
     }
 
     // Compute statistics (from sparse info)
@@ -575,11 +644,12 @@ int BayesW::runMpiGibbs_bW() {
     //if (rank == 0) printf("INFO   : start computing statistics on Ntot = %d individuals\n", Ntot);
     double dN   = (double) (Ntot1 + Ntot2);
     double dNm1 = (double)(Ntot1 + Ntot2 - 1);
-    double *mave, *mstd, *sum_failure, *sum_failure_fix; 
+    double *mave, *mstd, *sum_failure, *sum_failure2, *sum_failure_fix; 
 
     mave = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mave, __LINE__, __FILE__);
     mstd = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
     sum_failure = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
+    sum_failure2 = (double*)_mm_malloc(size_t(M) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
 
     sum_failure_fix = (double*)_mm_malloc(size_t(numFixedEffects) * sizeof(double), 64);  check_malloc(mstd, __LINE__, __FILE__);
 
@@ -587,13 +657,15 @@ int BayesW::runMpiGibbs_bW() {
 
     double tmp0, tmp1, tmp2;
     double temp_fail_sum = used_data_alpha.failure_vector.array().sum();
+    double temp_fail_sum2 = used_data_alpha.failure_vector2.array().sum();
+
     for (int i=0; i < M; ++i) {
         // For now use the old way to compute means
-        mave[i] = (double(N1L[i]) + double(N1L_2[i])  + 2.0 * (double(N2L[i]) + double(N2L_2[i])  )  )  / (dN - double(NML[i] - double(NML_2[i]));        
+        mave[i] = (double(N1L[i]) + double(N1L_2[i])  + 2.0 * (double(N2L[i]) + double(N2L_2[i])  )  )  / (dN - double(NML[i] - double(NML_2[i])));        
 
         tmp1 = (double(N1L[i]) + double(N1L_2[i])) * (1.0 - mave[i]) * (1.0 - mave[i]);
         tmp2 = (double(N2L[i]) + double(N2L_2[i])) * (2.0 - mave[i]) * (2.0 - mave[i]);
-        tmp0 = double(Ntot1 + Ntot2 - N1L[i] - N1L_2[i] - N2L[i] - N2L_2[i] - NML[i] - NML_2[i])) * (0.0 - mave[i]) * (0.0 - mave[i]);
+        tmp0 = double(Ntot1 + Ntot2 - N1L[i] - N1L_2[i] - N2L[i] - N2L_2[i] - NML[i] - NML_2[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
         //TODO At some point we need to turn sd to 1/sd for speed
         //mstd[i] = sqrt(double(Ntot - 1) / (tmp0+tmp1+tmp2));
         mstd[i] = sqrt( (tmp0+tmp1+tmp2)/double(Ntot1 + Ntot2 - 1));
@@ -607,8 +679,16 @@ int BayesW::runMpiGibbs_bW() {
         for(size_t ii = N2S[i]; ii < (N2S[i] + N2L[i]) ; ii++){
             temp_sum += 2*used_data_alpha.failure_vector(I2[ii]);
         }
-
         sum_failure[i] = (temp_sum - mave[i] * temp_fail_sum) / mstd[i];
+
+        temp_sum = 0;
+        for(size_t ii = N1S_2[i]; ii < (N1S_2[i] + N1L_2[i]) ; ii++){
+            temp_sum += used_data_alpha.failure_vector2(I1_2[ii]);
+        }
+        for(size_t ii = N2S[i]; ii < (N2S[i] + N2L[i]) ; ii++){
+            temp_sum += 2*used_data_alpha.failure_vector2(I2_2[ii]);
+        }
+        sum_failure2[i] = (temp_sum - mave[i] * temp_fail_sum2) / mstd[i];
 
         //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
@@ -651,17 +731,33 @@ int BayesW::runMpiGibbs_bW() {
     dEpsSum      = (double*)_mm_malloc(NDB, 64);  check_malloc(dEpsSum,      __LINE__, __FILE__);
     deltaSum     = (double*)_mm_malloc(NDB, 64);  check_malloc(deltaSum,     __LINE__, __FILE__);
 
-    //We also keep in memory the second residual (coming from tau)
-    double *tmpEps_2, *deltaEps_2, *dEpsSum_2, *deltaSum_2, *epsilon_2 , *tmpEps_vi_2, *tmp_deltaEps_2;
+    //We also keep in memory residuals 2,3,4
+    double *y2, *tmpEps2, *deltaEps2, *dEpsSum2, *deltaSum2, *epsilon2 , *tmpEps_vi2, *tmp_deltaEps2;
     const size_t NDB_2 = size_t(Ntot2) * sizeof(double);
-    epsilon_2      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(epsilon_2,      __LINE__, __FILE__);
-    tmpEps_vi_2    = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps_vi_2,    __LINE__, __FILE__);
-    tmpEps_2       = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps_2,       __LINE__, __FILE__);
-    tmp_deltaEps_2 = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmp_deltaEps_2, __LINE__, __FILE__);
-    deltaEps_2     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaEps_2,     __LINE__, __FILE__);
-    dEpsSum_2      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(dEpsSum_2,      __LINE__, __FILE__);
-    deltaSum_2     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaSum_2,     __LINE__, __FILE__);
+    epsilon2      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(epsilon2,      __LINE__, __FILE__);
+    tmpEps_vi2    = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps_vi2,    __LINE__, __FILE__);
+    tmpEps2       = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps2,       __LINE__, __FILE__);
+    tmp_deltaEps2 = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmp_deltaEps2, __LINE__, __FILE__);
+    deltaEps2     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaEps2,     __LINE__, __FILE__);
+    dEpsSum2      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(dEpsSum2,      __LINE__, __FILE__);
+    deltaSum2     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaSum2,     __LINE__, __FILE__);
 
+    double *tmpEps3, *deltaEps3, *dEpsSum3, *deltaSum3, *epsilon3 , *tmpEps_vi3, *tmp_deltaEps3;
+    epsilon3      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(epsilon3,      __LINE__, __FILE__);
+    tmpEps_vi3    = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps_vi3,    __LINE__, __FILE__);
+    tmpEps3       = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps3,       __LINE__, __FILE__);
+    tmp_deltaEps3 = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmp_deltaEps3, __LINE__, __FILE__);
+    deltaEps3     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaEps3,     __LINE__, __FILE__);
+    dEpsSum3      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(dEpsSum3,      __LINE__, __FILE__);
+    deltaSum3     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaSum3,     __LINE__, __FILE__);
+
+    double *tmpEps4, *deltaEps4, *dEpsSum4, *deltaSum4, *epsilon4 , *tmpEps_vi4, *tmp_deltaEps4;
+    tmpEps_vi4    = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps_vi4,    __LINE__, __FILE__);
+    tmpEps4       = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmpEps4,       __LINE__, __FILE__);
+    tmp_deltaEps4 = (double*)_mm_malloc(NDB_2, 64);  check_malloc(tmp_deltaEps4, __LINE__, __FILE__);
+    deltaEps4     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaEps4,     __LINE__, __FILE__);
+    dEpsSum4      = (double*)_mm_malloc(NDB_2, 64);  check_malloc(dEpsSum4,      __LINE__, __FILE__);
+    deltaSum4     = (double*)_mm_malloc(NDB_2, 64);  check_malloc(deltaSum4,     __LINE__, __FILE__);
 
     cout << "sizeof(double) = " << sizeof(double) << " vs sizeof(long double) = " << sizeof(long double) << endl;
 
@@ -671,8 +767,14 @@ int BayesW::runMpiGibbs_bW() {
     long double* tmp_vi = (long double*)_mm_malloc(NLDB, 64);  check_malloc(tmp_vi,   __LINE__, __FILE__);
     long double* vi     = (long double*)_mm_malloc(NLDB, 64);  check_malloc(vi,       __LINE__, __FILE__);
 
-    long double* tmp_vi_2 = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(tmp_vi_2,   __LINE__, __FILE__);
-    long double* vi_2     = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(vi_2,       __LINE__, __FILE__);
+    long double* tmp_vi2 = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(tmp_vi2,   __LINE__, __FILE__);
+    long double* vi2     = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(vi2,       __LINE__, __FILE__);
+
+    long double* tmp_vi3 = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(tmp_vi3,   __LINE__, __FILE__);
+    long double* vi3     = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(vi3,       __LINE__, __FILE__);
+ 
+    long double* tmp_vi4 = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(tmp_vi4,   __LINE__, __FILE__);
+    long double* vi4     = (long double*)_mm_malloc(NLDB_2, 64);  check_malloc(vi4,       __LINE__, __FILE__);
 
     dalloc += NDB * 10 / 1E9;
     dalloc += NDB_2 * 10 / 1E9;
@@ -683,7 +785,7 @@ int BayesW::runMpiGibbs_bW() {
         printf("INFO   : overall allocation %.3f GB\n", totalloc);
 
     set_array(dEpsSum, 0.0, Ntot1);
-    set_array(dEpsSum_2, 0.0, Ntot2);
+    set_array(dEpsSum2, 0.0, Ntot2);
 
 
     // Copy, center and scale phenotype observations
@@ -691,9 +793,13 @@ int BayesW::runMpiGibbs_bW() {
 //TODO: Fix the restart for two epochs
     if (opt.restart) {
 
-        for (int i=0; i<Ntot; ++i){
+        for (int i=0; i<Ntot1; ++i){
             epsilon[i] = epsilon_restart[i];
         }
+        //TODO - Fix restart
+        /*for (int i=0; i<Ntot2; ++i){
+            epsilon2[i] = epsilon_restart2[i];
+        }*/
 
         markerI = markerI_restart;
 
@@ -704,21 +810,31 @@ int BayesW::runMpiGibbs_bW() {
             }
         }
     } else {
-        for (int i=0; i<Ntot; ++i) {
+        for (int i=0; i < Ntot1; ++i) {
             y[i]       = data.y(i);
             epsilon[i] = y[i] - mu;
-	    epsilon_2[i] = tau - mu; 
+        }
+        for (int i=0; i < Ntot2; ++i) {
+            y2[i]       = data.y2(i);
+            epsilon2[i] = y[i] - mu;
         }
     }
 
-    VectorXd sum_beta_squaredNorm;
+    VectorXd sum_beta_squaredNorm, sum_beta_squaredNorm2, sum_beta1_beta2;
+
     double   beta, betaOld, deltaBeta, p, acum;
-    VectorXd beta_squaredNorm;
+    double   beta2, betaOld2, deltaBeta2, p2;
+
+    // beta1_beta2 is the vector of covariances
+    VectorXd beta_squaredNorm, beta_squaredNorm2, beta1_beta2;
     size_t   markoff;
     int      marker, cx;
 
     beta_squaredNorm.resize(numGroups);
     sum_beta_squaredNorm.resize(numGroups);
+
+    beta_squaredNorm2.resize(numGroups);
+    sum_beta_squaredNorm2.resize(numGroups);
     // A counter on previously saved thinned iterations
     uint n_thinned_saved = 0;
 
@@ -772,9 +888,15 @@ int BayesW::runMpiGibbs_bW() {
         double xr = 5;   //xl and xr and the maximum and minimum values between which we sample
 
         //Update before sampling
-        for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
+        for(int mu_ind=0; mu_ind < Ntot1; mu_ind++){
             (used_data.epsilon)[mu_ind] = epsilon[mu_ind] + mu;// we add to epsilon =Y+mu-X*beta
         }
+        for(int mu_ind=0; mu_ind < Ntot2; mu_ind++){
+            (used_data.epsilon2)[mu_ind] = epsilon2[mu_ind] + mu;
+            (used_data.epsilon3)[mu_ind] = epsilon3[mu_ind] + mu;
+            (used_data.epsilon4)[mu_ind] = epsilon4[mu_ind] + mu;
+        }
+
         // Use ARS to sample mu (with density mu_dens, using parameters from used_data)
         err = arms(xinit,    ninit,  &xl,   &xr,   mu_dens, &used_data, &convex, npoint,
                    dometrop, &xprev, xsamp, nsamp, qcent,   xcent,      ncent,   &neval, dist);
@@ -784,8 +906,13 @@ int BayesW::runMpiGibbs_bW() {
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         mu = xsamp[0];   // Save the sampled value
         //Update after sampling
-        for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
+        for(int mu_ind=0; mu_ind < Ntot1; mu_ind++){
             epsilon[mu_ind] = (used_data.epsilon)[mu_ind] - mu;// we add to epsilon =Y+mu-X*beta
+        }
+        for(int mu_ind=0; mu_ind < Ntot2; mu_ind++){
+	    epsilon2[mu_ind] = (used_data.epsilon2)[mu_ind] - mu;            
+            epsilon3[mu_ind] = (used_data.epsilon3)[mu_ind] - mu;
+            epsilon4[mu_ind] = (used_data.epsilon4)[mu_ind] - mu;
         }
         ////////// End sampling mu
         /* 1a. Fixed effects (gammas) */
@@ -801,7 +928,7 @@ int BayesW::runMpiGibbs_bW() {
 
 
    	    //Use only rank 0 shuffling
-            check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
 	    MPI_Barrier(MPI_COMM_WORLD);
 
@@ -827,22 +954,29 @@ int BayesW::runMpiGibbs_bW() {
                 used_data.sum_failure = sum_failure_fix[xI[fix_i]];
 
 
-                for(int k = 0; k < Ntot; k++){
+                for(int k = 0; k < Ntot1; k++){
                     (used_data.epsilon)[k] = epsilon[k] + used_data.X_j[k] * gamma_old;// we adjust the residual with the respect to the previous gamma value
                 }
+                for(int k = 0; k < Ntot2; k++){
+                    (used_data.epsilon2)[k] = epsilon2[k] + used_data.X_j[k] * gamma_old;// we adjust the residual with the respect to the previous gamma value
+                }
+                //TODO - Fix covariates by concatenating epsilons here
                 // Sample using ARS
                 err = arms(xinit,ninit,&xl,&xr, gamma_dens,&used_data,&convex,
                            npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval, dist);
                 errorCheck(err);
 
                 //Use only rank 0
-		check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+		        check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 		
                 gamma(xI[fix_i]) = xsamp[0];  // Save the new result
-                for(int k = 0; k < Ntot; k++){
+                for(int k = 0; k < Ntot1; k++){
                     epsilon[k] = (used_data.epsilon)[k] - used_data.X_j[k] * gamma(xI[fix_i]);// we adjust the residual with the respect to the previous gamma value
                 }
-		MPI_Barrier(MPI_COMM_WORLD);
+                for(int k = 0; k < Ntot2; k++){
+                    epsilon2[k] = (used_data.epsilon2)[k] - used_data.X_j[k] * gamma(xI[fix_i]);// we adjust the residual with the respect to the previous gamma value
+                }
+		    MPI_Barrier(MPI_COMM_WORLD);
             }
         }
 
@@ -865,10 +999,14 @@ int BayesW::runMpiGibbs_bW() {
 
         //Give the residual to alpha structure
         //used_data_alpha.epsilon = epsilon;
-        for(int alpha_ind=0; alpha_ind < Ntot; alpha_ind++){
+        for(int alpha_ind=0; alpha_ind < Ntot1; alpha_ind++){
             (used_data_alpha.epsilon)[alpha_ind] = epsilon[alpha_ind];
         }
-
+        for(int alpha_ind=0; alpha_ind < Ntot2; alpha_ind++){
+            (used_data_alpha.epsilon2)[alpha_ind] = epsilon2[alpha_ind];
+            (used_data_alpha.epsilon3)[alpha_ind] = epsilon3[alpha_ind];
+            (used_data_alpha.epsilon4)[alpha_ind] = epsilon4[alpha_ind];
+	}
         //Sample using ARS
         err = arms(xinit,ninit,&xl,&xr,alpha_dens,&used_data_alpha,&convex,
                    npoint,dometrop,&xprev,xsamp,nsamp,qcent,xcent,ncent,&neval, dist);
@@ -883,13 +1021,16 @@ int BayesW::runMpiGibbs_bW() {
         MPI_Barrier(MPI_COMM_WORLD);
 
         // Calculate the vector of exponent of the adjusted residuals
-        for (int i = 0; i < Ntot; ++i) {
+        for (int i = 0; i < Ntot1; ++i) {
             vi[i] = expl((long double)(used_data.alpha * epsilon[i] - EuMasc));
-            vi_2[i] = expl((long double)(used_data.alpha * epsilon_2[i] - EuMasc));  
-
+        }
+    	for (int i = 0; i < Ntot2; ++i) {
+            vi2[i] = expl((long double)(used_data.alpha * epsilon2[i] - EuMasc));  
+            vi3[i] = expl((long double)(used_data.alpha * epsilon3[i] - EuMasc));
+            vi4[i] = expl((long double)(used_data.alpha * epsilon4[i] - EuMasc));
         }
 
- 	boost::uniform_int<> unii(0, M-1);
+ 	    boost::uniform_int<> unii(0, M-1);
         boost::variate_generator< boost::mt19937&, boost::uniform_int<> > generator(dist.rng, unii);
         if (opt.shuffleMarkers) {
             //std::shuffle(markerI.begin(), markerI.end(), dist.rng);
@@ -897,13 +1038,27 @@ int BayesW::runMpiGibbs_bW() {
 	}
 
         m0.setZero();
+        m0_2.setZero();
 
         cass.setZero();
+        cass2.setZero();
 
-        for (int i=0; i<Ntot; ++i) tmpEps[i] = epsilon[i];
+
+        for (int i=0; i<Ntot1; ++i) tmpEps[i] = epsilon[i];
+
+        for (int i=0; i<Ntot2; ++i){
+	        tmpEps2[i] = epsilon2[i];
+            tmpEps3[i] = epsilon3[i];
+            tmpEps4[i] = epsilon4[i];
+	}
+
 
         double cumSumDeltaBetas = 0.0;
+        double cumSumDeltaBetas2 = 0.0;
+
         double task_sum_abs_deltabeta = 0.0;
+        double task_sum_abs_deltabeta2 = 0.0;
+
         int    sinceLastSync    = 0;
      
         // First element for the marginal likelihoods is always is pi_0 *sqrt(pi) for
@@ -911,9 +1066,12 @@ int BayesW::runMpiGibbs_bW() {
         //Precalculate the product already before for each group
         for(int gg = 0; gg < numGroups; gg++){
             marginal_likelihood_0(gg) = pi_L(gg,0) * sqrtPI ;
+            marginal_likelihood2_0(gg) = pi_L2(gg,0) * sqrtPI ; // For the second epoch
         }
         //Set the sum of beta squared 0
         beta_squaredNorm.setZero();
+        beta_squaredNorm2.setZero();
+
         // Loop over (shuffled) markers
         // ----------------------------
 
@@ -923,6 +1081,7 @@ int BayesW::runMpiGibbs_bW() {
             if (j < M) {
                 marker  = markerI[j];
                 beta =  Beta(marker);
+                beta2 =  Beta2(marker);
 
                 unsigned int cur_group = groups[MrankS[rank] + marker];
                 /////////////////////////////////////////////////////////
@@ -931,60 +1090,137 @@ int BayesW::runMpiGibbs_bW() {
                 double vi_1   = 0.0;
                 double vi_2   = 0.0;
 
-                used_data_beta.sigmaG = sigmaG[cur_group];
+                double vi2_sum = 0.0;
+                double vi2_1   = 0.0;
+                double vi2_2   = 0.0;
+
+                double vi3_sum = 0.0;
+                double vi3_1   = 0.0;
+                double vi3_2   = 0.0;
+
+                double vi4_sum = 0.0;
+                double vi4_1   = 0.0;
+                double vi4_2   = 0.0;
+
+                used_data_beta.sigmaG1 = sigmaG[cur_group];
+                used_data_beta.sigmaG2 = sigmaG2[cur_group];
+
 
                 marginal_likelihoods(0) = marginal_likelihood_0(cur_group);  //Each group has now different marginal likelihood at 0
 
                 //Change the residual vector only if the previous beta was non-zero
                 
                 if (Beta(marker) != 0.0) {
-                 
                     //Calculate the change in epsilon if we remove the previous marker effect (-Beta(marker))
-                    set_array(tmp_deltaEps, 0.0, Ntot);                   
-                    
-                    
+                    //Epsilon and epsilon3 are using beta1
+                    set_array(tmp_deltaEps, 0.0, Ntot1);                   
+                    set_array(tmp_deltaEps3, 0.0, Ntot2);                   
+
                     sparse_scaadd(tmp_deltaEps, Beta(marker),
                                   I1, N1S[marker], N1L[marker],
                                   I2, N2S[marker], N2L[marker],
                                   IM, NMS[marker], NML[marker],
-                                  mave[marker], 1.0 / mstd[marker] , Ntot);
-                    
+                                  mave[marker], 1.0 / mstd[marker] , Ntot1);
+                    sparse_scaadd(tmp_deltaEps3, Beta(marker),
+                                  I1_2, N1S_2[marker], N1L_2[marker],
+                                  I2_2, N2S_2[marker], N2L_2[marker],
+                                  IM_2, NMS_2[marker], NML_2[marker],
+                                  mave[marker], 1.0 / mstd[marker] , Ntot2);
                     
                     //Create the temporary vector to store the vector without the last Beta(marker)
-                    add_arrays(tmpEps_vi, epsilon, tmp_deltaEps,  Ntot);
+                    add_arrays(tmpEps_vi, epsilon, tmp_deltaEps,  Ntot1);
+                    add_arrays(tmpEps_vi3, epsilon3, tmp_deltaEps3,  Ntot2);
 
                     //Also find the transformed residuals
-                    
-                    for (uint i=0; i<Ntot; ++i){
+                    for (uint i=0; i<Ntot1; ++i){
                         tmp_vi[i] = expl((long double) (used_data.alpha * tmpEps_vi[i] - EuMasc));
                     }
+                    for (uint i=0; i<Ntot2; ++i){
+                        tmp_vi3[i] = expl((long double) (used_data.alpha * tmpEps_vi3[i] - EuMasc));
+                    }
 
-                    vi_sum = sum_array_elements(tmp_vi, Ntot);
+                    vi_sum = sum_array_elements(tmp_vi, Ntot1);
                     vi_2 = sparse_partial_sum(tmp_vi, I2, N2S[marker], N2L[marker]);
                     vi_1 = sparse_partial_sum(tmp_vi, I1, N1S[marker], N1L[marker]);
-                    //printf("iter %3d  A: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
 
+                    vi3_sum = sum_array_elements(tmp_vi3, Ntot2);
+                    vi3_2 = sparse_partial_sum(tmp_vi3, I2_2, N2S_2[marker], N2L_2[marker]);
+                    vi3_1 = sparse_partial_sum(tmp_vi3, I1_2, N1S_2[marker], N1L_2[marker]);
+                    //printf("iter %3d  A: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
                 } else {
                     // Calculate the sums of vi elements
-                    vi_sum = sum_array_elements(vi, Ntot);
+                    vi_sum = sum_array_elements(vi, Ntot1);
                     vi_2 = sparse_partial_sum(vi, I2, N2S[marker], N2L[marker]);
                     vi_1 = sparse_partial_sum(vi, I1, N1S[marker], N1L[marker]);
+
+                    vi3_sum = sum_array_elements(vi3, Ntot2);
+                    vi3_2 = sparse_partial_sum(vi3, I2_2, N2S_2[marker], N2L_2[marker]);
+                    vi3_1 = sparse_partial_sum(vi3, I1_2, N1S_2[marker], N1L_2[marker]);
                     //printf("iter %3d  B: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
                 }
-
                 double vi_0 = vi_sum - vi_1 - vi_2;
+                double vi3_0 = vi3_sum - vi3_1 - vi3_2;
+                if (Beta2(marker) != 0.0) {
+                    //Calculate the change in epsilon if we remove the previous marker effect (-Beta(marker))
+                    //Epsilon and epsilon3 are using beta1
+                    set_array(tmp_deltaEps2, 0.0, Ntot1);                   
+                    set_array(tmp_deltaEps4, 0.0, Ntot2);                   
 
+                    sparse_scaadd(tmp_deltaEps2, Beta2(marker),
+                                  I1_2, N1S_2[marker], N1L_2[marker],
+                                  I2_2, N2S_2[marker], N2L_2[marker],
+                                  IM, NMS_2[marker], NML_2[marker],
+                                  mave[marker], 1.0 / mstd[marker] , Ntot2);
+                    sparse_scaadd(tmp_deltaEps4, Beta2(marker),
+                                  I1_2, N1S_2[marker], N1L_2[marker],
+                                  I2_2, N2S_2[marker], N2L_2[marker],
+                                  IM_2, NMS_2[marker], NML_2[marker],
+                                  mave[marker], 1.0 / mstd[marker] , Ntot2);
+                    
+                    //Create the temporary vector to store the vector without the last Beta(marker)
+                    add_arrays(tmpEps_vi2, epsilon2, tmp_deltaEps2,  Ntot2);
+                    add_arrays(tmpEps_vi4, epsilon4, tmp_deltaEps4,  Ntot2);
+
+                    //Also find the transformed residuals
+                    for (uint i=0; i<Ntot2; ++i){
+                        tmp_vi2[i] = expl((long double) (used_data.alpha * tmpEps_vi2[i] - EuMasc));
+                    }
+                    for (uint i=0; i<Ntot2; ++i){
+                        tmp_vi4[i] = expl((long double) (used_data.alpha * tmpEps_vi4[i] - EuMasc));
+                    }
+
+                    vi2_sum = sum_array_elements(tmp_vi2, Ntot2);
+                    vi2_2 = sparse_partial_sum(tmp_vi2, I2_2, N2S_2[marker], N2L_2[marker]);
+                    vi2_1 = sparse_partial_sum(tmp_vi2, I1_2, N1S_2[marker], N1L_2[marker]);
+
+                    vi4_sum = sum_array_elements(tmp_vi4, Ntot2);
+                    vi4_2 = sparse_partial_sum(tmp_vi4, I2_2, N2S_2[marker], N2L_2[marker]);
+                    vi4_1 = sparse_partial_sum(tmp_vi4, I1_2, N1S_2[marker], N1L_2[marker]);
+                    //printf("iter %3d  A: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
+                } else {
+                    // Calculate the sums of vi elements
+                    vi2_sum = sum_array_elements(vi2, Ntot2);
+                    vi2_2 = sparse_partial_sum(vi2, I2_2, N2S_2[marker], N2L_2[marker]);
+                    vi2_1 = sparse_partial_sum(vi2, I1_2, N1S_2[marker], N1L_2[marker]);
+
+                    vi4_sum = sum_array_elements(vi4, Ntot2);
+                    vi4_2 = sparse_partial_sum(vi4, I2_2, N2S_2[marker], N2L_2[marker]);
+                    vi4_1 = sparse_partial_sum(vi4, I1_2, N1S_2[marker], N1L_2[marker]);
+                    //printf("iter %3d  B: vi_sum _1 _2 = %25.16f %25.16f %25.16f  %20.17f\n", iteration, vi_sum, vi_1, vi_2, Beta(marker));
+                }
+                double vi2_0 = vi2_sum - vi2_1 - vi2_2;
+                double vi4_0 = vi4_sum - vi4_1 - vi4_2;
                 /* Calculate the mixture probability */
-                double p = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)    
+                double p2 = dist.unif_rng();  //Generate number from uniform distribution (for sampling from categorical distribution)    
  
                 // Calculate the (ratios of) marginal likelihoods
                 
                 //EO!!!!!!!!!!!!!!
-                //sum_failure[marker] = 0.0;
                 used_data_beta.sum_failure = sum_failure[marker];
                 //printf("m %3d -> sum fail = %20.15f\n", marker, sum_failure[marker]);
 
                 marginal_likelihood_vec_calc(pi_L.row(cur_group) , marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
+                                            vi3_sum, vi3_2, vi3_1, vi3_0,
                                              mave[marker],mstd[marker], mave[marker]/mstd[marker], cur_group, used_data_beta);
 
                 // Calculate the probability that marker is 0
@@ -1008,12 +1244,15 @@ int BayesW::runMpiGibbs_bW() {
                             used_data_beta.sd = mstd[marker];
                             used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
 
-		
                             used_data_beta.mixture_value = cVa(cur_group, k-1); //k-1 because cVa stores only non-zero in bW
 
                             used_data_beta.vi_0 = vi_0;
                             used_data_beta.vi_1 = vi_1;
                             used_data_beta.vi_2 = vi_2;
+
+                            used_data_beta.vi_tau_0 = vi3_0;
+                            used_data_beta.vi_tau_1 = vi3_1;
+                            used_data_beta.vi_tau_2 = vi3_2;
 
                             // double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_classes(k-1));
 
@@ -1044,10 +1283,6 @@ int BayesW::runMpiGibbs_bW() {
 
 	                        errorCheck(err);
                             
-                            //printf("xsamp %5d %20.16f\n", j, xsamp[0]);
-                            //xsamp[0] = 0.00000111111;
-                            
-
                             Beta(marker) = xsamp[0];  // Save the new result
 
                             cass(cur_group, k) += 1;
@@ -1055,7 +1290,98 @@ int BayesW::runMpiGibbs_bW() {
                             
                             // Write the sum of the beta squared to the vector
                             beta_squaredNorm[groups[MrankS[rank] + marker]] += Beta[marker] * Beta[marker];
+                        }
+                        break;
+                    } else {
+                        if((k+1) == km1){
+                            acum = 1; // In the end probability will be 1
+                        }else{
+                            acum += marginal_likelihoods(k+1)/marginal_likelihoods.sum();
+                        }
+                    }
+                }
+                //////////////////////////
+                //Do same for second epoch
+                marginal_likelihoods(0) = marginal_likelihood2_0(cur_group);  //Each group has now different marginal likelihood at 0
+                used_data_beta.sum_failure = sum_failure2[marker];
+                //printf("m %3d -> sum fail = %20.15f\n", marker, sum_failure[marker]);
 
+                // The function is the same but now we use residuals 2 and 4
+                marginal_likelihood_vec_calc(pi_L2.row(cur_group) , marginal_likelihoods, quad_points, vi2_sum, vi2_2, vi2_1, vi2_0,
+                                            vi4_sum, vi4_2, vi4_1, vi4_0,
+                                             mave[marker],mstd[marker], mave[marker]/mstd[marker], cur_group, used_data_beta);
+
+                // Calculate the probability that marker is 0
+                acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
+
+                //Loop through the possible mixture classes
+                for (int k = 0; k < K; k++) {
+                    if (p2 <= acum) {
+                        //if zeroth component
+                        if (k == 0) {
+                            Beta2(marker)        = 0.0;
+                            cass2(cur_group, 0) += 1;
+                            components2[marker]  = k;
+
+                        }
+                        // If is not 0th component then sample using ARS
+                        else {
+
+                            //used_data_beta.sum_failure = sum_failure(marker);
+                            used_data_beta.mean = mave[marker];
+                            used_data_beta.sd = mstd[marker];
+                            used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
+
+                            used_data_beta.mixture_value = cVa(cur_group, k-1); //k-1 because cVa stores only non-zero in bW
+
+                            used_data_beta.vi_0 = vi2_0;
+                            used_data_beta.vi_1 = vi2_1;
+                            used_data_beta.vi_2 = vi2_2;
+
+                            used_data_beta.vi_tau_0 = vi4_0;
+                            used_data_beta.vi_tau_1 = vi4_1;
+                            used_data_beta.vi_tau_2 = vi4_2;
+
+                            // double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_classes(k-1));
+
+                            //printf("safe_limit: 2.0 * sqrt(%20.17f * %20.17f)\n", sumSigmaG, used_data_beta.mixture_value);
+                            double safe_limit = 2.0 * std::sqrt(sumSigmaG2 * used_data_beta.mixture_value); // Need to think is this safe enough 
+                            // ARS parameters
+                            neval    = 0;
+                            xsamp[0] = 0.0;
+                            convex   = 1.0;
+                            dometrop = 0;
+                            xprev    = 0.0;
+
+                            xinit[0] = Beta2(marker) - safe_limit/10.0;     // Initial abscissae
+                            xinit[1] = Beta2(marker);
+                            xinit[2] = Beta2(marker) + safe_limit/20.0;
+                            xinit[3] = Beta2(marker) + safe_limit/10.0;
+		        
+                            // Initial left and right (pseudo) extremes
+                            xl = Beta2(marker) - safe_limit  ; //Construct the hull around previous beta value
+                            xr = Beta2(marker) + safe_limit;
+
+                            // Sample using ARS
+                            //printf("beta:  %20.17f, safe_limit = %20.17f\n", Beta(marker), safe_limit);
+                            //printf("xinit: %20.17f %20.17f %20.17f %20.17f\n", xinit[0], xinit[1], xinit[2], xinit[3]);
+
+                            err = arms(xinit, ninit, &xl, &xr, beta_dens, &used_data_beta, &convex,
+                                       npoint,dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
+
+	                        errorCheck(err);
+                            
+                            Beta2(marker) = xsamp[0];  // Save the new result
+
+                            cass2(cur_group, k) += 1;
+                            components2[marker]  = k;
+                            
+                            // Write the sum of the beta squared to the vector
+                            beta_squaredNorm2[groups[MrankS[rank] + marker]] += Beta2[marker] * Beta2[marker];
+                            //If the first epoch marker was also included, add the product to the covariance
+                            if(Beta[marker] != 0){
+                                beta1_beta2[groups[MrankS[rank] + marker]] += Beta[marker] * Beta2[marker];
+                            }
                         }
                         break;
                     } else {
@@ -1067,37 +1393,86 @@ int BayesW::runMpiGibbs_bW() {
                     }
                 }
 
+
                 betaOld   = beta;
                 beta      = Beta(marker);
                 deltaBeta = betaOld - beta;
-                
+                // And the same for second epoch
+                betaOld2   = beta2;
+                beta2      = Beta2(marker);
+                deltaBeta2 = betaOld2 - beta2;
 
                 //continue;
 
-                if (deltaBeta != 0.0)
+                //if (deltaBeta != 0.0)
                     //printf("deltaBeta = %20.16f\n", deltaBeta);
 
-
                 // Compute delta epsilon
+                // beta will affect residuals 1 and 3
                 if (deltaBeta != 0.0) {
                     //printf("it %d, task %3d, marker %5d has non-zero deltaBeta = %15.10f (%15.10f, %15.10f) => %15.10f) 1,2,M: %lu, %lu, %lu\n", iteration, rank, marker, deltaBeta, mave[marker], mstd[marker],  deltaBeta * mstd[marker], N1L[marker], N2L[marker], NML[marker]);
 
                     if (opt.sparseSync && nranks > 1) {
-
+                        //TODO - Check if it's feasible to use for multiepoch bW
                         mark2sync.push_back(marker);
                         dbet2sync.push_back(deltaBeta);
 
                     } else {
+                        // Change in residual 1 (across Ntot1 individuals)
                         sparse_scaadd(deltaEps, deltaBeta, 
                                       I1, N1S[marker], N1L[marker],
                                       I2, N2S[marker], N2L[marker],
                                       IM, NMS[marker], NML[marker],
-                                      mave[marker], 1/mstd[marker] , Ntot); //Use here 1/sd
+                                      mave[marker], 1/mstd[marker] , Ntot1); //Use here 1/sd
                         
                         // Update local sum of delta epsilon
-                        add_arrays(dEpsSum, deltaEps, Ntot);
+                        add_arrays(dEpsSum, deltaEps, Ntot1);
+
+                        // Change in residual 3 (across Ntot2 individuals)
+                        sparse_scaadd(deltaEps3, deltaBeta, 
+                                      I1_2, N1S_2[marker], N1L_2[marker],
+                                      I2_2, N2S_2[marker], N2L_2[marker],
+                                      IM_2, NMS_2[marker], NML_2[marker],
+                                      mave[marker], 1/mstd[marker] , Ntot2); //Use here 1/sd
+                        
+                        // Update local sum of delta epsilon
+                        add_arrays(dEpsSum3, deltaEps3, Ntot2);
+
                     }
-                }	
+                }
+                	
+                if (deltaBeta2 != 0.0) {
+                    //printf("it %d, task %3d, marker %5d has non-zero deltaBeta = %15.10f (%15.10f, %15.10f) => %15.10f) 1,2,M: %lu, %lu, %lu\n", iteration, rank, marker, deltaBeta, mave[marker], mstd[marker],  deltaBeta * mstd[marker], N1L[marker], N2L[marker], NML[marker]);
+
+                    if (opt.sparseSync && nranks > 1) {
+                        //TODO - Check if it's feasible to use for multiepoch bW
+                        mark2sync.push_back(marker);
+                        dbet2sync.push_back(deltaBeta);
+
+                    } else {
+                        // Change in residual 2 (across Ntot2 individuals)
+                        sparse_scaadd(deltaEps2, deltaBeta2, 
+                                      I1_2, N1S_2[marker], N1L_2[marker],
+                                      I2_2, N2S_2[marker], N2L_2[marker],
+                                      IM_2, NMS_2[marker], NML_2[marker],
+                                      mave[marker], 1/mstd[marker] , Ntot2); //Use here 1/sd
+                        
+                        // Update local sum of delta epsilon
+                        add_arrays(dEpsSum2, deltaEps2, Ntot2);
+
+                        // Change in residual 4 (across Ntot2 individuals)
+                        sparse_scaadd(deltaEps4, deltaBeta2, 
+                                      I1_2, N1S_2[marker], N1L_2[marker],
+                                      I2_2, N2S_2[marker], N2L_2[marker],
+                                      IM_2, NMS_2[marker], NML_2[marker],
+                                      mave[marker], 1/mstd[marker] , Ntot2); //Use here 1/sd
+                        
+                        // Update local sum of delta epsilon
+                        add_arrays(dEpsSum4, deltaEps4, Ntot2);
+
+                    }
+                }
+
             }
 
             // Make the contribution of tasks beyond their last marker nill
@@ -1105,13 +1480,19 @@ int BayesW::runMpiGibbs_bW() {
             else {
                 //cout << "rank " << rank << " with M=" << M << " waiting for " << lmax << endl;
                 deltaBeta = 0.0;
-                
-                set_array(deltaEps, 0.0, Ntot);
+                deltaBeta2 = 0.0;
+
+                set_array(deltaEps, 0.0, Ntot1);
+                set_array(deltaEps2, 0.0, Ntot2);
+                set_array(deltaEps3, 0.0, Ntot2);
+                set_array(deltaEps4, 0.0, Ntot2);
+
             }
 
             //continue;
 
             task_sum_abs_deltabeta += fabs(deltaBeta);
+            task_sum_abs_deltabeta2 += fabs(deltaBeta2);
 
             // Check whether we have a non-zero beta somewhere
             //if (nranks > 1 && (sync_rate == 0 || sinceLastSync > sync_rate || j == lmax-1)) {
@@ -1119,6 +1500,7 @@ int BayesW::runMpiGibbs_bW() {
                 //MPI_Barrier(MPI_COMM_WORLD);
                 double tb = MPI_Wtime();                
                 check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta, &cumSumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta2, &cumSumDeltaBetas2, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
                 double te = MPI_Wtime();
                 tot_sync_ar1  += te - tb;
@@ -1128,6 +1510,8 @@ int BayesW::runMpiGibbs_bW() {
 
             } else {
                 cumSumDeltaBetas = task_sum_abs_deltabeta;
+                cumSumDeltaBetas2 = task_sum_abs_deltabeta2;
+
             }
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
 
@@ -1142,6 +1526,7 @@ int BayesW::runMpiGibbs_bW() {
                     
                     // Sparse synchronization
                     // ----------------------
+                    //TODO - sparse sync yet to be thought and implemented
                     if (opt.sparseSync) {
                             
                         uint task_m2s = (uint) mark2sync.size();
@@ -1235,9 +1620,10 @@ int BayesW::runMpiGibbs_bW() {
                             
                             // Set all to 0 contribution
                             if (i == 0) {
-                                set_array(deltaSum, lambda0, Ntot);
+                                //TODO - fix sparse sync
+                                //set_array(deltaSum, lambda0, Ntot);
                             } else {
-                                offset_array(deltaSum, lambda0, Ntot);
+                                //offset_array(deltaSum, lambda0, Ntot);
                             }
                             
                             // M -> revert lambda 0 (so that equiv to add 0.0)
@@ -1272,11 +1658,18 @@ int BayesW::runMpiGibbs_bW() {
                         
                     } else {
                         
-                        check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-                    
+                        check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allreduce(&dEpsSum2[0], &deltaSum2[0], Ntot2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allreduce(&dEpsSum3[0], &deltaSum3[0], Ntot2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allreduce(&dEpsSum4[0], &deltaSum4[0], Ntot2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
                     }
                     
-                    add_arrays(epsilon, tmpEps, deltaSum, Ntot);
+                    add_arrays(epsilon, tmpEps, deltaSum, Ntot1);
+                    add_arrays(epsilon2, tmpEps2, deltaSum2, Ntot2);
+                    add_arrays(epsilon3, tmpEps3, deltaSum3, Ntot2);
+                    add_arrays(epsilon4, tmpEps4, deltaSum4, Ntot2);
+
                     
                     double te = MPI_Wtime();
                     tot_sync_ar2  += te - tb;
@@ -1285,41 +1678,48 @@ int BayesW::runMpiGibbs_bW() {
                     it_nsync_ar2  += 1;    
 
                 } else { // case nranks == 1    
-                    if(opt.deltaUpdate == true){
-                        add_arrays(epsilon, tmpEps, dEpsSum,  Ntot);
-                    }else{	
-                        for(uint i=0; i < Ntot; i++){
-                            epsilon[i] = epsilon[i] -  betaOld * mave[marker]/mstd[marker];
-                            epsilon[i] = epsilon[i] + beta * mave[marker]/mstd[marker];
-                        }
-                        //And adjust even further for specific 1 and 2 allele values
-		                for (size_t i = N1S[marker]; i < (N1S[marker] + N1L[marker]) ; i++){
-                            epsilon[I1[i]] += betaOld/mstd[marker];
-                            epsilon[I1[i]] -= beta/mstd[marker];
-                        }
-                        for (size_t i = N2S[marker]; i < (N2S[marker] + N2L[marker]) ; i++){
-                            epsilon[I2[i]] += 2*betaOld/mstd[marker];
-                            epsilon[I2[i]] -= 2*beta/mstd[marker];
-                        }
-                    }
+                    add_arrays(epsilon, tmpEps, dEpsSum,  Ntot1);
+                    add_arrays(epsilon2, tmpEps2, dEpsSum2,  Ntot2);
+                    add_arrays(epsilon3, tmpEps3, dEpsSum3,  Ntot2);
+                    add_arrays(epsilon4, tmpEps4, dEpsSum4,  Ntot2);
+                    
                 }
    
                 // Do a update currently locally for vi vector
-                for(int vi_ind=0; vi_ind < Ntot; vi_ind++){
+                for(int vi_ind=0; vi_ind < Ntot1; vi_ind++){
                     vi[vi_ind] = expl((long double)(used_data.alpha * epsilon[vi_ind] - EuMasc));
+                }
+
+                for(int vi_ind=0; vi_ind < Ntot2; vi_ind++){
+                    vi2[vi_ind] = expl((long double)(used_data.alpha * epsilon2[vi_ind] - EuMasc));
+                    vi3[vi_ind] = expl((long double)(used_data.alpha * epsilon3[vi_ind] - EuMasc));
+                    vi4[vi_ind] = expl((long double)(used_data.alpha * epsilon4[vi_ind] - EuMasc));
+
+
                 }
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
                 
                 // Store epsilon state at last synchronization
-                copy_array(tmpEps, epsilon, Ntot);
+                copy_array(tmpEps, epsilon, Ntot1);
+                copy_array(tmpEps2, epsilon2, Ntot2);
+                copy_array(tmpEps3, epsilon3, Ntot2);
+                copy_array(tmpEps4, epsilon4, Ntot2);
+
                 
                 // Reset local sum of delta epsilon
-                set_array(dEpsSum, 0.0, Ntot);
+                set_array(dEpsSum, 0.0, Ntot1);
+                set_array(dEpsSum2, 0.0, Ntot2);
+                set_array(dEpsSum3, 0.0, Ntot2);
+                set_array(dEpsSum4, 0.0, Ntot2);
+
                 
                 // Reset cumulated sum of delta betas
                 cumSumDeltaBetas       = 0.0;
                 task_sum_abs_deltabeta = 0.0;
+
+                cumSumDeltaBetas2       = 0.0;
+                task_sum_abs_deltabeta2 = 0.0;
                 
                 sinceLastSync = 0;
                 
@@ -1331,10 +1731,8 @@ int BayesW::runMpiGibbs_bW() {
         //continue;
 
        
-        printf("rank %d it %d  beta_squaredNorm[0] = %20.15f\n", rank, iteration, beta_squaredNorm[0]);
-
-
-        //continue;
+        printf("rank %d it %d  beta_squaredNorm[0] = %20.15f, beta_squaredNorm2[0] = %20.15f, beta1_beta2[0] = %20.15f\n",
+         rank, iteration, beta_squaredNorm[0],beta_squaredNorm2[0],beta1_beta2[0]);
 
         //printf("==> after eps sync it %d, rank %d, epsilon[0] = %15.10f %15.10f\n", iteration, rank, epsilon[0], epsilon[Ntot-1]);
 
@@ -1343,11 +1741,20 @@ int BayesW::runMpiGibbs_bW() {
         if (nranks > 1) {
             MPI_Barrier(MPI_COMM_WORLD);
             check_mpi(MPI_Allreduce(beta_squaredNorm.data(), sum_beta_squaredNorm.data(), beta_squaredNorm.size(),  MPI_DOUBLE,  MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            check_mpi(MPI_Allreduce(cass.data(),       sum_cass.data(),       cass.size(), MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            cass             = sum_cass;
-            beta_squaredNorm = sum_beta_squaredNorm;
-        }
+            check_mpi(MPI_Allreduce(beta_squaredNorm2.data(), sum_beta_squaredNorm2.data(), beta_squaredNorm2.size(),  MPI_DOUBLE,  MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(beta1_beta2.data(), sum_beta1_beta2.data(), beta_squaredNorm.size(),  MPI_DOUBLE,  MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
+            check_mpi(MPI_Allreduce(cass.data(),       sum_cass.data(),       cass.size(), MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(cass2.data(),       sum_cass2.data(),       cass2.size(), MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+            cass             = sum_cass;
+            cass2            = sum_cass2;
+            
+            beta_squaredNorm = sum_beta_squaredNorm;
+            beta_squaredNorm2 = sum_beta_squaredNorm2;
+            beta1_beta2 = sum_beta1_beta2;
+
+        }
 
         if (rank < 0) {
 
@@ -1365,31 +1772,40 @@ int BayesW::runMpiGibbs_bW() {
         // ------------------------
         for(int gg = 0; gg < numGroups ; gg++){
 	        m0[gg] = MtotGrp[gg] - cass(gg,0);
+            m0_2[gg] = MtotGrp[gg] - cass2(gg,0);
+
 		if (opt.priorsFile != "") {
 		       // Prior parameters for sigmaG
-                       alpha_sigma = data.priors(gg, 0);   //First column is for alpha_sigma, second for beta_sigma hyperparameter
-                       beta_sigma = data.priors(gg, 1);
+                    alpha_sigma = data.priors(gg, 0);   //First column is for alpha_sigma, second for beta_sigma hyperparameter
+                    beta_sigma = data.priors(gg, 1);
                 }
 
 		if (opt.dPriorsFile != "") {
-                       // get vector of parameters for the current group
-                       dirc = data.dPriors.row(gg).transpose().array();
-                }
+            // get vector of parameters for the current group
+            dirc = data.dPriors.row(gg).transpose().array();
+        }
 		// 4. Sample sigmaG
-		sigmaG[gg]  = dist.inv_gamma_rng((double) (alpha_sigma + 0.5 * m0[gg]),(double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
+        // TODO - Figure out how to sample from Inverse Wishart
+		    sigmaG[gg]  = dist.inv_gamma_rng((double) (alpha_sigma + 0.5 * m0[gg]),(double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
 
 		// 5. Sample prior mixture component probability from Dirichlet distribution
-                VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
-   		pi_L.row(gg) = dist.dirichlet_rng(dirin);
+            VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
+            VectorXd dirin2 = cass2.row(gg).transpose().array().cast<double>() + dirc.array();
+   		    pi_L.row(gg) = dist.dirichlet_rng(dirin);
+            pi_L2.row(gg) = dist.dirichlet_rng(dirin);
         }
 
         MPI_Barrier(MPI_COMM_WORLD);
 
-	// Synchronise the global parameters  
+	    // Synchronise the global parameters  
         check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
         check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        check_mpi(MPI_Bcast(pi_L2.data(), pi_L2.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
 
 	sumSigmaG = sigmaG.sum();  // Keep in memory for safe limit calculations
+	sumSigmaG2 = sigmaG2.sum();  // similarly for epoch 2
 
         //Print results
         //if(rank == 0){
@@ -1524,13 +1940,18 @@ int BayesW::runMpiGibbs_bW() {
             
             offset = sizeof(uint);
  
-            check_mpi(MPI_File_write_at(epsfh, offset, &Ntot,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(epsfh, offset, &Ntot1,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+//TODO - need to add Ntot2 option
+//            check_mpi(MPI_File_write_at(epsfh, offset, &Ntot2,         1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+
             check_mpi(MPI_File_write_at(mrkfh, offset, &M,            1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
             check_mpi(MPI_File_write_at(xbetfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);                
             check_mpi(MPI_File_write_at(xcpnfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
 
             offset = sizeof(uint) + sizeof(uint);
-            check_mpi(MPI_File_write_at(epsfh, offset, epsilon,        Ntot,           MPI_DOUBLE, &status), __LINE__, __FILE__);
+            check_mpi(MPI_File_write_at(epsfh, offset, epsilon,        Ntot1,           MPI_DOUBLE, &status), __LINE__, __FILE__);
+            //check_mpi(MPI_File_write_at(epsfh, offset, epsilon,        Ntot2,           MPI_DOUBLE, &status), __LINE__, __FILE__);
+
             check_mpi(MPI_File_write_at(mrkfh, offset, markerI.data(), markerI.size(), MPI_INT,    &status), __LINE__, __FILE__);
 
             offset = sizeof(uint) + sizeof(uint) + size_t(MrankS[rank]) * sizeof(double);
@@ -1606,6 +2027,7 @@ int BayesW::runMpiGibbs_bW() {
     _mm_free(mstd);
     _mm_free(USEBED);
     _mm_free(sum_failure);
+    _mm_free(sum_failure2);
     _mm_free(N1S);
     _mm_free(N1L);
     _mm_free(I1);
@@ -1615,9 +2037,32 @@ int BayesW::runMpiGibbs_bW() {
     _mm_free(NMS);
     _mm_free(NML);
     _mm_free(IM);
+
+    _mm_free(N1S_2);
+    _mm_free(N1L_2);
+    _mm_free(I1_2);
+    _mm_free(N2S_2); 
+    _mm_free(N2L_2);
+    _mm_free(I2_2);
+    _mm_free(NMS_2);
+    _mm_free(NML_2);
+    _mm_free(IM_2);
+
     _mm_free(vi);
     _mm_free(tmp_vi);
     _mm_free(tmpEps_vi);
+
+    _mm_free(vi2);
+    _mm_free(tmp_vi2);
+    _mm_free(tmpEps_vi2);
+
+    _mm_free(vi3);
+    _mm_free(tmp_vi3);
+    _mm_free(tmpEps_vi3);
+
+    _mm_free(vi4);
+    _mm_free(tmp_vi4);
+    _mm_free(tmpEps_vi4);
 
     if (opt.sparseSync) {
         _mm_free(glob_info);

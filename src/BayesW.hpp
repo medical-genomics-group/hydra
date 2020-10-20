@@ -32,22 +32,42 @@ public:
     unsigned int    km1          = opt.S.size();      // Number of mixtures 
     const size_t    LENBUF_gamma = 3500;              // Not more than 160 "fixed effects can be used at the moment 
 
+    const double tau = log(40.0); // Later we need to read from the data what is the breaking point
+
+
 	// The ARS structures
 	struct pars used_data;
 	struct pars_beta_sparse used_data_beta;
 	struct pars_alpha used_data_alpha;
 
 	// Component variables
-	MatrixXd pi_L;                   // mixture probabilities
+	MatrixXd pi_L, pi_L2;                   // mixture probabilities
 	VectorXd marginal_likelihoods;   // likelihood for each mixture component (for specific group)
     VectorXd marginal_likelihood_0;  // 0th likelihood for each group component
+    VectorXd marginal_likelihood2_0;  // 0th likelihood for each group component
     
     int numGroups;
     VectorXi groups;
 
+    MatrixXi cass2;
+
     // Linear model variables
-    VectorXd vi;
-    
+    VectorXd vi1;
+    VectorXd vi2;
+    VectorXd vi3;
+    VectorXd vi4;
+
+    VectorXd epsilon2;
+    VectorXd epsilon3;
+    VectorXd epsilon4;
+
+    //Variables for the second epoch
+    VectorXd Beta2;       // effect sizes
+    VectorXi components2;
+    VectorXd y2;
+
+    VectorXd sigmaG2;    // Genetic variance for epoch 2
+
 
     BayesW(Data &data, Options &opt) : BayesRRm(data, opt)
 	{
@@ -58,9 +78,9 @@ public:
     int runMpiGibbs_bW();
     
 private:
-    void init(unsigned int individualCount, unsigned int Mtot, unsigned int fixedCount);
+    void init(unsigned int individualCount, unsigned int individualCount2, unsigned int Mtot, unsigned int fixedCount);
 
-	void init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot, const uint fixtot,
+	void init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot1, const uint Ntot2, const uint fixtot,
                            const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart);
 
 	void marginal_likelihood_vec_calc(VectorXd prior_prob,
@@ -70,6 +90,10 @@ private:
                                       double   vi_2,
                                       double   vi_1,
                                       double   vi_0,
+                                      double   vi_tau_sum,
+                                      double   vi_tau_2,
+                                      double   vi_tau_1,
+                                      double   vi_tau_0,
                                       double   mean,
                                       double   sd,
                                       double   mean_sd_ratio,

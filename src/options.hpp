@@ -69,6 +69,15 @@ public:
 
     string markerBlocksFile;
     string bedFile;
+
+    //SEO: Similar files for the individuals whose last known time before event was in the second epoch
+    string bedFile2;  
+    string failureFile2;
+    string phenotypeFile2;
+    string covariatesFile2;       
+    unsigned numberIndividuals2   = 0;
+
+
     string mcmcOutDir  = "";
     string mcmcOutNam  = "default_output_name";
     string mcmcOut     = "default_output_name";

@@ -47,12 +47,12 @@ double alpha_dens(double x, void *norm_data) {
 // We are sampling beta (denoted by x here)
 //inline
 double beta_dens(double x, void *norm_data) {
-
+	//TODO - Recode
     pars_beta_sparse p = *(static_cast<pars_beta_sparse *>(norm_data));
-
-	return -p.alpha * x * p.sum_failure -
+	return p.alpha;
+	/*return -p.alpha * x * p.sum_failure -
         exp(p.alpha*x*p.mean_sd_ratio)* (p.vi_0 + p.vi_1 * exp(-p.alpha*x/p.sd) + p.vi_2 * exp(-2.0 * p.alpha * x / p.sd))
-        -x * x / (2 * p.mixture_value * p.sigmaG);
+        -x * x / (2 * p.mixture_value * p.sigmaG);*/
 };
 
 
