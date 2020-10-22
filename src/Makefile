@@ -8,50 +8,22 @@ EXE      ?= hydra
 
 CXX       = mpiicpc
 
-#CXXFLAGS  = -O0
 CXXFLAGS  = -Ofast
-CXXFLAGS += -g
+#CXXFLAGS += -g
 CXXFLAGS += -std=c++17
 CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
 #CXXFLAGS += -xCORE-AVX2
-#CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512 -qopt-zmm-usage=high
 CXXFLAGS += -D USE_MPI
-#CXXFLAGS += -D EIGEN_DONT_VECTORIZE
 CXXFLAGS += -qopenmp
-#CXXFLAGS += -qopt-report=2
-#CXXFLAGS += -qopt-report-phase=loop,vec
-#CXXFLAGS += -qopt-report-file=stdout
-CXXFLAGS += -L/usr/lib64
 
-#EO: set this back when switching to production
-#    This will allow to fully use vectorization on both fidis and gacrux
-#CXXFLAGS += -xCORE-AVX2, -axCORE-AVX512
-##CXXFLAGS += -xCORE-AVX512 -qopt-zmm-usage=high
-
-#EO: enable the following for a strict comparison with Eigen
-#CXXFLAGS += -fp-model precise 
-#CXXFLAGS += -fp-model source
-#CXXFLAGS += -fp-model consistent
-
-#INCLUDE   = -I$(HOME)/inc/Eigen-3.3.7
-#INCLUDE  += -I$(HOME)/inc/Boost-1.71.0
 INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE += -I$(BOOST_ROOT)/include
 
 LIBS     = -lz 
-#LIBS    += -lomp
-#LIBS    += -lstdc++fs
-#LIBS    += -lboost_system 
-#LIBS    += -lboost_filesystem
 
-CCASFLAGS=-no-multibyte-chars
-#LANG=en_US.utf8
-#LC_ALL=en_US.utf8
-
-#SOURCES = main.cpp data.cpp BayesRRm.cpp BayesRRm_mt.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
-#//EO@@@ remove multi-trait version for now
+#EO: remove multi-trait version for now
 SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
-#SOURCES = main.cpp data.cpp BayesRRm.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
+
 
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
