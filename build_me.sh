@@ -2,53 +2,44 @@
 
 # Author : E. Orliac, DCSR, UNIL
 # Date   : 26.03.2019
-# Purpose: Handle compilation for sequential and MPI versions of the code
+# Purpose: Handle compilation for MPI versions of the code
+# Note   : to force compilation, use: sh build_me -B
 
 echo "First arg is: >>$1<<"
 
-echo 
-echo "==========================================="
-echo "       COMPILING THE MPI VERSION (GNU)     "
-echo "==========================================="
-echo
+BUILD_GCC=0
+BUILD_INTEL=1
 
-module purge
-module load gcc/7.3.0 mvapich2 openblas boost eigen zlib
+if [ $BUILD_GCC == 1 ]; then
+    echo 
+    echo "====================================="
+    echo "     COMPILING WITH GCC/MVAPCIH2     "
+    echo "====================================="
+    echo
 
-cd src
-make $1 -f Makefile_G
-cd ..
-
-#echo "__EARLY_EXIT__"
-#exit
-
-echo 
-echo "==========================================="
-echo "       COMPILING THE MPI VERSION (INTEL)   "
-echo "==========================================="
-echo
-module purge
-module load intel intel-mpi intel-mkl boost eigen zlib
-
-cd src
-make $1
-
-if [ $? -ne 0 ] ; then
-    echo "make failed."
-    exit 1
+    module purge
+    module load gcc mvapich2 boost eigen
+    
+    cd src
+    make $1 -f Makefile_G || exit 1
+    cd ..
 fi
-cd ..
-module purge
 
-exit 0
 
-echo 
-echo "======================================"
-echo "   COMPILING THE SEQUENTIAL VERSION   "
-echo "======================================"
-echo
+if [ $BUILD_INTEL == 1 ]; then
+    
+    echo 
+    echo "========================================"
+    echo "     COMPILING WITH INTEL/INTEL-MPI     "
+    echo "========================================"
+    echo
+    module purge
+    module load intel intel-mpi boost eigen
+    
+    cd src
+    make $1 || exit 1
+    cd ..
+
+fi
+
 module purge
-module load gcc/7.3.0 mvapich2/2.3rc2 cmake boost eigen
-module list
-cmake -G "CodeBlocks - Ninja" -DCMAKE_BUILD_TYPE=Release ../BayesRRcmd
-ninja
