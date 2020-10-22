@@ -50,16 +50,63 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
                                           double mean, double sd,
                                           double mean_sd_ratio, unsigned int group_index,
                                           const pars_beta_sparse used_data_beta) {
+    double exp_sum;
+    if (used_data_beta.beta_ind==1){
+        double M,s; //auxiliary variables
+        if (used_data_beta.mixture_value_other==0) {
+            s=used_data_beta.alpha * used_data_beta.rho* used_data_beta.sigmaG1 * (used_data_beta.mixture_value).sqrt() / used_data_beta.sigmaG2 / (used_data_beta.mixture_value_other).sqrt() * used_data_beta.beta_other / sd;
+        } else {
+            s=0;
+        }
+        M= s.exp();
+        exp_sum = ( mean* mean * (vi_0 + vi_tau_0) + M *( (1- mean)* (1-mean) * (vi_1 + vi_tau_1) + M * (4-mean)*(4-mean)* (vi_2 + vi_tau_2) ) ) / (sd * sd);
+        double C_k = used_data_beta.mixture_value;
+        double C_k_other = used_data_beta.mixture_value_other;
 
-	double exp_sum = (vi_1 * (1.0 - 2.0 * mean) + 4.0 * (1.0 - mean) * vi_2 + vi_sum * mean * mean) / (sd * sd);
+        for (int i=0; i < km1; i++) {
+		//Calculate the sigma for the adaptive G-H
+		double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG1 * used_data_beta.sigmaG1 
+        * M.pow(-mean) * (1 - used_data_beta.rho * used_data_beta.rho)  * used_data_beta.mixture_value * exp_sum);
+       	
+        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral( C_k, sigma,n, vi_sum, vi_2,vi_1, vi_0, vi_tau_2, vi_tau_1,vi_tau_0,mean,sd,mean_sd_ratio,
+             used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other , C_k_other, vi_tau_sum);
+        }
+        //gauss_hermite_adaptive_integral(cVa(group_index,i), sigma, n, vi_sum, vi_2,  vi_1,  vi_0, mean, sd, mean_sd_ratio, used_data_beta);
+    
+    
+    } else if (used_data_beta.beta_ind==2) {
+        double M,s; //auxiliary variables
+        if (used_data_beta.mixture_value_other==0) {
+            s=used_data_beta.alpha * used_data_beta.rho* used_data_beta.sigmaG2 * (used_data_beta.mixture_value).sqrt() / used_data_beta.sigmaG1 / (used_data_beta.mixture_value_other).sqrt() * used_data_beta.beta_other / sd;
+        } else {
+            s=0;
+        }
+        M= s.exp();
+        exp_sum = ( mean* mean * (vi_0 - vi_tau_0) + M *( (1- mean)* (1-mean) * (vi_1 - vi_tau_1) + M * (4-mean)*(4-mean)* (vi_2 - vi_tau_2) ) ) / (sd * sd);
+        double C_k = used_data_beta.mixture_value;
+        double C_k_other = used_data_beta.mixture_value_other;
 
-	for (int i=0; i < km1; i++) {
+        for (int i=0; i < km1; i++) {
+		//Calculate the sigma for the adaptive G-H
+		double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG2 * used_data_beta.sigmaG2 
+        * M.pow(-mean) * (1 - used_data_beta.rho * used_data_beta.rho)  * used_data_beta.mixture_value * exp_sum);
+         
+        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral( C_k, sigma,n, vi_sum, vi_2,vi_1, vi_0, vi_tau_2, vi_tau_1,vi_tau_0,mean,sd,mean_sd_ratio,
+             used_data_beta, used_data_beta.sigmaG2, used_data_beta.sigmaG1, used_data_beta.beta_other , C_k_other, vi_tau_sum);
+       	}
+    }
+
+
+	//double exp_sum = (vi_1 * (1.0 - 2.0 * mean) + 4.0 * (1.0 - mean) * vi_2 + vi_sum * mean * mean) / (sd * sd);
+    //double exp_sum = (vi_1 * (1.0 - 2.0 * mean) + 4.0 * (1.0 - mean) * vi_2 + vi_sum * mean * mean) / (sd * sd);
+
+	//for (int i=0; i < km1; i++) {
 		//Calculate the sigma for the adaptive G-H
 		//double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG * cVa(group_index, i) * exp_sum);
 
         //(i+1) because 0th is already pre-calculated
 		//post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index,i), sigma, n, vi_sum,  vi_2,  vi_1,  vi_0, mean, sd, mean_sd_ratio, used_data_beta);
-	}
+	//}
 }
 
 
@@ -1254,6 +1301,15 @@ int BayesW::runMpiGibbs_bW() {
                             used_data_beta.vi_tau_1 = vi3_1;
                             used_data_beta.vi_tau_2 = vi3_2;
 
+                            used_data_beta.beta_ind = 1;
+                            used_data_beta.beta_other = beta2(marker);
+                            if (components2[marker]!=0){
+                                used_data_beta.mixture_value_other = cVa(cur_group, components2[marker]-1);
+                            } else {
+                                used_data_beta.mixture_value_other = 0;
+                            }
+                            
+
                             // double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_classes(k-1));
 
                             //printf("safe_limit: 2.0 * sqrt(%20.17f * %20.17f)\n", sumSigmaG, used_data_beta.mixture_value);
@@ -1341,6 +1397,15 @@ int BayesW::runMpiGibbs_bW() {
                             used_data_beta.vi_tau_0 = vi4_0;
                             used_data_beta.vi_tau_1 = vi4_1;
                             used_data_beta.vi_tau_2 = vi4_2;
+
+                            used_data_beta.beta_ind = 2;
+                            used_data_beta.beta_other = Beta(marker);
+                            if (components[marker]!=0){
+                                used_data_beta.mixture_value_other = cVa(cur_group, components[marker]-1);
+                            } else {
+                                used_data_beta.mixture_value_other = 0;
+                            }
+                            
 
                             // double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_classes(k-1));
 

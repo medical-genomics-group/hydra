@@ -11,4 +11,5 @@ const double sqrtPI     = sqrt(M_PI);
 
 const double EuMasc     = 0.577215664901532;
 
+const double expmEuMasc = 0.561459483566885;
 #endif

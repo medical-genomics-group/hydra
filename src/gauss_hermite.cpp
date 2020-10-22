@@ -8,7 +8,7 @@
 
 // The function for integration
 //inline 
-double gh_integrand_adaptive(double s,
+/*double gh_integrand_adaptive(double s,
                              double alpha,
                              double dj,
                              double sqrt_2Ck_sigmaG,
@@ -27,6 +27,42 @@ double gh_integrand_adaptive(double s,
 
 	return exp(temp);
 }
+*/
+
+double gh_integrand_adaptive (double s,
+                               double alpha,
+                               double rho,
+                               double sigmaG,
+                               double C_k,
+                               double sigmaG_other,
+                               double C_k_other,
+                               double beta_other,
+                               double sd,
+                               double sqrt_2Ck_sigmaG_rho,
+                               double mean,
+                               double vi_sum,
+                               double vi_sum_tau,
+                               double vi_2,
+                               double vi_1, 
+                               double vi_0,
+                               double vi_tau_2,
+                               double vi_tau_1,
+                               double vi_tau_0,
+                               double dj){
+
+    double ML = 0 , temp, res = 0;
+    if (C_k_other==0) {
+            temp= alpha* rho * sigmaG* (C_k).sqrt() / sigmaG_other / (C_k_other).sqrt() * beta_other / sd;
+        } else {
+            temp=0;
+        }
+    ML = (temp - s / sd * sqrt_2Ck_sigmaG_rho).exp();
+    res = - (ML).pow(- mean) * ( vi_0 + vi_tau_1 + ML * (vi_1 + vi_tau_1 + ML * (vi_2 + vi_tau_2) ) );
+    res = res - s*s + vi_sum + vi_sum_tau;
+    res = res - alpha * (s* sqrt_2Ck_sigmaG_rho + temp ) * dj;
+    res = res.exp();
+    return res;
+}
 
 
 // Calculate the value of the integral using Adaptive Gauss-Hermite quadrature
@@ -38,15 +74,26 @@ double gauss_hermite_adaptive_integral(double C_k,
                                        double vi_2,
                                        double vi_1,
                                        double vi_0,
+                                       double vi_tau_2,
+                                       double vi_tau_1,
+                                       double vi_tau_0,
                                        double mean,
                                        double sd,
                                        double mean_sd_ratio,
-                                       const pars_beta_sparse used_data_beta) {
+                                       const pars_beta_sparse used_data_beta,
+                                       double sigmaG,
+                                       double sigmaG_other,
+                                       double beta_other, 
+                                       double C_k_other,
+                                       double vi_sum_tau) {
 
 	double temp = 0.0;
 
-	double sqrt_2ck_sigma = sqrt(2.0 * C_k * used_data_beta.sigmaG);
+	//double sqrt_2ck_sigma = sqrt(2.0 * C_k  );
 
+    double alpha = used_data_beta.alpha;
+    double rho = used_data_beta.rho;
+    double sqrt_2Ck_sigmaG_rho = sqrt(2.0 * C_k * sigmaG * ( 1- rho * rho));
 	if (n == "3") {
 
 		double x1 = 1.2247448713916;
@@ -59,10 +106,10 @@ double gauss_hermite_adaptive_integral(double C_k,
 		x1 = sigma * x1;
 		x2 = sigma * x2;
 
-		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                           vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+		temp = 	w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+            mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w3;
 
 	} else if (n == "5") {
@@ -89,14 +136,14 @@ double gauss_hermite_adaptive_integral(double C_k,
 		x4 = sigma*x4;
 		//x5 = sigma*x5;
 
-		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                           vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+		temp = 	w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w3 * gh_integrand_adaptive (x3, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w4 * gh_integrand_adaptive (x4, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w5 ;//* gh_integrand_adaptive(x5,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j); // This part is just 1
 
 	} else if (n == "7") {
@@ -128,18 +175,18 @@ double gauss_hermite_adaptive_integral(double C_k,
 		x5 = sigma*x5;
 		x6 = sigma*x6;
 
-		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                           vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,
-                                       vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+		temp = 	w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w3 * gh_integrand_adaptive (x3, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w4 * gh_integrand_adaptive (x4, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w5 * gh_integrand_adaptive (x5, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w6 * gh_integrand_adaptive (x6, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w7;
 
 	} else if(n == "9") {
@@ -179,14 +226,22 @@ double gauss_hermite_adaptive_integral(double C_k,
 		x7 = sigma*x7;
 		x8 = sigma*x8;
 
-		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+		temp = 	w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w3 * gh_integrand_adaptive (x3, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w4 * gh_integrand_adaptive (x4, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w5 * gh_integrand_adaptive (x5, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w6 * gh_integrand_adaptive (x6, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w7 * gh_integrand_adaptive (x7, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w8 * gh_integrand_adaptive (x8, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w9 ;//* gh_integrand_adaptive(x9,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 
 	} else if (n == "11") {
@@ -234,16 +289,26 @@ double gauss_hermite_adaptive_integral(double C_k,
 		x10 = sigma*x10;
 		//	x11 = sigma*x11;
 
-		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+		temp = 	w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w3 * gh_integrand_adaptive (x3, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w4 * gh_integrand_adaptive (x4, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w5 * gh_integrand_adaptive (x5, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w6 * gh_integrand_adaptive (x6, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w7 * gh_integrand_adaptive (x7, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w8 * gh_integrand_adaptive (x8, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w9 * gh_integrand_adaptive (x9, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w10 * gh_integrand_adaptive (x10, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w11 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 
 	} else if (n == "13") {
@@ -298,18 +363,30 @@ double gauss_hermite_adaptive_integral(double C_k,
 		x12 = sigma*x12;
 
 
-		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+		temp = 	w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w3 * gh_integrand_adaptive (x3, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w4 * gh_integrand_adaptive (x4, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w5 * gh_integrand_adaptive (x5, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w6 * gh_integrand_adaptive (x6, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w7 * gh_integrand_adaptive (x7, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w8 * gh_integrand_adaptive (x8, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w9 * gh_integrand_adaptive (x9, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w10 * gh_integrand_adaptive (x10, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w11 * gh_integrand_adaptive (x11, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w12 * gh_integrand_adaptive (x12, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w13 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 
 	} else if (n == "15") {
@@ -370,20 +447,34 @@ double gauss_hermite_adaptive_integral(double C_k,
 		x13 = sigma*x13;
 		x14 = sigma*x14;
 
-		temp = 	w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+		temp = 	w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w3 * gh_integrand_adaptive (x3, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w4 * gh_integrand_adaptive (x4, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w5 * gh_integrand_adaptive (x5, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w6 * gh_integrand_adaptive (x6, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w7 * gh_integrand_adaptive (x7, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w8 * gh_integrand_adaptive (x8, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w9 * gh_integrand_adaptive (x9, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w10 * gh_integrand_adaptive (x10, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w11 * gh_integrand_adaptive (x11, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w12 * gh_integrand_adaptive (x12, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w13 * gh_integrand_adaptive (x13, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w14 * gh_integrand_adaptive (x14, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w15 ;//* gh_integrand_adaptive(x11,p.alpha,p.sum_failure,sqrt_2ck_sigma,vi,p.X_j);
 
 	} else if (n == "17") {
@@ -450,22 +541,38 @@ double gauss_hermite_adaptive_integral(double C_k,
         x15 = sigma*x15;
         x16 = sigma*x16;
 
-        temp =  w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w15 * gh_integrand_adaptive(x15,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w16 * gh_integrand_adaptive(x16,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+        temp =  w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w3 * gh_integrand_adaptive (x3, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w4 * gh_integrand_adaptive (x4, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w5 * gh_integrand_adaptive (x5, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w6 * gh_integrand_adaptive (x6, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w7 * gh_integrand_adaptive (x7, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w8 * gh_integrand_adaptive (x8, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w9 * gh_integrand_adaptive (x9, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w10 * gh_integrand_adaptive (x10, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w11 * gh_integrand_adaptive (x11, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w12 * gh_integrand_adaptive (x12, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w13 * gh_integrand_adaptive (x13, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w14 * gh_integrand_adaptive (x14, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w15 * gh_integrand_adaptive (x15, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w16 * gh_integrand_adaptive (x16, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w17 ;//* gh_integrand_adaptive(0,...)= 1
 
     } else if (n == "25") {
@@ -559,30 +666,54 @@ double gauss_hermite_adaptive_integral(double C_k,
         x23 = sigma*x23;
         x24 = sigma*x24;
 
-        temp =  w1 * gh_integrand_adaptive(x1,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w2 * gh_integrand_adaptive(x2,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w3 * gh_integrand_adaptive(x3,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w4 * gh_integrand_adaptive(x4,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w5 * gh_integrand_adaptive(x5,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w6 * gh_integrand_adaptive(x6,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w7 * gh_integrand_adaptive(x7,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w8 * gh_integrand_adaptive(x8,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w9 * gh_integrand_adaptive(x9,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w10 * gh_integrand_adaptive(x10,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w11 * gh_integrand_adaptive(x11,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w12 * gh_integrand_adaptive(x12,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w13 * gh_integrand_adaptive(x13,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w14 * gh_integrand_adaptive(x14,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w15 * gh_integrand_adaptive(x15,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w16 * gh_integrand_adaptive(x16,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w17 * gh_integrand_adaptive(x17,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w18 * gh_integrand_adaptive(x18,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w19 * gh_integrand_adaptive(x19,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w20 * gh_integrand_adaptive(x20,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w21 * gh_integrand_adaptive(x21,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w22 * gh_integrand_adaptive(x22,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w23 * gh_integrand_adaptive(x23,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
-            w24 * gh_integrand_adaptive(x24,used_data_beta.alpha,used_data_beta.sum_failure,sqrt_2ck_sigma,vi_sum, vi_2, vi_1, vi_0, mean, sd, mean_sd_ratio)+
+        temp =  w1 * gh_integrand_adaptive (x1, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w2 * gh_integrand_adaptive (x2, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w3 * gh_integrand_adaptive (x3, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w4 * gh_integrand_adaptive (x4, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w5 * gh_integrand_adaptive (x5, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w6 * gh_integrand_adaptive (x6, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w7 * gh_integrand_adaptive (x7, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w8 * gh_integrand_adaptive (x8, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w9 * gh_integrand_adaptive (x9, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure) +
+            w10 * gh_integrand_adaptive (x10, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w11 * gh_integrand_adaptive (x11, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w12 * gh_integrand_adaptive (x12, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w13 * gh_integrand_adaptive (x13, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w14 * gh_integrand_adaptive (x14, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w15 * gh_integrand_adaptive (x15, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w16 * gh_integrand_adaptive (x16, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w17 * gh_integrand_adaptive (x17, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w18 * gh_integrand_adaptive (x18, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w19 * gh_integrand_adaptive (x19, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w20 * gh_integrand_adaptive (x20, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w21 * gh_integrand_adaptive (x21, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w22 * gh_integrand_adaptive (x22, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w23 * gh_integrand_adaptive (x23, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
+            w24 * gh_integrand_adaptive (x24, rho, sigmaG,C_k, sigmaG_other, C_k_other, beta_other,sd, alpha, sqrt_2Ck_sigmaG_rho,
+                mean, vi_sum, vi_sum_tau, vi_2, vi_1,  vi_0, vi_tau_2, vi_tau_1, vi_tau_0, used_data_beta.sum_failure)+
             w25 ;//* gh_integrand_adaptive(0,...)= 1
 
     } else {
