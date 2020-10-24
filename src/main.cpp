@@ -123,7 +123,7 @@ int main(int argc, const char * argv[]) {
             // ---------------------------------------------
             else if (opt.readFromSparseFiles && opt.readFromBedFile) {
 
-                cout << "EO: CHANGE BEHAVIOUR HERE!" << endl;
+                //cout << "EO: CHANGE BEHAVIOUR HERE!" << endl;
                 
                 //cout << "WARNING: mixed-representation processing type requested!" << endl;
                 opt.mixedRepresentation = true;

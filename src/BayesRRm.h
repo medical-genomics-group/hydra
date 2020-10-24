@@ -101,6 +101,11 @@ class BayesRRm
     double epsilonsum;
     double ytildesum;
 
+    // FH parameters
+    double v0L, v0t, v0c, s02c, hypTau, tau, tau0, scaledBSQN;
+    VectorXd lambda_var, nu_var, c_slab;
+    
+
     BayesRRm(Data &data, Options &opt, const long memPageSize);
     virtual ~BayesRRm();
 

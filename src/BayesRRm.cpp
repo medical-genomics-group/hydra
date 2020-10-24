@@ -1121,41 +1121,46 @@ int BayesRRm::runMpiGibbs() {
     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FH
     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FH
     //----------- FHDT parameters
-    double v0L = opt.v0L;
-    double v0t = opt.v0t;
-    double v0c = opt.v0c;
-    double s02c = opt.s02c;
-    double hypTau;
-    VectorXd lambda_var(Beta.size());
-    VectorXd nu_var(Beta.size());
-    double tau;
-    double tau0 = opt.tau0;
-    VectorXd c_slab(numGroups);
-    double scaledBSQN;
     
-    tau=0;
-    c_slab.setZero();;
-    lambda_var.setZero();
-    nu_var.setZero();
-    
-    std::cout << "INFO Sampling initial hypTau" <<"\n";
-    std::cout << "tau0: "<<tau0 << "\n";
-    hypTau = dist.inv_gamma_rate_rng(0.5,1.0/(tau0*tau0));
-    std::cout << "hypTau: "<< hypTau <<"\n";
-    std::cout << "INFO Sampling initial tau" <<"\n";
-    tau = dist.inv_gamma_rate_rng(0.5*v0t,v0t/hypTau);
-    std::cout << "tau: " << tau <<"\n";
-    std::cout << "INFO Sampling initial slab" <<"\n";
-    for(int jj=0;jj<numGroups;++jj)
-      c_slab[jj] = dist.inv_scaled_chisq_rng( v0c, s02c);
-    std::cout << "c: " << c_slab <<"\n";
-    std::cout << "v0L" << v0L << "\n";
-    //if using newtonian uncomment this
-    //SamplerLocalVar  lambdaSampler(dist,v0L,c_slab/(double)Mtot);
-    
-    std::cout << "INFO Sampling initial lambda with values: "<< c_slab.sum()/(double)Mtot<<"\n";
-    lambda_var.array() = c_slab.sum()/(double)Mtot;
-    std::cout << "<------------ FH initialisation finished -------------------->\n";
+    if (opt.bayesType == "bayesFHMPI") { 
+        
+        v0L  = opt.v0L;
+        v0t  = opt.v0t;
+        v0c  = opt.v0c;
+        s02c = opt.s02c;
+        tau0 = opt.tau0;
+
+        tau        = 0.0;
+        scaledBSQN = 0.0;
+
+        lambda_var.resize(Beta.size());
+        lambda_var.setZero();
+
+        nu_var.resize(Beta.size());
+        nu_var.setZero();
+
+        c_slab.resize(numGroups);        
+        c_slab.setZero();;
+        
+        std::cout << "INFO Sampling initial hypTau" <<"\n";
+        std::cout << "tau0: "<<tau0 << "\n";
+        hypTau = dist.inv_gamma_rate_rng(0.5,1.0/(tau0*tau0));
+        std::cout << "hypTau: "<< hypTau <<"\n";
+        std::cout << "INFO Sampling initial tau" <<"\n";
+        tau = dist.inv_gamma_rate_rng(0.5*v0t,v0t/hypTau);
+        std::cout << "tau: " << tau <<"\n";
+        std::cout << "INFO Sampling initial slab" <<"\n";
+        for(int jj=0;jj<numGroups;++jj)
+            c_slab[jj] = dist.inv_scaled_chisq_rng( v0c, s02c);
+        std::cout << "c: " << c_slab <<"\n";
+        std::cout << "v0L" << v0L << "\n";
+        //if using newtonian uncomment this
+        //SamplerLocalVar  lambdaSampler(dist,v0L,c_slab/(double)Mtot);
+        
+        std::cout << "INFO Sampling initial lambda with values: "<< c_slab.sum()/(double)Mtot<<"\n";
+        lambda_var.array() = c_slab.sum()/(double)Mtot;
+        std::cout << "<------------ FH initialisation finished -------------------->\n";
+    }
     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FH
     //@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ FH
     
