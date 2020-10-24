@@ -947,8 +947,8 @@ int BayesRRm::runMpiGibbs() {
     MPI_Info   info;
 
     // Display banner if wished
-    if (rank < 0) {
-        opt.printBanner();
+    if (rank == 0) {
+        //opt.printBanner();
         opt.printProcessingOptions();
     }
 
