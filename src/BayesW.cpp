@@ -54,14 +54,12 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
 
     if (used_data_beta.mixture_value_other != 0) // SEO : before it was  == 0 - is it now correct?
     {
-        s = used_data_beta.alpha * used_data_beta.rho * used_data_beta.sigmaG1 * sqrt(used_data_beta.mixture_value/used_data_beta.mixture_value_other)/ used_data_beta.sigmaG2 * used_data_beta.beta_other / sd;
+        s = used_data_beta.alpha * used_data_beta.rho * used_data_beta.sigmaG1 * sqrt(used_data_beta.mixture_value / used_data_beta.mixture_value_other) / used_data_beta.sigmaG2 * used_data_beta.beta_other / sd;
         M = exp(s);
-        M_pow_mean = exp(s-mean);
-
+        M_pow_mean = exp(s - mean);
     }
 
     double exp_sum = (mean * mean * (vi_0 + vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 + vi_tau_1) + M * (4 - mean) * (4 - mean) * (vi_2 + vi_tau_2))) / (sd * sd);
-    double C_k = used_data_beta.mixture_value;
     double C_k_other = used_data_beta.mixture_value_other;
 
     for (int i = 0; i < km1; i++)
@@ -69,7 +67,45 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
         //Calculate the sigma for the adaptive G-H
         double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG1 * used_data_beta.sigmaG1 * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * used_data_beta.mixture_value * exp_sum);
 
-        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(C_k, sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
+        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
+                                                                                    used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, vi_tau_sum);
+    }
+}
+
+void BayesW::marginal_likelihood_vec_calc_test(VectorXd prior_prob, VectorXd &post_marginals, string n,
+                                               double vi_sum, double vi_2, double vi_1, double vi_0,
+                                               double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
+                                               double mean, double sd,
+                                               double mean_sd_ratio, unsigned int group_index,
+                                               const pars_beta_sparse used_data_beta)
+{
+    double s = 0;
+    double M = 1; //auxiliary variables
+    double M_pow_mean = exp(-mean);
+
+    if (used_data_beta.mixture_value_other != 0) // SEO : before it was  == 0 - is it now correct?
+    {
+        s = used_data_beta.alpha * used_data_beta.rho * used_data_beta.sigmaG1 * sqrt(used_data_beta.mixture_value / used_data_beta.mixture_value_other) / used_data_beta.sigmaG2 * used_data_beta.beta_other / sd;
+        M = exp(s);
+        M_pow_mean = exp(s - mean);
+    }
+
+    double exp_sum = (mean * mean * (vi_0 + vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 + vi_tau_1) + M * (4 - mean) * (4 - mean) * (vi_2 + vi_tau_2))) / (sd * sd);
+
+    double C_k_other = used_data_beta.mixture_value_other;
+
+    for (int i = 0; i < km1; i++)
+    {
+        //Calculate the sigma for the adaptive G-H
+        double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG1 * used_data_beta.sigmaG1 * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * used_data_beta.mixture_value * exp_sum);
+        cout << "C_k = " << cVa(group_index, i) << endl;
+        cout << "mean_sd_ratio = " << mean_sd_ratio << endl;
+        cout << "C_k_other = " << C_k_other << endl;
+
+        cout << gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
+                                                used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, vi_tau_sum) << endl;
+
+        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
                                                                                     used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, vi_tau_sum);
     }
 }
@@ -87,14 +123,12 @@ void BayesW::marginal_likelihood_vec_calc2(VectorXd prior_prob, VectorXd &post_m
 
     if (used_data_beta.mixture_value_other != 0) //SEO - changed from ==
     {
-        s = used_data_beta.alpha * used_data_beta.rho * used_data_beta.sigmaG2 * sqrt(used_data_beta.mixture_value/used_data_beta.mixture_value_other) / used_data_beta.sigmaG1 * used_data_beta.beta_other / sd;
+        s = used_data_beta.alpha * used_data_beta.rho * used_data_beta.sigmaG2 * sqrt(used_data_beta.mixture_value / used_data_beta.mixture_value_other) / used_data_beta.sigmaG1 * used_data_beta.beta_other / sd;
         M = exp(s);
-        M_pow_mean = exp(s-mean);
-
+        M_pow_mean = exp(s - mean);
     }
 
     double exp_sum = (mean * mean * (vi_0 - vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 - vi_tau_1) + M * (4 - mean) * (4 - mean) * (vi_2 - vi_tau_2))) / (sd * sd);
-    double C_k = used_data_beta.mixture_value;
     double C_k_other = used_data_beta.mixture_value_other;
 
     for (int i = 0; i < km1; i++)
@@ -102,7 +136,7 @@ void BayesW::marginal_likelihood_vec_calc2(VectorXd prior_prob, VectorXd &post_m
         //Calculate the sigma for the adaptive G-H
         double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG2 * used_data_beta.sigmaG2 * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * used_data_beta.mixture_value * exp_sum);
 
-        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(C_k, sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
+        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
                                                                                     used_data_beta, used_data_beta.sigmaG2, used_data_beta.sigmaG1, used_data_beta.beta_other, C_k_other, vi_tau_sum);
     }
 }
@@ -187,8 +221,8 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     }
 
     // Component variables
-    pi_L.resize(numGroups, K);          // prior mixture probabilities (also the 0th)
-    pi_L2.resize(numGroups, K);          // prior mixture probabilities (also the 0th)
+    pi_L.resize(numGroups, K);  // prior mixture probabilities (also the 0th)
+    pi_L2.resize(numGroups, K); // prior mixture probabilities (also the 0th)
 
     marginal_likelihoods = VectorXd(K); // likelihood for each mixture component
 
@@ -217,7 +251,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
 
     //initialize epsilon vector as the phenotype vector
     y = data.y.cast<double>().array();
-    y2 = data.y.cast<double>().array();
+    y2 = data.y2.cast<double>().array();
 
     epsilon = y;
     epsilon2 = y2;
@@ -227,17 +261,14 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     mu = y.mean(); // mean or intercept
     // Initialize the variables in structures
     //Save variance classes
-            cout << "A5" << endl; 
 
     //Store the vector of failures only in the structure used for sampling alpha
     used_data_alpha.failure_vector = data.fail.cast<double>();
     used_data_alpha.failure_vector2 = data.fail2.cast<double>();
-            cout << "A6" << endl; 
 
     double denominator = (6 * ((y.array() - mu).square()).sum() / (y.size() - 1));
     used_data.alpha = PI / sqrt(denominator);      // The shape parameter initial value
     used_data_beta.alpha = PI / sqrt(denominator); // The shape parameter initial value
-            cout << "A7" << endl; 
 
     //Initialise epoch 1 individuals
     for (int i = 0; i < (y.size()); ++i)
@@ -245,6 +276,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
         (used_data.epsilon)[i] = y[i] - mu; // Initially, all the BETA elements are set to 0, XBeta = 0
         epsilon[i] = y[i] - mu;
     }
+
     // and epoch 2 individuals
     for (int i = 0; i < (y2.size()); ++i)
     {
@@ -254,11 +286,9 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
         (used_data.epsilon3)[i] = tau - mu;
         epsilon3[i] = tau - mu;
 
-        (used_data.epsilon4)[i] = y[i] - mu;
+        (used_data.epsilon4)[i] = tau - mu;
         epsilon4[i] = tau - mu;
     }
-            cout << "A8" << endl; 
-
     // Use h2 = 0.5 for the inital estimate// divided  by the number of groups
     sigmaG.array() = PI_squared / (6 * pow(used_data_beta.alpha, 2)) / numGroups;
     //Also initialise similarly for the second epoch
@@ -267,7 +297,6 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     //Restart variables
     epsilon_restart.resize(individualCount);
     epsilon_restart.setZero();
-            cout << "A9" << endl; 
 
     gamma_restart.resize(fixedCount);
     gamma_restart.setZero();
@@ -296,7 +325,6 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
         /* covariates */
         used_data.sigma_covariate = data.covarPrior;
     }
-            cout << "A10" << endl; 
 
     // Save the number of events
     used_data.d = used_data_alpha.failure_vector.array().sum();
@@ -446,7 +474,6 @@ int BayesW::runMpiGibbs_bW()
 
     dalloc += M * sizeof(int) / 1E9;        // for components
     dalloc += 2 * M * sizeof(double) / 1E9; // for Beta and Acum
-            cout << "A1" << endl; 
 
     // Adapt the --thin and --save options such that --save >= --thin and --save%--thin = 0
     // ------------------------------------------------------------------------------------
@@ -464,7 +491,6 @@ int BayesW::runMpiGibbs_bW()
         if (rank == 0)
             printf("         opt.save reset to %d, the closest multiple of opt.thin (%d)\n", opt.save, opt.thin);
     }
-            cout << "A2" << endl; 
 
     // Invariant initializations (from scratch / from restart)
     // -------------------------------------------------------
@@ -488,7 +514,6 @@ int BayesW::runMpiGibbs_bW()
     string eps2fp = opt.mcmcOut + ".eps2." + std::to_string(rank);
     string eps3fp = opt.mcmcOut + ".eps3." + std::to_string(rank);
     string eps4fp = opt.mcmcOut + ".eps4." + std::to_string(rank);
-            cout << "A3" << endl; 
 
     if (opt.restart)
     {
@@ -530,7 +555,6 @@ int BayesW::runMpiGibbs_bW()
         // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
         //@@@EO srand(opt.seed);
         //TODO: SEO - fix NAs
-                    cout << "A4" << endl; 
 
         init(Ntot1, Ntot2, Mtot, numFixedEffects); //- data.numNAs
     }
@@ -625,12 +649,12 @@ int BayesW::runMpiGibbs_bW()
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xbetfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xbetfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, cpnfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &cpnfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xcpnfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xcpnfh), __LINE__, __FILE__);
- 
+
     check_mpi(MPI_File_open(MPI_COMM_WORLD, bet2fp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &bet2fh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xbet2fp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xbet2fh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, cpn2fp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &cpn2fh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xcpn2fp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xcpn2fh), __LINE__, __FILE__);
- 
+
     check_mpi(MPI_File_open(MPI_COMM_WORLD, gamfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &gamfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xivfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xivfh), __LINE__, __FILE__);
 
@@ -717,14 +741,11 @@ int BayesW::runMpiGibbs_bW()
     if (opt.readFromBedFile)
     {
         //Read the data sets for two epochs
-            cout << "Read bed file1" << endl; 
-
         data.load_data_from_bed_file(opt.bedFile, Ntot1, M, rank, MrankS[rank],
                                      N1S, N1L, I1,
                                      N2S, N2L, I2,
                                      NMS, NML, IM,
                                      taskBytes);
-        cout << "Read bed file2" << endl; 
 
         data.load_data_from_bed_file(opt.bedFile2, Ntot2, M, rank, MrankS[rank],
                                      N1S_2, N1L_2, I1_2,
@@ -831,7 +852,7 @@ int BayesW::runMpiGibbs_bW()
         {
             temp_sum += used_data_alpha.failure_vector2(I1_2[ii]);
         }
-        for (size_t ii = N2S[i]; ii < (N2S[i] + N2L[i]); ii++)
+        for (size_t ii = N2S_2[i]; ii < (N2S_2[i] + N2L_2[i]); ii++)
         {
             temp_sum += 2 * used_data_alpha.failure_vector2(I2_2[ii]);
         }
@@ -839,6 +860,7 @@ int BayesW::runMpiGibbs_bW()
 
         //printf("marker %6d mean %20.15f, std = %20.15f (%.1f / %.15f)  (%15.10f, %15.10f, %15.10f)\n", i, mave[i], mstd[i], double(Ntot - 1), tmp0+tmp1+tmp2, tmp1, tmp2, tmp0);
     }
+
     //If there are fixed effects, find the same values for them
     //TODO: Implement covariates later for the two epochs
     if (opt.covariates)
@@ -889,6 +911,8 @@ int BayesW::runMpiGibbs_bW()
     //We also keep in memory residuals 2,3,4
     double *y2, *tmpEps2, *deltaEps2, *dEpsSum2, *deltaSum2, *epsilon2, *tmpEps_vi2, *tmp_deltaEps2;
     const size_t NDB_2 = size_t(Ntot2) * sizeof(double);
+    y2 = (double *)_mm_malloc(NDB, 64);
+    check_malloc(y2, __LINE__, __FILE__);
     epsilon2 = (double *)_mm_malloc(NDB_2, 64);
     check_malloc(epsilon2, __LINE__, __FILE__);
     tmpEps_vi2 = (double *)_mm_malloc(NDB_2, 64);
@@ -921,6 +945,8 @@ int BayesW::runMpiGibbs_bW()
     check_malloc(deltaSum3, __LINE__, __FILE__);
 
     double *tmpEps4, *deltaEps4, *dEpsSum4, *deltaSum4, *epsilon4, *tmpEps_vi4, *tmp_deltaEps4;
+    epsilon4 = (double *)_mm_malloc(NDB_2, 64);
+    check_malloc(epsilon4, __LINE__, __FILE__);
     tmpEps_vi4 = (double *)_mm_malloc(NDB_2, 64);
     check_malloc(tmpEps_vi4, __LINE__, __FILE__);
     tmpEps4 = (double *)_mm_malloc(NDB_2, 64);
@@ -969,7 +995,6 @@ int BayesW::runMpiGibbs_bW()
 
     set_array(dEpsSum, 0.0, Ntot1);
     set_array(dEpsSum2, 0.0, Ntot2);
-
     // Copy, center and scale phenotype observations
     // In bW we are not scaling and centering phenotypes
     //TODO: Fix the restart for two epochs
@@ -1003,6 +1028,7 @@ int BayesW::runMpiGibbs_bW()
             y[i] = data.y(i);
             epsilon[i] = y[i] - mu;
         }
+
         for (int i = 0; i < Ntot2; ++i)
         {
             y2[i] = data.y2(i);
@@ -1010,7 +1036,6 @@ int BayesW::runMpiGibbs_bW()
             epsilon3[i] = tau - mu;
             epsilon4[i] = epsilon3[i];
         }
-      
     }
 
     VectorXd sum_beta_squaredNorm, sum_beta_squaredNorm2, sum_beta1_beta2;
@@ -1028,6 +1053,9 @@ int BayesW::runMpiGibbs_bW()
 
     beta_squaredNorm2.resize(numGroups);
     sum_beta_squaredNorm2.resize(numGroups);
+
+    beta1_beta2.resize(numGroups);
+    sum_beta1_beta2.resize(numGroups);
     // A counter on previously saved thinned iterations
     uint n_thinned_saved = 0;
 
@@ -1115,6 +1143,7 @@ int BayesW::runMpiGibbs_bW()
             epsilon3[mu_ind] = (used_data.epsilon3)[mu_ind] - mu;
             epsilon4[mu_ind] = (used_data.epsilon4)[mu_ind] - mu;
         }
+
         ////////// End sampling mu
         /* 1a. Fixed effects (gammas) */
         if (opt.covariates)
@@ -1214,6 +1243,7 @@ int BayesW::runMpiGibbs_bW()
             (used_data_alpha.epsilon3)[alpha_ind] = epsilon3[alpha_ind];
             (used_data_alpha.epsilon4)[alpha_ind] = epsilon4[alpha_ind];
         }
+
         //Sample using ARS
         err = arms(xinit, ninit, &xl, &xr, alpha_dens, &used_data_alpha, &convex,
                    npoint, dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
@@ -1443,10 +1473,42 @@ int BayesW::runMpiGibbs_bW()
                 used_data_beta.sum_failure = sum_failure[marker];
                 //printf("m %3d -> sum fail = %20.15f\n", marker, sum_failure[marker]);
 
+                used_data_beta.beta_other = Beta2(marker);
+                if (components2[marker] != 0)
+                {
+                    used_data_beta.mixture_value_other = cVa(cur_group, components2[marker] - 1);
+                }
+                else
+                {
+                    used_data_beta.mixture_value_other = 0;
+                }
+
+                if (j == 0)
+                {
+                    cout << "marginal likelihoods size = " << marginal_likelihoods.size() << endl;
+                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << endl;
+                    cout << "vi pars = " << vi_sum << ", " << vi_2 << "," << vi_1 << ", " << vi_0 << endl;
+                    cout << "vi_tau pars = " << vi3_sum << ", " << vi3_2 << "," << vi3_1 << ", " << vi3_0 << endl;
+                    cout << "mean = " << mave[marker] << endl;
+                    cout << "sd = " << mstd[marker] << endl;
+                    cout << "cur_group = " << cur_group << endl;
+                    cout << "rho = " << used_data_beta.rho << endl;
+                    cout << "sigmaG1 = " << used_data_beta.sigmaG1 << endl;
+                    cout << "sigmaG2 = " << used_data_beta.sigmaG2 << endl;
+                    cout << "pi values = " << pi_L(cur_group, 0) << ", " << pi_L(cur_group, 1) << "," << pi_L(cur_group, 2) << endl;
+
+                    marginal_likelihood_vec_calc_test(pi_L.row(cur_group), marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
+                                                      vi3_sum, vi3_2, vi3_1, vi3_0,
+                                                      mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
+                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << "," << marginal_likelihoods(2) << endl;
+
+                }
+
                 marginal_likelihood_vec_calc(pi_L.row(cur_group), marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
                                              vi3_sum, vi3_2, vi3_1, vi3_0,
                                              mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
-
+                //  cout << "A0" << endl;
+                // cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << endl;
                 // Calculate the probability that marker is 0
                 double acum = marginal_likelihoods(0) / marginal_likelihoods.sum();
 
@@ -1479,16 +1541,6 @@ int BayesW::runMpiGibbs_bW()
                             used_data_beta.vi_tau_0 = vi3_0;
                             used_data_beta.vi_tau_1 = vi3_1;
                             used_data_beta.vi_tau_2 = vi3_2;
-
-                            used_data_beta.beta_other = Beta2(marker);
-                            if (components2[marker] != 0)
-                            {
-                                used_data_beta.mixture_value_other = cVa(cur_group, components2[marker] - 1);
-                            }
-                            else
-                            {
-                                used_data_beta.mixture_value_other = 0;
-                            }
 
                             //printf("safe_limit: 2.0 * sqrt(%20.17f * %20.17f)\n", sumSigmaG, used_data_beta.mixture_value);
                             double safe_limit = 2.0 * std::sqrt(sumSigmaG * used_data_beta.mixture_value); // Need to think is this safe enough
@@ -1539,17 +1591,29 @@ int BayesW::runMpiGibbs_bW()
                         }
                     }
                 }
+
                 //////////////////////////
                 //Do same for second epoch
                 marginal_likelihoods(0) = marginal_likelihood2_0(cur_group); //Each group has now different marginal likelihood at 0
                 used_data_beta.sum_failure = sum_failure2[marker];
                 //printf("m %3d -> sum fail = %20.15f\n", marker, sum_failure[marker]);
 
+                used_data_beta.beta_other = Beta(marker);
+
+                if (components[marker] != 0)
+                {
+                    used_data_beta.mixture_value_other = cVa(cur_group, components[marker] - 1);
+                }
+                else
+                {
+                    used_data_beta.mixture_value_other = 0;
+                }
+
                 // Now we use residuals 2 and 4
                 marginal_likelihood_vec_calc2(pi_L2.row(cur_group), marginal_likelihoods, quad_points, vi2_sum, vi2_2, vi2_1, vi2_0,
-                                             vi4_sum, vi4_2, vi4_1, vi4_0,
-                                             mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
-
+                                              vi4_sum, vi4_2, vi4_1, vi4_0,
+                                              mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
+                // cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << endl;
                 // Calculate the probability that marker is 0
                 acum = marginal_likelihoods(0) / marginal_likelihoods.sum();
 
@@ -1582,16 +1646,6 @@ int BayesW::runMpiGibbs_bW()
                             used_data_beta.vi_tau_0 = vi4_0;
                             used_data_beta.vi_tau_1 = vi4_1;
                             used_data_beta.vi_tau_2 = vi4_2;
-
-                            used_data_beta.beta_other = Beta(marker);
-                            if (components[marker] != 0)
-                            {
-                                used_data_beta.mixture_value_other = cVa(cur_group, components[marker] - 1);
-                            }
-                            else
-                            {
-                                used_data_beta.mixture_value_other = 0;
-                            }
 
                             //printf("safe_limit: 2.0 * sqrt(%20.17f * %20.17f)\n", sumSigmaG, used_data_beta.mixture_value);
                             double safe_limit = 2.0 * std::sqrt(sumSigmaG2 * used_data_beta.mixture_value); // Need to think is this safe enough
@@ -1628,6 +1682,7 @@ int BayesW::runMpiGibbs_bW()
                             // Write the sum of the beta squared to the vector
                             beta_squaredNorm2[groups[MrankS[rank] + marker]] += Beta2[marker] * Beta2[marker];
                             //If the first epoch marker was also included, add the product to the covariance
+
                             if (Beta[marker] != 0)
                             {
                                 beta1_beta2[groups[MrankS[rank] + marker]] += Beta[marker] * Beta2[marker];
@@ -2062,12 +2117,11 @@ int BayesW::runMpiGibbs_bW()
                 dirc = data.dPriors.row(gg).transpose().array();
             }
             // 4. Sample sigmaG
-            // TODO - Figure out how to sample 
+            // TODO - Figure out how to sample
             //sigmaG[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0[gg]), (double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
             sigmaG[gg] = beta_squaredNorm(gg);
             sigmaG2[gg] = beta_squaredNorm2(gg);
-            Rho[gg] = beta1_beta2(gg)/sqrt(sigmaG[gg]*sigmaG2[gg]);
-
+            Rho[gg] = beta1_beta2(gg) / sqrt(sigmaG[gg] * sigmaG2[gg]);
 
             // 5. Sample prior mixture component probability from Dirichlet distribution
             VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
@@ -2353,7 +2407,6 @@ int BayesW::runMpiGibbs_bW()
     check_mpi(MPI_File_close(&eps2fh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&eps3fh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&eps4fh), __LINE__, __FILE__);
-
 
     check_mpi(MPI_File_close(&cpnfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&xcpnfh), __LINE__, __FILE__);

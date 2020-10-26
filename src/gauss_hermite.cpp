@@ -51,8 +51,8 @@ double gh_integrand_adaptive (double s,
                                double dj){
 
     double temp = 0 , res = 0;
-    if (C_k_other==0) {
-        temp = alpha* rho * sigmaG * sqrt(C_k/C_k_other) / sigmaG_other * beta_other / sd;
+    if (C_k_other != 0) {
+        temp = alpha * rho * sqrt(C_k*sigmaG/C_k_other/ sigmaG_other) * beta_other / sd;
     } 
     double ML = exp(temp - s / sd * sqrt_2Ck_sigmaG_rho);
     double ML_mean = exp(temp - s / sd * sqrt_2Ck_sigmaG_rho - mean);
@@ -60,8 +60,8 @@ double gh_integrand_adaptive (double s,
     res = - (ML_mean * ( vi_0 + vi_tau_1 + ML * (vi_1 + vi_tau_1 + ML * (vi_2 + vi_tau_2) ) ));
     res = res - s*s + vi_sum + vi_sum_tau;
     res = res - alpha * (s* sqrt_2Ck_sigmaG_rho + temp ) * dj;
-    res = exp(res);
-    return res;
+
+    return exp(res);
 }
 
 
