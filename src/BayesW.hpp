@@ -32,7 +32,7 @@ public:
     unsigned int    km1          = opt.S.size();      // Number of mixtures 
     const size_t    LENBUF_gamma = 3500;              // Not more than 160 "fixed effects can be used at the moment 
 
-    const double tau = log(40.0); // Later we need to read from the data what is the breaking point
+    const double tau = log(61.0); // Later we need to read from the data what is the breaking point
 
 
 	// The ARS structures

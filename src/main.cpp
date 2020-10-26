@@ -58,8 +58,8 @@ int main(int argc, const char * argv[]) {
             // Reading from BED file
             // ---------------------
             if (opt.readFromBedFile && !opt.readFromSparseFiles) {
-
                 data.readFamFile(opt.bedFile + ".fam");
+                data.readFamFile2(opt.bedFile2 + ".fam");  // For the second epoch
                 data.readBimFile(opt.bedFile + ".bim");
 
                 //EO: no usable for now
@@ -76,7 +76,10 @@ int main(int argc, const char * argv[]) {
                         }
                     } else {
                         if (opt.bayesType == "bayesWMPI") {
+
                             data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
+                            //For epoch 2
+                            data.readPhenFailFiles(opt.phenotypeFile2, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, rank);
                         } else {
                             data.readPhenotypeFile(opt.phenotypeFile);
                         }

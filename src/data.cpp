@@ -35,21 +35,37 @@ uint Data::set_Ntot(const int rank, const Options opt) {
     return Ntot;
 }
 
+uint Data::set_Ntot1(const int rank, const Options opt) {
+
+    uint Ntot1 = opt.numberIndividuals;
+
+    if (Ntot1 == 0) {
+        printf("FATAL  : opt.numberIndividuals is zero! Set it via --number-individuals in call.");
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+//TODO: Deal with NAs for two epochs separately
+    if (Ntot1 != numInds - numNAs) {
+        if (rank == 0)
+            printf("WARNING: opt.numberIndividuals set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot1, numInds, numNAs, numInds - numNAs);
+    }
+    return Ntot1;
+}
+
 uint Data::set_Ntot2(const int rank, const Options opt) {
 
-    uint Ntot = opt.numberIndividuals2;
+    uint Ntot2 = opt.numberIndividuals2;
 
-    if (Ntot == 0) {
+    if (Ntot2 == 0) {
         printf("FATAL  : opt.numberIndividuals2 is zero! Set it via --number-individuals2 in call.");
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 //TODO: Deal with NAs for two epochs separately
-    if (Ntot != numInds - numNAs) {
+    if (Ntot2 != numInds2 - numNAs) {
         if (rank == 0)
-            printf("WARNING: opt.numberIndividuals2 set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot, numInds, numNAs, numInds - numNAs);
+            printf("WARNING: opt.numberIndividuals2 set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot2, numInds2, numNAs, numInds2 - numNAs);
     }
 
-    return Ntot;
+    return Ntot2;
 }
 
 uint Data::set_Mtot(const int rank, Options opt) {
@@ -1571,6 +1587,7 @@ void Data::readMarkerBlocksFile(const string &markerBlocksFile) {
 void Data::readFamFile(const string &famFile){
     // ignore phenotype column
     ifstream in(famFile.c_str());
+
     if (!in) throw ("Error: can not open the file [" + famFile + "] to read.");
     //cout << "Reading PLINK FAM file from [" + famFile + "]." << endl;
     indInfoVec.clear();
@@ -1589,6 +1606,26 @@ void Data::readFamFile(const string &famFile){
     //cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
 }
 
+void Data::readFamFile2(const string &famFile){
+    // ignore phenotype column
+    ifstream in(famFile.c_str());
+    if (!in) throw ("Error: can not open the file [" + famFile + "] to read.");
+    //cout << "Reading PLINK FAM file from [" + famFile + "]." << endl;
+    indInfoVec.clear();
+    indInfoMap.clear();
+    string fid, pid, dad, mom, sex, phen;
+    unsigned idx = 0;
+    while (in >> fid >> pid >> dad >> mom >> sex >> phen) {
+        IndInfo *ind = new IndInfo(idx++, fid, pid, dad, mom, atoi(sex.c_str()));
+        indInfoVec.push_back(ind);
+        if (indInfoMap.insert(pair<string, IndInfo*>(ind->catID, ind)).second == false) {
+            throw ("Error: Duplicate individual ID found: \"" + fid + "\t" + pid + "\".");
+        }
+    }
+    in.close();
+    numInds2 = (unsigned) indInfoVec.size();
+    //cout << numInds2 << " individuals to be included from [" + famFile + "]." << endl;
+}
 
 void Data::readBimFile(const string &bimFile) {
     // Read bim file: recombination rate is defined between SNP i and SNP i-1

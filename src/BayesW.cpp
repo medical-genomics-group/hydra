@@ -188,6 +188,8 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
 
     // Component variables
     pi_L.resize(numGroups, K);          // prior mixture probabilities (also the 0th)
+    pi_L2.resize(numGroups, K);          // prior mixture probabilities (also the 0th)
+
     marginal_likelihoods = VectorXd(K); // likelihood for each mixture component
 
     // Vector to store the 0th component of the marginal likelihood for each group
@@ -203,7 +205,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     // Second epoch
     pi_L2.setConstant(1.0 / Mtot);
     pi_L2.col(0).array() = 0.99;
-    pi_L2.col(1).array() = 1 - pi_L.col(0).array() - (km1 - 1) / Mtot;
+    pi_L2.col(1).array() = 1 - pi_L2.col(0).array() - (km1 - 1) / Mtot;
 
     marginal_likelihoods.setOnes(); //Initialize with just ones
     marginal_likelihood_0.setOnes();
@@ -225,14 +227,17 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     mu = y.mean(); // mean or intercept
     // Initialize the variables in structures
     //Save variance classes
+            cout << "A5" << endl; 
 
     //Store the vector of failures only in the structure used for sampling alpha
     used_data_alpha.failure_vector = data.fail.cast<double>();
     used_data_alpha.failure_vector2 = data.fail2.cast<double>();
+            cout << "A6" << endl; 
 
     double denominator = (6 * ((y.array() - mu).square()).sum() / (y.size() - 1));
     used_data.alpha = PI / sqrt(denominator);      // The shape parameter initial value
     used_data_beta.alpha = PI / sqrt(denominator); // The shape parameter initial value
+            cout << "A7" << endl; 
 
     //Initialise epoch 1 individuals
     for (int i = 0; i < (y.size()); ++i)
@@ -252,6 +257,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
         (used_data.epsilon4)[i] = y[i] - mu;
         epsilon4[i] = tau - mu;
     }
+            cout << "A8" << endl; 
 
     // Use h2 = 0.5 for the inital estimate// divided  by the number of groups
     sigmaG.array() = PI_squared / (6 * pow(used_data_beta.alpha, 2)) / numGroups;
@@ -261,6 +267,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     //Restart variables
     epsilon_restart.resize(individualCount);
     epsilon_restart.setZero();
+            cout << "A9" << endl; 
 
     gamma_restart.resize(fixedCount);
     gamma_restart.setZero();
@@ -289,6 +296,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
         /* covariates */
         used_data.sigma_covariate = data.covarPrior;
     }
+            cout << "A10" << endl; 
 
     // Save the number of events
     used_data.d = used_data_alpha.failure_vector.array().sum();
@@ -386,7 +394,7 @@ int BayesW::runMpiGibbs_bW()
     }
 
     //TODO: Write new functions for Ntot1 and Ntot2 to read from different epochs
-    uint Ntot1 = data.set_Ntot(rank, opt);
+    uint Ntot1 = data.set_Ntot1(rank, opt);
     uint Ntot2 = data.set_Ntot2(rank, opt);
 
     const uint Mtot = data.set_Mtot(rank, opt);
@@ -438,6 +446,7 @@ int BayesW::runMpiGibbs_bW()
 
     dalloc += M * sizeof(int) / 1E9;        // for components
     dalloc += 2 * M * sizeof(double) / 1E9; // for Beta and Acum
+            cout << "A1" << endl; 
 
     // Adapt the --thin and --save options such that --save >= --thin and --save%--thin = 0
     // ------------------------------------------------------------------------------------
@@ -455,6 +464,7 @@ int BayesW::runMpiGibbs_bW()
         if (rank == 0)
             printf("         opt.save reset to %d, the closest multiple of opt.thin (%d)\n", opt.save, opt.thin);
     }
+            cout << "A2" << endl; 
 
     // Invariant initializations (from scratch / from restart)
     // -------------------------------------------------------
@@ -478,6 +488,7 @@ int BayesW::runMpiGibbs_bW()
     string eps2fp = opt.mcmcOut + ".eps2." + std::to_string(rank);
     string eps3fp = opt.mcmcOut + ".eps3." + std::to_string(rank);
     string eps4fp = opt.mcmcOut + ".eps4." + std::to_string(rank);
+            cout << "A3" << endl; 
 
     if (opt.restart)
     {
@@ -519,8 +530,11 @@ int BayesW::runMpiGibbs_bW()
         // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
         //@@@EO srand(opt.seed);
         //TODO: SEO - fix NAs
+                    cout << "A4" << endl; 
+
         init(Ntot1, Ntot2, Mtot, numFixedEffects); //- data.numNAs
     }
+
     cass.resize(numGroups, K); //rows are groups columns are mixtures
     cass2.resize(numGroups, K);
 
@@ -703,11 +717,15 @@ int BayesW::runMpiGibbs_bW()
     if (opt.readFromBedFile)
     {
         //Read the data sets for two epochs
+            cout << "Read bed file1" << endl; 
+
         data.load_data_from_bed_file(opt.bedFile, Ntot1, M, rank, MrankS[rank],
                                      N1S, N1L, I1,
                                      N2S, N2L, I2,
                                      NMS, NML, IM,
                                      taskBytes);
+        cout << "Read bed file2" << endl; 
+
         data.load_data_from_bed_file(opt.bedFile2, Ntot2, M, rank, MrankS[rank],
                                      N1S_2, N1L_2, I1_2,
                                      N2S_2, N2L_2, I2_2,

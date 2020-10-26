@@ -115,6 +115,8 @@ public:
 
     unsigned numSnps = 0;
     unsigned numInds = 0;
+    unsigned numInds2 = 0;  // For the second epoch 
+
     unsigned numNAs  = 0;
 
     vector<uint> NAsInds;
@@ -124,6 +126,7 @@ public:
 
 
     uint set_Ntot(const int rank, const Options opt);
+    uint set_Ntot1(const int rank, const Options opt);
     uint set_Ntot2(const int rank, const Options opt);
 
     uint set_Mtot(const int rank, Options opt);
@@ -323,6 +326,7 @@ public:
     void readMarkerBlocksFile(const string &markerBlocksFile);
 
     void readFamFile(const string &famFile);
+    void readFamFile2(const string &famFile);
 
     void readBimFile(const string &bimFile);
 
