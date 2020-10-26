@@ -55,9 +55,6 @@ struct pars_beta_sparse {
 	// Parameter for inter-epoch correlation
 	double rho;
 
-	// indictes the epoch on which beta is being updated
-	int beta_ind;
-
 	// Beta_j - specific variables
 	// Sums of exponentiated residuals - one for difference from y, one for difference from tau
 	double vi_0, vi_1, vi_2; // Sums of vi elements

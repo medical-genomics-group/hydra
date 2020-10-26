@@ -50,17 +50,17 @@ double gh_integrand_adaptive (double s,
                                double vi_tau_0,
                                double dj){
 
-    double ML = 0 , temp, res = 0;
+    double temp = 0 , res = 0;
     if (C_k_other==0) {
-            temp= alpha* rho * sigmaG* (C_k).sqrt() / sigmaG_other / (C_k_other).sqrt() * beta_other / sd;
-        } else {
-            temp=0;
-        }
-    ML = (temp - s / sd * sqrt_2Ck_sigmaG_rho).exp();
-    res = - (ML).pow(- mean) * ( vi_0 + vi_tau_1 + ML * (vi_1 + vi_tau_1 + ML * (vi_2 + vi_tau_2) ) );
+        temp = alpha* rho * sigmaG * sqrt(C_k/C_k_other) / sigmaG_other * beta_other / sd;
+    } 
+    double ML = exp(temp - s / sd * sqrt_2Ck_sigmaG_rho);
+    double ML_mean = exp(temp - s / sd * sqrt_2Ck_sigmaG_rho - mean);
+
+    res = - (ML_mean * ( vi_0 + vi_tau_1 + ML * (vi_1 + vi_tau_1 + ML * (vi_2 + vi_tau_2) ) ));
     res = res - s*s + vi_sum + vi_sum_tau;
     res = res - alpha * (s* sqrt_2Ck_sigmaG_rho + temp ) * dj;
-    res = res.exp();
+    res = exp(res);
     return res;
 }
 
