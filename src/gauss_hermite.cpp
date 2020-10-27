@@ -29,7 +29,7 @@
 }
 */
 
-double gh_integrand_adaptive (double s,
+double gh_integrand_adaptive_new (double s,
                                double rho,
                                double sigmaG,
                                double C_k,
@@ -62,6 +62,47 @@ double gh_integrand_adaptive (double s,
     res = res - alpha * (s* sqrt_2Ck_sigmaG_rho + alpha * temp / sd) * dj;
 
     return exp(res);
+}
+
+// In the second epoch pass vi_tau with different sign
+double gh_integrand_adaptive(double s,
+                               double rho,
+                               double sigmaG,
+                               double C_k,
+                               double sigmaG_other,
+                               double C_k_other,
+                               double beta_other,
+                               double sd,
+                               double alpha,
+                               double sqrt_2Ck_sigmaG_rho,
+                               double mean,
+                               double vi_sum,
+                               double vi_sum_tau,
+                               double vi_2,
+                               double vi_1, 
+                               double vi_0,
+                               double vi_tau_2,
+                               double vi_tau_1,
+                               double vi_tau_0,
+                               double dj){
+	//vi is a vector of exp(vi)
+    double temp = 0.0;
+    if (C_k_other != 0) {
+        double eta = rho * sqrt(C_k*sigmaG/C_k_other/ sigmaG_other) * beta_other; // This term is non-zero if beta in the other epoch is non-zero
+
+        temp = -alpha * dj * (s * sqrt_2Ck_sigmaG_rho + eta) + 
+            (vi_0 + vi_tau_0) * exp(alpha * mean * eta / sd) * (1 - exp(alpha * mean * s * sqrt_2Ck_sigmaG_rho / sd)) +
+            (vi_1 + vi_tau_1) * exp(-alpha * (1-mean) * eta / sd) * (1 - exp(-alpha * (1-mean) * s * sqrt_2Ck_sigmaG_rho / sd)) +
+            (vi_2 + vi_tau_2) * exp(-alpha * (2-mean) * eta / sd) * (1 - exp(-alpha * (2-mean) * s * sqrt_2Ck_sigmaG_rho / sd)) - pow(s, 2.0);
+        return exp(temp);
+    } 
+
+    temp = -alpha * dj * (s * sqrt_2Ck_sigmaG_rho) + 
+            (vi_0 + vi_tau_0)  * (1 - exp(alpha * mean * s * sqrt_2Ck_sigmaG_rho / sd)) +
+            (vi_1 + vi_tau_1)  * (1 - exp(-alpha * (1-mean) * s * sqrt_2Ck_sigmaG_rho / sd)) +
+            (vi_2 +vi_tau_2) * (1 - exp(-alpha * (2-mean) * s * sqrt_2Ck_sigmaG_rho / sd)) - pow(s, 2.0);
+            
+	return exp(temp);
 }
 
 
