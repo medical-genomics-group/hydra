@@ -10,7 +10,8 @@ SRC_EXCL +=  $(SOURCEDIR)/mk_lut.cpp
 
 SOURCES  := $(filter-out $(SRC_EXCL),$(SOURCES))
 
-CXXFLAGS  = -Ofast
+#CXXFLAGS  = -Ofast
+CXXFLAGS  = -O0
 CXXFLAGS += -g
 CXXFLAGS += -std=c++17
 

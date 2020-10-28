@@ -100,7 +100,7 @@ void BayesW::marginal_likelihood_vec_calc_test(VectorXd prior_prob, VectorXd &po
         //Calculate the sigma for the adaptive G-H
         double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG1 * used_data_beta.sigmaG1 * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * used_data_beta.mixture_value * exp_sum);
         cout << "C_k = " << cVa(group_index, i) << endl;
-        cout << sigma << endl;
+ 
         cout << gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
                                                 used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, vi_tau_sum) << endl;
 
@@ -516,6 +516,10 @@ int BayesW::runMpiGibbs_bW()
     dalloc += M * sizeof(int) / 1E9;        // for components
     dalloc += 2 * M * sizeof(double) / 1E9; // for Beta and Acum
 
+    //Same for epoch 2
+    dalloc += M * sizeof(int) / 1E9;        // for components
+    dalloc += 2 * M * sizeof(double) / 1E9; // for Beta and Acum
+
     // Adapt the --thin and --save options such that --save >= --thin and --save%--thin = 0
     // ------------------------------------------------------------------------------------
     if (opt.save < opt.thin)
@@ -851,14 +855,14 @@ int BayesW::runMpiGibbs_bW()
     mstd = (double *)_mm_malloc(size_t(M) * sizeof(double), 64);
     check_malloc(mstd, __LINE__, __FILE__);
     sum_failure = (double *)_mm_malloc(size_t(M) * sizeof(double), 64);
-    check_malloc(mstd, __LINE__, __FILE__);
+    check_malloc(sum_failure, __LINE__, __FILE__);
     sum_failure2 = (double *)_mm_malloc(size_t(M) * sizeof(double), 64);
-    check_malloc(mstd, __LINE__, __FILE__);
+    check_malloc(sum_failure2, __LINE__, __FILE__);
 
     sum_failure_fix = (double *)_mm_malloc(size_t(numFixedEffects) * sizeof(double), 64);
-    check_malloc(mstd, __LINE__, __FILE__);
+    check_malloc(sum_failure_fix, __LINE__, __FILE__);
 
-    dalloc += 2 * size_t(M) * sizeof(double) / 1E9;
+    dalloc += 5 * size_t(M) * sizeof(double) / 1E9;   //SEO - Is this correct? Previously it was 2
 
     double tmp0, tmp1, tmp2;
     double temp_fail_sum = used_data_alpha.failure_vector.array().sum();
@@ -952,7 +956,7 @@ int BayesW::runMpiGibbs_bW()
     //We also keep in memory residuals 2,3,4
     double *y2, *tmpEps2, *deltaEps2, *dEpsSum2, *deltaSum2, *epsilon2, *tmpEps_vi2, *tmp_deltaEps2;
     const size_t NDB_2 = size_t(Ntot2) * sizeof(double);
-    y2 = (double *)_mm_malloc(NDB, 64);
+    y2 = (double *)_mm_malloc(NDB_2, 64);
     check_malloc(y2, __LINE__, __FILE__);
     epsilon2 = (double *)_mm_malloc(NDB_2, 64);
     check_malloc(epsilon2, __LINE__, __FILE__);
@@ -1027,7 +1031,8 @@ int BayesW::runMpiGibbs_bW()
     check_malloc(vi4, __LINE__, __FILE__);
 
     dalloc += NDB * 10 / 1E9;
-    dalloc += NDB_2 * 10 / 1E9;
+  //  dalloc += NDB_2 * 10 / 1E9;
+    dalloc += NDB_2 * 10 * 3 / 1E9;
 
     double totalloc = 0.0;
     MPI_Reduce(&dalloc, &totalloc, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -1036,6 +1041,9 @@ int BayesW::runMpiGibbs_bW()
 
     set_array(dEpsSum, 0.0, Ntot1);
     set_array(dEpsSum2, 0.0, Ntot2);
+    set_array(dEpsSum3, 0.0, Ntot2);
+    set_array(dEpsSum4, 0.0, Ntot2);
+
     // Copy, center and scale phenotype observations
     // In bW we are not scaling and centering phenotypes
     //TODO: Fix the restart for two epochs
@@ -1164,14 +1172,14 @@ int BayesW::runMpiGibbs_bW()
             (used_data.epsilon3)[mu_ind] = epsilon3[mu_ind] + mu;
             (used_data.epsilon4)[mu_ind] = epsilon4[mu_ind] + mu;
         }
-cout << "Sample mu" << endl;
+        cout << "Sample mu" << endl;
 
         // Use ARS to sample mu (with density mu_dens, using parameters from used_data)
         err = arms(xinit, ninit, &xl, &xr, mu_dens, &used_data, &convex, npoint,
                    dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
 
         errorCheck(err); // If there is error, stop the program
-cout << "Mu sampled" << endl;
+        cout << "Mu sampled" << endl;
 
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         mu = xsamp[0]; // Save the sampled value
@@ -1286,7 +1294,7 @@ cout << "Mu sampled" << endl;
             (used_data_alpha.epsilon3)[alpha_ind] = epsilon3[alpha_ind];
             (used_data_alpha.epsilon4)[alpha_ind] = epsilon4[alpha_ind];
         }
-cout << "Sample alpha" << endl;
+        cout << "Sample alpha" << endl;
 
         //Sample using ARS
         err = arms(xinit, ninit, &xl, &xr, alpha_dens, &used_data_alpha, &convex,
@@ -1298,7 +1306,7 @@ cout << "Sample alpha" << endl;
 
         used_data.alpha = xsamp[0];
         used_data_beta.alpha = xsamp[0];
-cout << "Alpha sampled" << endl;
+        cout << "Alpha sampled" << endl;
         MPI_Barrier(MPI_COMM_WORLD);
 
         // Calculate the vector of exponent of the adjusted residuals
@@ -1549,7 +1557,7 @@ cout << "Alpha sampled" << endl;
                 // Calculate the probability that marker is 0
                 double acum = marginal_likelihoods(0) / marginal_likelihoods.sum();
 
-                if (false)
+                if (j == 0)
                 {
                     cout << "Epoch 1 sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
                     cout << "EPOCH 1!" << endl;
@@ -1575,13 +1583,13 @@ cout << "Alpha sampled" << endl;
                             Beta(marker) = 0.0;
                             cass(cur_group, 0) += 1;
                             components[marker] = k;
-                            if(j % 200) cout << "Epoch 1 no sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
+                            if(j % 200 == 0) cout << "Epoch 1 no sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
 
                         }
                         // If is not 0th component then sample using ARS
                         else
                         {
-cout << "Epoch 1 sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
+        cout << "Epoch 1 sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
                             //used_data_beta.sum_failure = sum_failure(marker);
                             used_data_beta.mean = mave[marker];
                             used_data_beta.sd = mstd[marker];
@@ -1714,7 +1722,7 @@ cout << "Epoch 1 sample " << j << "; p=" << p << "M likelihoods: "<< marginal_li
                             cass2(cur_group, 0) += 1;
                             components2[marker] = k;
 
-                            if(j % 200) cout << "Epoch 2 no sample " << j << "; p=" << p2 << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
+                            if(j % 200 == 0) cout << "Epoch 2 no sample " << j << "; p=" << p2 << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
 
                         }
                         // If is not 0th component then sample using ARS
@@ -2186,7 +2194,7 @@ cout << "Epoch 1 sample " << j << "; p=" << p << "M likelihoods: "<< marginal_li
                 printf(" -> sum = %8d\n", cass.row(i).sum());
             }
         }
-cout << "Sample hyperparameters" << endl;
+        cout << "Sample hyperparameters" << endl;
         // Update global parameters
         // ------------------------
         for (int gg = 0; gg < numGroups; gg++)
@@ -2219,11 +2227,14 @@ cout << "Sample hyperparameters" << endl;
             pi_L.row(gg) = dist.dirichlet_rng(dirin);
             pi_L2.row(gg) = dist.dirichlet_rng(dirin);
         }
+        cout << "Hyperparameters done" << endl;
 
         MPI_Barrier(MPI_COMM_WORLD);
 
         // Synchronise the global parameters
         check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        check_mpi(MPI_Bcast(sigmaG2.data(), sigmaG2.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+        check_mpi(MPI_Bcast(Rho.data(), Rho.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
         check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         check_mpi(MPI_Bcast(pi_L2.data(), pi_L2.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -2261,6 +2272,7 @@ cout << "Sample hyperparameters" << endl;
         // Write output files
         // ------------------
 
+
         if (iteration % opt.thin == 0)
         {
 
@@ -2276,10 +2288,11 @@ cout << "Sample hyperparameters" << endl;
 
                 for (int jj = 0; jj < sigmaG.size(); ++jj)
                 {
-                    sigmaG(jj) = (double)((int)(sigmaG(jj) * 1E15)) * 1E-15;
+                    //sigmaG(jj) = (double)((int)(sigmaG(jj) * 1E15)) * 1E-15;   // Doesn't work with -O0
                     cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %22.17f", sigmaG(jj));
                     assert(cx >= 0 && cx < LENBUF - strlen(buff));
                 }
+                
 
                 for (int ii = 0; ii < pi_L.rows(); ++ii)
                 {
@@ -2293,11 +2306,11 @@ cout << "Sample hyperparameters" << endl;
                 //Same for epoch 2
                 for (int jj = 0; jj < sigmaG2.size(); ++jj)
                 {
-                    sigmaG2(jj) = (double)((int)(sigmaG2(jj) * 1E15)) * 1E-15;
+                    //sigmaG2(jj) = (double)((int)(sigmaG2(jj) * 1E15)) * 1E-15; // Doesn't work with -O0
                     cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %22.17f", sigmaG2(jj));
                     assert(cx >= 0 && cx < LENBUF - strlen(buff));
                 }
-
+  
                 for (int ii = 0; ii < pi_L2.rows(); ++ii)
                 {
                     for (int kk = 0; kk < pi_L2.cols(); ++kk)
@@ -2310,7 +2323,7 @@ cout << "Sample hyperparameters" << endl;
                 // Rho parameters
                 for (int jj = 0; jj < Rho.size(); ++jj)
                 {
-                    Rho(jj) = (double)((int)(Rho(jj) * 1E15)) * 1E-15;
+                    //Rho(jj) = (double)((int)(Rho(jj) * 1E15)) * 1E-15;   // Doesn't work with -O0
                     cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %22.17f", Rho(jj));
                     assert(cx >= 0 && cx < LENBUF - strlen(buff));
                 }
@@ -2481,7 +2494,7 @@ cout << "Sample hyperparameters" << endl;
 
         //double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
-
+ 
         MPI_Barrier(MPI_COMM_WORLD);
     }
 
