@@ -1164,12 +1164,14 @@ int BayesW::runMpiGibbs_bW()
             (used_data.epsilon3)[mu_ind] = epsilon3[mu_ind] + mu;
             (used_data.epsilon4)[mu_ind] = epsilon4[mu_ind] + mu;
         }
+cout << "Sample mu" << endl;
 
         // Use ARS to sample mu (with density mu_dens, using parameters from used_data)
         err = arms(xinit, ninit, &xl, &xr, mu_dens, &used_data, &convex, npoint,
                    dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
 
         errorCheck(err); // If there is error, stop the program
+cout << "Mu sampled" << endl;
 
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         mu = xsamp[0]; // Save the sampled value
@@ -1284,6 +1286,7 @@ int BayesW::runMpiGibbs_bW()
             (used_data_alpha.epsilon3)[alpha_ind] = epsilon3[alpha_ind];
             (used_data_alpha.epsilon4)[alpha_ind] = epsilon4[alpha_ind];
         }
+cout << "Sample alpha" << endl;
 
         //Sample using ARS
         err = arms(xinit, ninit, &xl, &xr, alpha_dens, &used_data_alpha, &convex,
@@ -1295,7 +1298,7 @@ int BayesW::runMpiGibbs_bW()
 
         used_data.alpha = xsamp[0];
         used_data_beta.alpha = xsamp[0];
-
+cout << "Alpha sampled" << endl;
         MPI_Barrier(MPI_COMM_WORLD);
 
         // Calculate the vector of exponent of the adjusted residuals
@@ -1524,7 +1527,7 @@ int BayesW::runMpiGibbs_bW()
                 {
                     used_data_beta.mixture_value_other = 0;
                 }
-                if (j == 0)
+                if (false)
                 {
                     cout << "EPOCH 1!" << endl;
                     cout << "marginal likelihoods size = " << marginal_likelihoods.size() << endl;
@@ -1546,6 +1549,21 @@ int BayesW::runMpiGibbs_bW()
                 // Calculate the probability that marker is 0
                 double acum = marginal_likelihoods(0) / marginal_likelihoods.sum();
 
+                if (false)
+                {
+                    cout << "Epoch 1 sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
+                    cout << "EPOCH 1!" << endl;
+
+                    cout << "vi pars = " << vi_sum << ", " << vi_2 << "," << vi_1 << ", " << vi_0 << endl;
+                    cout << "vi_tau pars = " << vi3_sum << ", " << vi3_2 << "," << vi3_1 << ", " << vi3_0 << endl;
+                    //cout << "pi values = " << pi_L(cur_group, 0) << ", " << pi_L(cur_group, 1) << "," << pi_L(cur_group, 2) << endl;
+
+                    marginal_likelihood_vec_calc_test(pi_L.row(cur_group), marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
+                                                      vi3_sum, vi3_2, vi3_1, vi3_0,
+                                                      mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
+                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << "," << marginal_likelihoods(2) << endl;
+
+                }
                 //Loop through the possible mixture classes
                 for (int k = 0; k < K; k++)
                 {
@@ -1557,14 +1575,13 @@ int BayesW::runMpiGibbs_bW()
                             Beta(marker) = 0.0;
                             cass(cur_group, 0) += 1;
                             components[marker] = k;
-                            if(j < 100) cout << "Epoch 1 no sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
+                            if(j % 200) cout << "Epoch 1 no sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
 
                         }
                         // If is not 0th component then sample using ARS
                         else
                         {
-                            cout << "Epoch 1 sample " << j << "; p=" << p2 << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
-
+cout << "Epoch 1 sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
                             //used_data_beta.sum_failure = sum_failure(marker);
                             used_data_beta.mean = mave[marker];
                             used_data_beta.sd = mstd[marker];
@@ -1608,7 +1625,7 @@ int BayesW::runMpiGibbs_bW()
                             errorCheck(err);
 
                             Beta(marker) = xsamp[0]; // Save the new result
-
+                            //cout << "Sampled beta1 = " <<  Beta(marker) << endl;
                             cass(cur_group, k) += 1;
                             components[marker] = k;
 
@@ -1647,7 +1664,7 @@ int BayesW::runMpiGibbs_bW()
                     used_data_beta.mixture_value_other = 0;
                 }
 
-                if (j == 0)
+                if (false)
                 {
                     cout << "EPOCH 2!" << endl;
                     cout << "marginal likelihoods size = " << marginal_likelihoods.size() << endl;
@@ -1670,7 +1687,21 @@ int BayesW::runMpiGibbs_bW()
                 // cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << endl;
                 // Calculate the probability that marker is 0
                 acum = marginal_likelihoods(0) / marginal_likelihoods.sum();
+                if (false)
+                {
+                    cout << "Epoch 2 sample " << j << "; p=" << p2 << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
+                    cout << "EPOCH 2!" << endl;
 
+                    cout << "vi pars = " << vi2_sum << ", " << vi2_2 << "," << vi2_1 << ", " << vi2_0 << endl;
+                    cout << "vi_tau pars = " << vi4_sum << ", " << vi4_2 << "," << vi4_1 << ", " << vi4_0 << endl;
+                    //cout << "pi values = " << pi_L(cur_group, 0) << ", " << pi_L(cur_group, 1) << "," << pi_L(cur_group, 2) << endl;
+
+                    marginal_likelihood_vec_calc2_test(pi_L2.row(cur_group), marginal_likelihoods, quad_points, vi2_sum, vi2_2, vi2_1, vi2_0,
+                                                      vi4_sum, vi4_2, vi4_1, vi4_0,
+                                                      mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
+                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << "," << marginal_likelihoods(2) << endl;
+
+                }
                 //Loop through the possible mixture classes
                 for (int k = 0; k < K; k++)
                 {
@@ -1683,14 +1714,14 @@ int BayesW::runMpiGibbs_bW()
                             cass2(cur_group, 0) += 1;
                             components2[marker] = k;
 
-                            if(j < 100) cout << "Epoch 2 sample " << j << "; p=" << p2 << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
+                            if(j % 200) cout << "Epoch 2 no sample " << j << "; p=" << p2 << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
 
                         }
                         // If is not 0th component then sample using ARS
                         else
                         {
                             //used_data_beta.sum_failure = sum_failure(marker);
-
+                            cout << "Epoch 2 sample " << j << "; p=" << p2 << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
                             used_data_beta.mean = mave[marker];
                             used_data_beta.sd = mstd[marker];
                             used_data_beta.mean_sd_ratio = mave[marker] / mstd[marker];
@@ -1733,6 +1764,7 @@ int BayesW::runMpiGibbs_bW()
                             errorCheck(err);
 
                             Beta2(marker) = xsamp[0]; // Save the new result
+                           // cout << "Sampled beta2 = " <<  Beta2(marker) << endl;
 
                             cass2(cur_group, k) += 1;
                             components2[marker] = k;
@@ -2154,7 +2186,7 @@ int BayesW::runMpiGibbs_bW()
                 printf(" -> sum = %8d\n", cass.row(i).sum());
             }
         }
-
+cout << "Sample hyperparameters" << endl;
         // Update global parameters
         // ------------------------
         for (int gg = 0; gg < numGroups; gg++)
@@ -2200,9 +2232,9 @@ int BayesW::runMpiGibbs_bW()
         sumSigmaG2 = sigmaG2.sum(); // similarly for epoch 2
 
         //Print results
-        //if(rank == 0){
-        //    cout << iteration << ". " << m0.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sigmaG.sum()  << endl;
-        //}
+        if(rank == 0){
+            cout << iteration << ". " << m0.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sumSigmaG << ": " <<  sumSigmaG2 << "; "<< beta1_beta2(0) << endl;
+        }
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);

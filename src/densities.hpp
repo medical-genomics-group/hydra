@@ -45,7 +45,7 @@ double beta_dens(double x, void *norm_data)
 {
 	pars_beta_sparse p = *(static_cast<pars_beta_sparse *>(norm_data));
 	long double s = 0;
-	long double H = expl((long double) (p.alpha * x / p.sd));
+	long double H = expl((long double) (-p.alpha * x / p.sd));
 	long double G = expl((long double) (p.alpha * p.mean * x / p.sd));
 
 	if (p.mixture_value_other != 0)

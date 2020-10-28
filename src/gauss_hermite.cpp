@@ -87,20 +87,16 @@ double gh_integrand_adaptive(double s,
                                double dj){
 	//vi is a vector of exp(vi)
     double temp = 0.0;
+    double eta = 0.0;
     if (C_k_other != 0) {
         double eta = rho * sqrt(C_k*sigmaG/C_k_other/ sigmaG_other) * beta_other; // This term is non-zero if beta in the other epoch is non-zero
 
-        temp = -alpha * dj * (s * sqrt_2Ck_sigmaG_rho + eta) + 
-            (vi_0 + vi_tau_0) * exp(alpha * mean * eta / sd) * (1 - exp(alpha * mean * s * sqrt_2Ck_sigmaG_rho / sd)) +
-            (vi_1 + vi_tau_1) * exp(-alpha * (1-mean) * eta / sd) * (1 - exp(-alpha * (1-mean) * s * sqrt_2Ck_sigmaG_rho / sd)) +
-            (vi_2 + vi_tau_2) * exp(-alpha * (2-mean) * eta / sd) * (1 - exp(-alpha * (2-mean) * s * sqrt_2Ck_sigmaG_rho / sd)) - pow(s, 2.0);
-        return exp(temp);
     } 
 
-    temp = -alpha * dj * (s * sqrt_2Ck_sigmaG_rho) + 
-            (vi_0 + vi_tau_0)  * (1 - exp(alpha * mean * s * sqrt_2Ck_sigmaG_rho / sd)) +
-            (vi_1 + vi_tau_1)  * (1 - exp(-alpha * (1-mean) * s * sqrt_2Ck_sigmaG_rho / sd)) +
-            (vi_2 +vi_tau_2) * (1 - exp(-alpha * (2-mean) * s * sqrt_2Ck_sigmaG_rho / sd)) - pow(s, 2.0);
+    temp = -alpha * dj * (s * sqrt_2Ck_sigmaG_rho + eta) + 
+            (vi_0 + vi_tau_0)  * (1 - exp(alpha * mean * (s * sqrt_2Ck_sigmaG_rho + eta) / sd)) +
+            (vi_1 + vi_tau_1) * (1 - exp(-alpha * (1-mean) * (s * sqrt_2Ck_sigmaG_rho + eta) / sd)) +
+            (vi_2 + vi_tau_2) * (1 - exp(-alpha * (2-mean) * (s * sqrt_2Ck_sigmaG_rho + eta) / sd)) - pow(s, 2.0);
             
 	return exp(temp);
 }
