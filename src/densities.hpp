@@ -57,7 +57,7 @@ double beta_dens(double x, void *norm_data)
 		s = p.rho * sqrt(p.sigmaG1 *p.mixture_value / p.mixture_value_other/ p.sigmaG2) * p.beta_other;
 	}
 
-	long double exp_sums = expmEuMasc * G * (p.vi_0 + p.vi_tau_0 + H * (p.vi_1 + p.vi_tau_1 + H * (p.vi_2 + p.vi_tau_2)));
+	long double exp_sums =  G * (p.vi_0 + p.vi_tau_0 + H * (p.vi_1 + p.vi_tau_1 + H * (p.vi_2 + p.vi_tau_2)));
 	return -p.alpha * x * p.sum_failure - exp_sums - (x - s) * (x - s) / (2 * p.mixture_value * p.sigmaG1 * (1 - p.rho * p.rho));
 };
 
@@ -74,7 +74,7 @@ double beta_dens2(double x, void *norm_data)
 		s = p.rho *  sqrt(p.sigmaG2 * p.mixture_value / p.mixture_value_other / p.sigmaG1) * p.beta_other ;
 	}
 
-	long double exp_sums = expmEuMasc * G * (p.vi_0 - p.vi_tau_0 + H * (p.vi_1 - p.vi_tau_1 + H * (p.vi_2 - p.vi_tau_2)));
+	long double exp_sums =  G * (p.vi_0 - p.vi_tau_0 + H * (p.vi_1 - p.vi_tau_1 + H * (p.vi_2 - p.vi_tau_2)));
 
 	return -p.alpha * x * p.sum_failure - exp_sums - (x - s) * (x - s) / (2 * p.mixture_value * p.sigmaG2 * (1 - p.rho * p.rho));
 };
