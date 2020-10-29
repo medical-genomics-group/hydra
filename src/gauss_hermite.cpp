@@ -54,8 +54,8 @@ double gh_integrand_adaptive (double s,
     if (C_k_other != 0) {
         temp = rho * sqrt(C_k*sigmaG/C_k_other/ sigmaG_other) * beta_other;
     } 
-    double ML = exp(-(alpha*temp  + s  * sqrt_2Ck_sigmaG_rho)/sd);
-    double ML_mean = exp(mean* (alpha*temp  + s  * sqrt_2Ck_sigmaG_rho)/sd);
+    double ML = exp(-alpha /sd * (s * sqrt_2Ck_sigmaG_rho + temp));
+    double ML_mean = exp(alpha * mean /sd * (s * sqrt_2Ck_sigmaG_rho + temp));
 
     res = - (ML_mean * ( vi_0 + vi_tau_0 + ML * (vi_1 + vi_tau_1 + ML * (vi_2 + vi_tau_2) ) ));
     res = res - s*s + vi_sum + vi_sum_tau;
