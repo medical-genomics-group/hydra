@@ -299,7 +299,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     epsilon3 = y2;
     epsilon4 = y2;
 
-    mu = y.mean(); // mean or intercept
+    mu = (y.sum() + y2.sum())/(individualCount + individualCount2) ; // mean or intercept
     // Initialize the variables in structures
     //Save variance classes
 
@@ -368,7 +368,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     }
 
     // Save the number of events
-    used_data.d = used_data_alpha.failure_vector.array().sum();
+    used_data.d = used_data_alpha.failure_vector.array().sum() + used_data_alpha.failure_vector2.array().sum();
     used_data_alpha.d = used_data.d;
 }
 
