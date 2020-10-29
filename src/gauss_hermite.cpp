@@ -29,7 +29,7 @@
 }
 */
 
-double gh_integrand_adaptive_new (double s,
+double gh_integrand_adaptive (double s,
                                double rho,
                                double sigmaG,
                                double C_k,
@@ -54,18 +54,18 @@ double gh_integrand_adaptive_new (double s,
     if (C_k_other != 0) {
         temp = rho * sqrt(C_k*sigmaG/C_k_other/ sigmaG_other) * beta_other;
     } 
-    double ML = exp(temp - s / sd * sqrt_2Ck_sigmaG_rho);
-    double ML_mean = exp(-mean* (temp - s / sd * sqrt_2Ck_sigmaG_rho ));
+    double ML = exp(-(alpha*temp  + s  * sqrt_2Ck_sigmaG_rho)/sd);
+    double ML_mean = exp(mean* (alpha*temp  + s  * sqrt_2Ck_sigmaG_rho)/sd);
 
-    res = - (ML_mean * ( vi_0 + vi_tau_1 + ML * (vi_1 + vi_tau_1 + ML * (vi_2 + vi_tau_2) ) ));
+    res = - (ML_mean * ( vi_0 + vi_tau_0 + ML * (vi_1 + vi_tau_1 + ML * (vi_2 + vi_tau_2) ) ));
     res = res - s*s + vi_sum + vi_sum_tau;
-    res = res - alpha * (s* sqrt_2Ck_sigmaG_rho + alpha * temp / sd) * dj;
+    res = res - alpha * (s* sqrt_2Ck_sigmaG_rho +  temp) * dj;
 
     return exp(res);
 }
 
 // In the second epoch pass vi_tau with different sign
-double gh_integrand_adaptive(double s,
+double gh_integrand_adaptive_new (double s,
                                double rho,
                                double sigmaG,
                                double C_k,
