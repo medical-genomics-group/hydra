@@ -149,7 +149,7 @@ void write_sparse_data_files(const uint bpr, const Data data, const Options opt)
         data.mpi_file_read_at_all <char*> (rawdata_n, offset, bedfh, MPI_CHAR, NREADS, rawdata, bytes);
 
         // Get number of ones, twos, and missing
-        data.sparse_data_get_sizes_from_raw(rawdata, MLi, snpLenByt, 0, N1, N2, NM);
+        data.sparse_data_get_sizes_from_raw(rawdata, data.numInds, MLi, snpLenByt, 0, N1, N2, NM); //SEO - this needs to be changed
         //printf("DEBUG  : off rank %d: N1 = %15lu, N2 = %15lu, NM = %15lu\n", rank, N1, N2, NM);
 
         rN1 += N1;
@@ -225,7 +225,7 @@ void write_sparse_data_files(const uint bpr, const Data data, const Options opt)
         NML = (size_t*) _mm_malloc(size_t(MLi) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
 
         size_t N1 = 0, N2 = 0, NM = 0;
-        data.sparse_data_get_sizes_from_raw(rawdata, uint(MLi), snpLenByt, 0, N1, N2, NM);
+        data.sparse_data_get_sizes_from_raw(rawdata, N, uint(MLi), snpLenByt, 0, N1, N2, NM);
         //printf("DEBUG  : N1 = %15lu, N2 = %15lu, NM = %15lu\n", N1, N2, NM);
 
         // Alloc and build sparse structure
@@ -239,7 +239,7 @@ void write_sparse_data_files(const uint bpr, const Data data, const Options opt)
         //for (int i=0; i<N2; i++) I2[i] = UINT_MAX;
         //for (int i=0; i<NM; i++) IM[i] = UINT_MAX;
 
-        data.sparse_data_fill_indices(rawdata, MLi, snpLenByt, 0, N1S, N1L, I1,  N2S, N2L, I2,  NMS, NML, IM);
+        data.sparse_data_fill_indices(rawdata, N, MLi, snpLenByt, 0, N1S, N1L, I1,  N2S, N2L, I2,  NMS, NML, IM);
 
         //check_whole_array_was_set(I1, N1, __LINE__, __FILE__);
         //check_whole_array_was_set(I2, N2, __LINE__, __FILE__);

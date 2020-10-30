@@ -44,6 +44,7 @@ uint Data::set_Ntot1(const int rank, const Options opt) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 //TODO: Deal with NAs for two epochs separately
+    cout << "Ep1: " << Ntot1 << ", " << numInds << endl;
     if (Ntot1 != numInds - numNAs) {
         if (rank == 0)
             printf("WARNING: opt.numberIndividuals set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot1, numInds, numNAs, numInds - numNAs);
@@ -60,6 +61,8 @@ uint Data::set_Ntot2(const int rank, const Options opt) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 //TODO: Deal with NAs for two epochs separately
+    cout << "Ep1: " << Ntot2 << ", " << numInds2 << endl;
+
     if (Ntot2 != numInds2 - numNAs) {
         if (rank == 0)
             printf("WARNING: opt.numberIndividuals2 set to %d but will be adjusted to %d - %d = %d due to NAs in phenotype file.\n", Ntot2, numInds2, numNAs, numInds2 - numNAs);
@@ -869,7 +872,7 @@ void Data::load_data_from_bed_file(const string bedfp_noext, const uint Ntot, co
     size_t N1 = 0, N2 = 0, NM = 0;
 
     //EO: reading from bed file, so NAs are not considered yet
-    sparse_data_get_sizes_from_raw(rawdata, M, snpLenByt, 0, N1, N2, NM);
+    sparse_data_get_sizes_from_raw(rawdata, Ntot, M, snpLenByt, 0, N1, N2, NM);
     //printf("read from bed: N1 = %lu, N2 = %lu, NM = %lu\n", N1, N2, NM);
 
     // Alloc and build sparse structure
@@ -877,7 +880,7 @@ void Data::load_data_from_bed_file(const string bedfp_noext, const uint Ntot, co
     I2 = (uint*)_mm_malloc(N2 * sizeof(uint), 64);  check_malloc(I2, __LINE__, __FILE__);
     IM = (uint*)_mm_malloc(NM * sizeof(uint), 64);  check_malloc(IM, __LINE__, __FILE__);
     
-    sparse_data_fill_indices(rawdata, M, snpLenByt, 0,
+    sparse_data_fill_indices(rawdata, Ntot, M, snpLenByt, 0,
                              N1S, N1L, I1,
                              N2S, N2L, I2,
                              NMS, NML, IM);
@@ -1311,12 +1314,13 @@ void Data::sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* N
 //     -> data.numNAs when handling an buffered marker stored in BED format
 //
 void Data::sparse_data_get_sizes_from_raw(const char* rawdata, 
+                                          const uint  Ntot,
                                           const uint  NC,
                                           const uint  NB,
                                           const uint  NA,
                                           size_t& N1, size_t& N2, size_t& NM) const {
 
-    assert(numInds - NA <= NB * 4);
+    assert(Ntot - NA <= NB * 4);
 
     // temporary array used for translation
     int8_t *tmpi = (int8_t*)_mm_malloc(NB * 4 * sizeof(char), 64);  check_malloc(tmpi, __LINE__, __FILE__);
@@ -1339,7 +1343,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata,
             }
         }
         
-        for (int ii=0; ii<numInds-NA; ++ii) {
+        for (int ii=0; ii<Ntot-NA; ++ii) {
             if (tmpi[ii] == 1) {
                 tmpi[ii] = -1;
             } else {
@@ -1347,7 +1351,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata,
             }
         }
 
-        for (int ii=0; ii<numInds-NA; ++ii) {
+        for (int ii=0; ii<Ntot-NA; ++ii) {
             if      (tmpi[ii] <  0) { cm += 1;  NM += 1; }
             else if (tmpi[ii] == 0) { c0 += 1;  N0 += 1; }
             else if (tmpi[ii] == 1) { c1 += 1;  N1 += 1; }
@@ -1355,7 +1359,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata,
         }
         //printf("N0, N1, N2, NM = %lu, %lu, %lu, %lu\n", N0, N1, N2, NM);
         //printf("%d - %d = %d\n", numInds, NA, numInds - NA);
-        assert(cm+c0+c1+c2 == numInds - NA);        
+        assert(cm+c0+c1+c2 == Ntot - NA);        
         //printf("N0, N1, N2, NM = %lu, %lu, %lu, %lu\n", N0, N1, N2, NM);
     }
 
@@ -1369,6 +1373,7 @@ void Data::sparse_data_get_sizes_from_raw(const char* rawdata,
 // I* : store the indices of the elements
 // -------------------------------------------------------------------------------------------
 void Data::sparse_data_fill_indices(const char* rawdata,
+                                    const uint  Ntot,
                                     const uint  NC,
                                     const uint  NB,
                                     const uint  NA,
@@ -1376,7 +1381,7 @@ void Data::sparse_data_fill_indices(const char* rawdata,
                                     size_t* N2S, size_t* N2L, uint* I2,
                                     size_t* NMS, size_t* NML, uint* IM) const {
     
-    assert(numInds - NA <= NB * 4);
+    assert(Ntot - NA <= NB * 4);
 
 
     // temporary array used for translation
@@ -1395,7 +1400,7 @@ void Data::sparse_data_fill_indices(const char* rawdata,
             }
         }
         
-        for (int ii=0; ii<numInds-NA; ++ii) {
+        for (int ii=0; ii<Ntot-NA; ++ii) {
             if (tmpi[ii] == 1) {
                 tmpi[ii] = -1;
             } else {
@@ -1405,7 +1410,7 @@ void Data::sparse_data_fill_indices(const char* rawdata,
         
         size_t n0 = 0, n1 = 0, n2 = 0, nm = 0;
         
-        for (uint ii=0; ii<numInds-NA; ++ii) {
+        for (uint ii=0; ii<Ntot-NA; ++ii) {
             if (tmpi[ii] < 0) {
                 IM[im] = ii;
                 im += 1;
@@ -1425,7 +1430,7 @@ void Data::sparse_data_fill_indices(const char* rawdata,
             }
         }
         
-        assert(nm + n0 + n1 + n2 == numInds - NA);
+        assert(nm + n0 + n1 + n2 == Ntot - NA);
         
         N1S[i] = N1;  N1L[i] = n1;  N1 += n1;
         N2S[i] = N2;  N2L[i] = n2;  N2 += n2;
@@ -1603,7 +1608,7 @@ void Data::readFamFile(const string &famFile){
     }
     in.close();
     numInds = (unsigned) indInfoVec.size();
-    //cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
+    cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
 }
 
 void Data::readFamFile2(const string &famFile){
@@ -1624,7 +1629,7 @@ void Data::readFamFile2(const string &famFile){
     }
     in.close();
     numInds2 = (unsigned) indInfoVec.size();
-    //cout << numInds2 << " individuals to be included from [" + famFile + "]." << endl;
+    cout << numInds2 << " individuals to be included from [" + famFile + "]." << endl;
 }
 
 void Data::readBimFile(const string &bimFile) {
@@ -1834,9 +1839,9 @@ void Data::readPhenCovFiles(const string &phenFile, const string covFile, const 
 //--------------------------------------------------------------
 void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank) {
 
-    numInds = numberIndividuals;
-    dest.setZero(numInds);
-    dfail.setZero(numInds);
+    uint numInds_local = numberIndividuals;
+    dest.setZero(numInds_local);
+    dfail.setZero(numInds_local);
 
     ifstream inp(phenFile.c_str());
     if (!inp)
@@ -1889,9 +1894,9 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
     inp.close();
     inc.close();
     inf.close();
-    assert(nonas + nas == numInds);
+    assert(nonas + nas == numInds_local);
 
-    assert(line == numInds);
+    assert(line == numInds_local);
 
     numFixedEffects = values.size() / (line - nas);
 
@@ -1899,8 +1904,8 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
 
     numNAs = nas;
 
-    dest.conservativeResize(numInds-nas);
-    dfail.conservativeResize(numInds-nas);
+    dest.conservativeResize(numInds_local-nas);
+    dfail.conservativeResize(numInds_local-nas);
 
 }
 
@@ -1908,9 +1913,9 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
 //SEO: Function to read phenotype and failure files simultaneously (without covariates)
 void Data::readPhenFailFiles(const string &phenFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank) {
 
-    numInds = numberIndividuals;
-    dest.setZero(numInds);
-    dfail.setZero(numInds);
+    uint numInds_local = numberIndividuals;
+    dest.setZero(numInds_local);
+    dfail.setZero(numInds_local);
 
     ifstream inp(phenFile.c_str());
     if (!inp)
@@ -1945,14 +1950,14 @@ void Data::readPhenFailFiles(const string &phenFile, const string &failFile, con
     }
     inp.close();
     inf.close();
-    assert(nonas + nas == numInds);
+    assert(nonas + nas == numInds_local);
 
-    assert(line == numInds);
+    assert(line == numInds_local);
 
     numNAs = nas;
 
-    dest.conservativeResize(numInds-nas);
-    dfail.conservativeResize(numInds-nas);
+    dest.conservativeResize(numInds_local-nas);
+    dfail.conservativeResize(numInds_local-nas);
 }
 
 

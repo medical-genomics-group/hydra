@@ -567,7 +567,7 @@ int BayesRRm::runMpiGibbs() {
             if (USEBED[i]) {
                 nusebed += 1;
                 size_t X1 = 0, X2 = 0, XM = 0;
-                data.sparse_data_get_sizes_from_raw(reinterpret_cast<char*>(&I1[N1S[i]]), 1, snpLenByt, data.numNAs, X1, X2, XM);
+                data.sparse_data_get_sizes_from_raw(reinterpret_cast<char*>(&I1[N1S[i]]), Ntot, 1, snpLenByt, data.numNAs, X1, X2, XM);  // Additional Ntot by SEO
                 //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu < << <<<\n", rank, i, X1, X2, XM);
 
                 //EO: N{1,2,M}L structures must not be changed anymore!

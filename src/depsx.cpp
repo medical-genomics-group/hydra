@@ -140,7 +140,7 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                 // note: locally available from markers local to task but ignored for now
                 //
                 size_t X1 = 0, X2 = 0, XM = 0;
-                data.sparse_data_get_sizes_from_raw(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, data.numNAs, X1, X2, XM);
+                data.sparse_data_get_sizes_from_raw(&glob_bed[(size_t) i * snpLenByt], Ntot, 1, snpLenByt, data.numNAs, X1, X2, XM);
                 //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu ###\n", rank, i, X1, X2, XM);
                 //fflush(stdout);
                 // Allocate sparse structure
@@ -155,7 +155,7 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                 size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
                             
                 //EO: bed data already adjusted for NAs
-                data.sparse_data_fill_indices(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, data.numNAs,
+                data.sparse_data_fill_indices(&glob_bed[(size_t) i * snpLenByt], Ntot, 1, snpLenByt, data.numNAs,
                                               &fake_n1s, &fake_n1l, XI1,
                                               &fake_n2s, &fake_n2l, XI2,
                                               &fake_nms, &fake_nml, XIM);

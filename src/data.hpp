@@ -219,12 +219,14 @@ public:
     void sparse_data_correct_for_missing_phenotype(const size_t* NS, size_t* NL, uint* I, const int M, const bool* USEBED);
 
     void sparse_data_get_sizes_from_raw(const char* rawdata,
+                                        const uint  Ntot,
                                         const uint  NC,
                                         const uint  NB,
                                         const uint  NA,
                                         size_t& N1,    size_t& N2,    size_t& NM) const;
 
     void sparse_data_fill_indices(const char* rawdata,
+                                  const uint  Ntot,
                                   const uint  NC,
                                   const uint  NB,
                                   const uint  NA,
