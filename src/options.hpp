@@ -76,7 +76,7 @@ public:
     string phenotypeFile2;
     string covariatesFile2;       
     unsigned numberIndividuals2   = 0;
-
+    double epochPoint;
 
     string mcmcOutDir  = "";
     string mcmcOutNam  = "default_output_name";

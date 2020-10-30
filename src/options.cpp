@@ -298,6 +298,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             covariatesFile2 = argv[++i];
             ss << "--covariates2 " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--epochPoint")) {
+            epochPoint = atof(argv[++i]);
+            ss << "--epochPoint" << argv[i] << "\n";
+        }
         else {
             stringstream errmsg;
             errmsg << "\nError: invalid option \"" << argv[i] << "\".\n";

@@ -12,7 +12,6 @@
 using namespace std;
 
 int main(int argc, const char * argv[]) {
-
     MPI_Init(NULL, NULL);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -105,6 +104,7 @@ int main(int argc, const char * argv[]) {
                         }
                     } else {
                         if (opt.bayesType == "bayesWMPI") {
+
                             data.readPhenFailFiles(opt.phenotypeFiles[0], opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
                         } else {
                             data.readPhenotypeFile(opt.phenotypeFiles[0], opt.numberIndividuals, data.y);

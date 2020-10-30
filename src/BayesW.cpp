@@ -426,7 +426,7 @@ void BayesW::init_from_restart(const int K, const uint M, const uint Mtot, const
 //-------------
 int BayesW::runMpiGibbs_bW()
 {
-
+    tau = log(opt.epochPoint); // Cut-off for defining two epochs
     const unsigned int numFixedEffects(data.numFixedEffects);
 
     char buff[LENBUF];
