@@ -1461,7 +1461,7 @@ int BayesW::runMpiGibbs_bW()
                 {
                     //Calculate the change in epsilon if we remove the previous marker effect (-Beta(marker))
                     //Epsilon and epsilon3 are using beta1
-                    set_array(tmp_deltaEps2, 0.0, Ntot1);
+                    set_array(tmp_deltaEps2, 0.0, Ntot2);
                     set_array(tmp_deltaEps4, 0.0, Ntot2);
 
                     sparse_scaadd(tmp_deltaEps2, Beta2(marker),
