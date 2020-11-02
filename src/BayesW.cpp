@@ -491,7 +491,8 @@ int BayesW::runMpiGibbs_bW()
     //       hence the correction in the call
     // --------------------------------------------------------------------
     int IrankS[nranks], IrankL[nranks];
-    define_blocks_of_markers(Ntot1 + Ntot2 - data.numNAs, IrankS, IrankL, nranks); //TODO: SEO - rethink
+    //define_blocks_of_markers(Ntot1 - data.numNAs, IrankS, IrankL, nranks); //TODO: SEO - rethink; why do we need this?
+    //define_blocks_of_markers(Ntot2 - data.numNAs, IrankS, IrankL, nranks); //TODO: SEO - rethink; why do we need this?
 
     Beta.resize(M);
     Beta.setZero();
@@ -1197,7 +1198,6 @@ int BayesW::runMpiGibbs_bW()
         /* 1a. Fixed effects (gammas) */
         if (opt.covariates)
         {
-
             double gamma_old = 0;
             //std::shuffle(xI.begin(), xI.end(), dist.rng);
             boost::uniform_int<> unii(0, numFixedEffects - 1);
