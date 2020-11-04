@@ -1109,6 +1109,11 @@ int BayesW::runMpiGibbs_bW()
     // A counter on previously saved thinned iterations
     uint n_thinned_saved = 0;
 
+
+    MatrixXd g1(Ntot1+Ntot2, opt.chainLength), g2(Ntot1+Ntot2, opt.chainLength);
+    g1.setZero(); g2.setZero();
+    
+    
     // Main iteration loop
     // -------------------
     //bool replay_it = false;
@@ -1619,6 +1624,20 @@ int BayesW::runMpiGibbs_bW()
                             errorCheck(err);
 
                             Beta(marker) = xsamp[0]; // Save the new result
+                            
+                            for (int ind=0;  ind<(Ntot1+Ntot2); ind++)
+                            {
+                                g1(ind, iteration)-=Beta(marker)*mave[marker]/mstd[marker];
+                            }
+                            for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
+                            {
+                                g1(I1[ind],iteration)+= Beta(marker)/mstd[marker];
+                            }
+                            for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
+                            {
+                                g1(I2[ind], iteration)+= 2*Beta(marker)/mstd[marker];
+                            }
+
                             //cout << "Sampled beta1 = " <<  Beta(marker) << endl;
                             cass(cur_group, k) += 1;
                             components[marker] = k;
@@ -1745,6 +1764,19 @@ int BayesW::runMpiGibbs_bW()
 
                             Beta2(marker) = xsamp[0]; // Save the new result
                            // cout << "Sampled beta2 = " <<  Beta2(marker) << endl;
+                            for (int ind=0; ind<(Ntot1+Ntot2); ind++)
+                            {
+                                g2(ind, iteration) -=Beta2(marker)* mave[marker]/mstd[marker];
+                            }
+                            for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
+                            {
+                                g2(I1_2[ind]+Ntot1,iteration)+= Beta2(marker)/mstd[marker];
+                            }
+
+                            for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
+                            {
+                                g2(I2_2[ind]+Ntot1, iteration)+= 2*Beta2(marker)/mstd[marker];
+                            } 
 
                             cass2(cur_group, k) += 1;
                             components2[marker] = k;
