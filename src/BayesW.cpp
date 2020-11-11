@@ -1152,6 +1152,8 @@ int BayesW::runMpiGibbs_bW()
         int it_nsync_ar1 = 0;
         int it_nsync_ar2 = 0;
 
+        g1.setZero(); g2.setZero();
+
         /* 1. Intercept (mu) */
         //Removed sampleMu function on its own
         int err = 0;
