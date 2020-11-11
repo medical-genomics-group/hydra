@@ -1627,17 +1627,25 @@ int BayesW::runMpiGibbs_bW()
 
                             Beta(marker) = xsamp[0]; // Save the new result
                             
-                            for (int ind=0;  ind<(Ntot1+Ntot2); ind++)
+                            for (int ind=0; ind<(Ntot1+Ntot2); ind++)
                             {
                                 g1(ind)-=Beta(marker)*mave[marker]/mstd[marker];
                             }
                             for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
                             {
-                                g1(I1[ind])+= Beta(marker)/mstd[marker];
+                                g1(I1[ind])+= Beta(marker)/mstd[marker]; 
+                            }
+                            for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
+                            {
+                                g1(I1_2[ind]+Ntot1)+= Beta(marker)/mstd[marker];
                             }
                             for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
                                 g1(I2[ind])+= 2*Beta(marker)/mstd[marker];
+                            }
+                            for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
+                            {
+                                g1(I2_2[ind]+Ntot1)+= 2*Beta(marker)/mstd[marker];
                             }
 
                             //cout << "Sampled beta1 = " <<  Beta(marker) << endl;
@@ -1774,11 +1782,18 @@ int BayesW::runMpiGibbs_bW()
                             {
                                 g2(I1_2[ind]+Ntot1)+= Beta2(marker)/mstd[marker];
                             }
-
+                            for (int ind = N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
+                            {
+                                g2(I1[ind])+= Beta2(marker)/mstd[marker];
+                            }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
                                 g2(I2_2[ind]+Ntot1)+= 2*Beta2(marker)/mstd[marker];
                             } 
+                            for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
+                            {
+                                g2(I2[ind])+= 2*Beta2(marker)/mstd[marker];
+                            }
 
                             cass2(cur_group, k) += 1;
                             components2[marker] = k;
