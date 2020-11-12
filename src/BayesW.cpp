@@ -1116,7 +1116,6 @@ int BayesW::runMpiGibbs_bW()
 
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         mu = xsamp[0]; // Save the sampled value
-        cout << "mu sampled " << mu << endl;
         //Update after sampling
         for (int mu_ind = 0; mu_ind < Ntot1; mu_ind++)
         {
@@ -1227,7 +1226,6 @@ int BayesW::runMpiGibbs_bW()
             (used_data_alpha.epsilon3)[alpha_ind] = epsilon3[alpha_ind];
             (used_data_alpha.epsilon4)[alpha_ind] = epsilon4[alpha_ind];
         }
-                cout << "alpha sampling " << endl;
 
         //Sample using ARS
         err = arms(xinit, ninit, &xl, &xr, alpha_dens, &used_data_alpha, &convex,
@@ -1238,8 +1236,6 @@ int BayesW::runMpiGibbs_bW()
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
         used_data.alpha = xsamp[0];
-                cout << "alpha sampled " << used_data.alpha << endl;
-
         used_data_beta.alpha = xsamp[0];
         MPI_Barrier(MPI_COMM_WORLD);
 
@@ -2350,7 +2346,7 @@ int BayesW::runMpiGibbs_bW()
             VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
             VectorXd dirin2 = cass2.row(gg).transpose().array().cast<double>() + dirc.array();
             pi_L.row(gg) = dist.dirichlet_rng(dirin);
-            pi_L2.row(gg) = dist.dirichlet_rng(dirin);
+            pi_L2.row(gg) = dist.dirichlet_rng(dirin2);
         }
 
         MPI_Barrier(MPI_COMM_WORLD);
@@ -2368,7 +2364,7 @@ int BayesW::runMpiGibbs_bW()
 
         //Print results
         if(rank == 0){
-            cout << iteration << ". " << m0.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sumSigmaG << ": " <<  sumSigmaG2 << "; "<< beta1_beta2(0) << endl;
+            cout << iteration << ". " << m0.sum() << "|" << m0_2.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sumSigmaG << ": " <<  sumSigmaG2 << "; "<< beta1_beta2(0) << endl;
         }
 
         double end_it = MPI_Wtime();
