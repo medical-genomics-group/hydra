@@ -54,13 +54,14 @@ double beta_dens(double x, void *norm_data)
 
 	if (p.mixture_value_other != 0)
 	{
-		s = p.rho * sqrt(p.sigmaG1 *p.mixture_value / p.mixture_value_other/ p.sigmaG2) * p.beta_other;
+		s = p.rho * sqrt(p.sigmaG_upper *p.mixture_value / p.mixture_value_other/ p.sigmaG_lower) * p.beta_other;
 	}
 
 	double exp_sums =  G * (p.vi_0 + p.vi_tau_0 + H * (p.vi_1 + p.vi_tau_1 + H * (p.vi_2 + p.vi_tau_2)));
-	return -p.alpha * x * p.sum_failure - exp_sums - (x - s) * (x - s) / (2 * p.mixture_value * p.sigmaG1 * (1 - p.rho * p.rho));
+	return -p.alpha * x * p.sum_failure - exp_sums - (x - s) * (x - s) / (2 * p.mixture_value * p.sigmaG_upper * (1 - p.rho * p.rho));
 };
 
+/*
 double beta_dens2(double x, void *norm_data)
 {
 	pars_beta_sparse p = *(static_cast<pars_beta_sparse *>(norm_data));
@@ -78,5 +79,5 @@ double beta_dens2(double x, void *norm_data)
 
 	return -p.alpha * x * p.sum_failure - exp_sums - (x - s) * (x - s) / (2 * p.mixture_value * p.sigmaG2 * (1 - p.rho * p.rho));
 };
-
+*/
 #endif

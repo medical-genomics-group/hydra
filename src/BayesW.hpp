@@ -101,56 +101,8 @@ private:
                                       unsigned int group_index,
                                       const pars_beta_sparse used_data_beta);
 
-	void marginal_likelihood_vec_calc_test(VectorXd prior_prob,
-                                      VectorXd &post_marginals,
-                                      string   n,
-                                      double   vi_sum,
-                                      double   vi_2,
-                                      double   vi_1,
-                                      double   vi_0,
-                                      double   vi_tau_sum,
-                                      double   vi_tau_2,
-                                      double   vi_tau_1,
-                                      double   vi_tau_0,
-                                      double   mean,
-                                      double   sd,
-                                      double   mean_sd_ratio,
-                                      unsigned int group_index,
-                                      const pars_beta_sparse used_data_beta);
+ 
 
-   void marginal_likelihood_vec_calc2(VectorXd prior_prob,
-                                      VectorXd &post_marginals,
-                                      string   n,
-                                      double   vi_sum,
-                                      double   vi_2,
-                                      double   vi_1,
-                                      double   vi_0,
-                                      double   vi_tau_sum,
-                                      double   vi_tau_2,
-                                      double   vi_tau_1,
-                                      double   vi_tau_0,
-                                      double   mean,
-                                      double   sd,
-                                      double   mean_sd_ratio,
-                                      unsigned int group_index,
-                                      const pars_beta_sparse used_data_beta);      
-
-    void marginal_likelihood_vec_calc2_test(VectorXd prior_prob,
-                                      VectorXd &post_marginals,
-                                      string   n,
-                                      double   vi_sum,
-                                      double   vi_2,
-                                      double   vi_1,
-                                      double   vi_0,
-                                      double   vi_tau_sum,
-                                      double   vi_tau_2,
-                                      double   vi_tau_1,
-                                      double   vi_tau_0,
-                                      double   mean,
-                                      double   sd,
-                                      double   mean_sd_ratio,
-                                      unsigned int group_index,
-                                      const pars_beta_sparse used_data_beta);    
 
 };
 

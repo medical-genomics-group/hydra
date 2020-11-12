@@ -41,6 +41,7 @@
 BayesW::~BayesW() {}
 
 // Pass the vector post_marginals of marginal likelihoods by reference
+/*
 void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n,
                                           double vi_sum, double vi_2, double vi_1, double vi_0,
                                           double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
@@ -54,12 +55,12 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
     double M_pow_mean = 1;
     if (used_data_beta.mixture_value_other != 0) // SEO : before it was  == 0 - is it now correct?
     {
-        s = used_data_beta.alpha * used_data_beta.rho * sqrt(used_data_beta.mixture_value * used_data_beta.sigmaG1 / used_data_beta.mixture_value_other/ used_data_beta.sigmaG2)  * used_data_beta.beta_other / sd;
+        s = -used_data_beta.alpha * used_data_beta.rho * sqrt(used_data_beta.mixture_value * used_data_beta.sigmaG1 / used_data_beta.mixture_value_other/ used_data_beta.sigmaG2)  * used_data_beta.beta_other / sd;
         M = exp(s);
         M_pow_mean = exp(-mean*s);
     }
 
-    double exp_sum = (mean * mean * (vi_0 + vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 + vi_tau_1) + M * (4 - mean) * (4 - mean) * (vi_2 + vi_tau_2))) / (sd * sd);
+    double exp_sum = (mean * mean * (vi_0 + vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 + vi_tau_1) + M * (2 - mean) * (2 - mean) * (vi_2 + vi_tau_2))) / (sd * sd);
     double C_k_other = used_data_beta.mixture_value_other;
 
     for (int i = 0; i < km1; i++)
@@ -71,113 +72,39 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
                                                                                     used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, vi_tau_sum);
     }
 }
+*/
 
-void BayesW::marginal_likelihood_vec_calc_test(VectorXd prior_prob, VectorXd &post_marginals, string n,
-                                               double vi_sum, double vi_2, double vi_1, double vi_0,
-                                               double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
-                                               double mean, double sd,
-                                               double mean_sd_ratio, unsigned int group_index,
-                                               const pars_beta_sparse used_data_beta)
+void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n,
+                                           double vi_sum, double vi_2, double vi_1, double vi_0,
+                                           double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
+                                           double mean, double sd,
+                                           double mean_sd_ratio, unsigned int group_index,
+                                           const pars_beta_sparse used_data_beta)
 {
-    double s = 0;
-    double M = 1; //auxiliary variables
+    double M = 1;
+    double s = 0; //auxiliary variables
     double M_pow_mean = 1;
-
-    if (used_data_beta.mixture_value_other != 0) // SEO : before it was  == 0 - is it now correct?
-    {
-        s = used_data_beta.alpha * used_data_beta.rho * used_data_beta.sigmaG1 * sqrt(used_data_beta.mixture_value / used_data_beta.mixture_value_other) / used_data_beta.sigmaG2 * used_data_beta.beta_other / sd;
-        M = exp(s);
-        M_pow_mean = exp(-mean * s);
-    }
-
-    double exp_sum = (mean * mean * (vi_0 + vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 + vi_tau_1) + M * (4 - mean) * (4 - mean) * (vi_2 + vi_tau_2))) / (sd * sd);
-    cout << "exp_sum = " << exp_sum << endl;
 
     double C_k_other = used_data_beta.mixture_value_other;
 
+    double exp_sum = (mean * mean * (vi_0 + vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 + vi_tau_1) + M * (2 - mean) * (2 - mean) * (vi_2 + vi_tau_2))) / (sd * sd);
+
     for (int i = 0; i < km1; i++)
     {
-        //Calculate the sigma for the adaptive G-H
-        double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG1 * used_data_beta.sigmaG1 * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * used_data_beta.mixture_value * exp_sum);
-        cout << "C_k = " << cVa(group_index, i) << endl;
- 
-        cout << gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
-                                                used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, vi_tau_sum) << endl;
+        if (used_data_beta.mixture_value_other != 0) 
+        {
+            s = -used_data_beta.alpha * used_data_beta.rho * sqrt(cVa(group_index, i) * used_data_beta.sigmaG_upper / used_data_beta.mixture_value_other/ used_data_beta.sigmaG_lower)  * used_data_beta.beta_other / sd;
+            M = exp(s);
+            M_pow_mean = exp(-mean*s);
+            exp_sum = (mean * mean * (vi_0 + vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 + vi_tau_1) + M * (2 - mean) * (2 - mean) * (vi_2 + vi_tau_2))) / (sd * sd);
+        }
 
+        //Calculate the sigma for the adaptive G-H
+        double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG_upper * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * cVa(group_index, i) * exp_sum);
+
+        // Pass the tau-residual with opposite sign
         post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
-                                                                                    used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, vi_tau_sum);
-    }
-}
-
-void BayesW::marginal_likelihood_vec_calc2(VectorXd prior_prob, VectorXd &post_marginals, string n,
-                                           double vi_sum, double vi_2, double vi_1, double vi_0,
-                                           double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
-                                           double mean, double sd,
-                                           double mean_sd_ratio, unsigned int group_index,
-                                           const pars_beta_sparse used_data_beta)
-{
-    double M = 1;
-    double s = 0; //auxiliary variables
-    double M_pow_mean = 1;
-
-    if (used_data_beta.mixture_value_other != 0) //SEO - changed from ==
-    {
-        s = used_data_beta.alpha * used_data_beta.rho  * sqrt(used_data_beta.mixture_value * used_data_beta.sigmaG2/ used_data_beta.mixture_value_other/ used_data_beta.sigmaG1 ) * used_data_beta.beta_other / sd;
-        M = exp(s);
-        M_pow_mean = exp(- mean * s);
-    }
-
-    double exp_sum = (mean * mean * (vi_0 - vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 - vi_tau_1) + M * (4 - mean) * (4 - mean) * (vi_2 - vi_tau_2))) / (sd * sd);
-    double C_k_other = used_data_beta.mixture_value_other;
-
-    for (int i = 0; i < km1; i++)
-    {
-        //Calculate the sigma for the adaptive G-H
-        double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG2 * used_data_beta.sigmaG2 * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * used_data_beta.mixture_value * exp_sum);
-
-        // Pass the tau-residual with opposite sign
-        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, -vi_tau_2, -vi_tau_1, -vi_tau_0, mean, sd, mean_sd_ratio,
-                                                                                    used_data_beta, used_data_beta.sigmaG2, used_data_beta.sigmaG1, used_data_beta.beta_other, C_k_other, -vi_tau_sum);
-
-       // post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
-       //                                                                             used_data_beta, used_data_beta.sigmaG2, used_data_beta.sigmaG1, used_data_beta.beta_other, C_k_other, vi_tau_sum);
-
-    }
-}
-
-void BayesW::marginal_likelihood_vec_calc2_test(VectorXd prior_prob, VectorXd &post_marginals, string n,
-                                           double vi_sum, double vi_2, double vi_1, double vi_0,
-                                           double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
-                                           double mean, double sd,
-                                           double mean_sd_ratio, unsigned int group_index,
-                                           const pars_beta_sparse used_data_beta)
-{
-    double M = 1;
-    double s = 0; //auxiliary variables
-    double M_pow_mean = 1;
-
-    if (used_data_beta.mixture_value_other != 0) //SEO - changed from ==
-    {
-        s = used_data_beta.alpha * used_data_beta.rho * used_data_beta.sigmaG2 * sqrt(used_data_beta.mixture_value / used_data_beta.mixture_value_other) / used_data_beta.sigmaG1 * used_data_beta.beta_other / sd;
-        M = exp(s);
-        M_pow_mean = exp(- mean * s);
-    }
-
-    double exp_sum = (mean * mean * (vi_0 - vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 - vi_tau_1) + M * (4 - mean) * (4 - mean) * (vi_2 - vi_tau_2))) / (sd * sd);
-    double C_k_other = used_data_beta.mixture_value_other;
-    cout << "exp_sum = " << exp_sum << endl;
-
-    for (int i = 0; i < km1; i++)
-    {
-        //Calculate the sigma for the adaptive G-H
-        double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG2 * used_data_beta.sigmaG2 * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * used_data_beta.mixture_value * exp_sum);
-        cout << "C_k = " << cVa(group_index, i) << endl;
-
-        cout << gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, -vi_tau_2, -vi_tau_1, -vi_tau_0, mean, sd, mean_sd_ratio,
-                                                used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, -vi_tau_sum) << endl;
-        // Pass the tau-residual with opposite sign
-        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, -vi_tau_2, -vi_tau_1, -vi_tau_0, mean, sd, mean_sd_ratio,
-                                                                                    used_data_beta, used_data_beta.sigmaG2, used_data_beta.sigmaG1, used_data_beta.beta_other, C_k_other, -vi_tau_sum);
+                                                                                    used_data_beta, used_data_beta.sigmaG_upper, used_data_beta.sigmaG_lower, used_data_beta.beta_other, C_k_other, vi_tau_sum);
     }
 }
 
@@ -308,8 +235,8 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     used_data_alpha.failure_vector2 = data.fail2.cast<double>();
 
     double denominator = (6 * ((y.array() - mu).square()).sum() / (y.size() - 1));
-    used_data.alpha = PI / sqrt(denominator);      // The shape parameter initial value
-    used_data_beta.alpha = PI / sqrt(denominator); // The shape parameter initial value
+    used_data.alpha = 10;//PI / sqrt(denominator);      // The shape parameter initial value
+    used_data_beta.alpha = 10;//PI / sqrt(denominator); // The shape parameter initial value
 
     //Initialise epoch 1 individuals
     for (int i = 0; i < (y.size()); ++i)
@@ -1189,6 +1116,7 @@ int BayesW::runMpiGibbs_bW()
 
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
         mu = xsamp[0]; // Save the sampled value
+        cout << "mu sampled " << mu << endl;
         //Update after sampling
         for (int mu_ind = 0; mu_ind < Ntot1; mu_ind++)
         {
@@ -1299,6 +1227,7 @@ int BayesW::runMpiGibbs_bW()
             (used_data_alpha.epsilon3)[alpha_ind] = epsilon3[alpha_ind];
             (used_data_alpha.epsilon4)[alpha_ind] = epsilon4[alpha_ind];
         }
+                cout << "alpha sampling " << endl;
 
         //Sample using ARS
         err = arms(xinit, ninit, &xl, &xr, alpha_dens, &used_data_alpha, &convex,
@@ -1309,6 +1238,8 @@ int BayesW::runMpiGibbs_bW()
         check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
         used_data.alpha = xsamp[0];
+                cout << "alpha sampled " << used_data.alpha << endl;
+
         used_data_beta.alpha = xsamp[0];
         MPI_Barrier(MPI_COMM_WORLD);
 
@@ -1355,6 +1286,8 @@ int BayesW::runMpiGibbs_bW()
         double task_sum_abs_deltabeta2 = 0.0;
 
         int sinceLastSync = 0;
+        int sinceLastSync2 = 0; //For residuals 2 and 4
+
 
         // First element for the marginal likelihoods is always is pi_0 *sqrt(pi) for
         //marginal_likelihoods(0) = pi_L(0) * sqrtPI;
@@ -1375,6 +1308,7 @@ int BayesW::runMpiGibbs_bW()
         for (int j = 0; j < lmax; j++)
         {
             sinceLastSync += 1;
+            sinceLastSync2 += 1;
 
             if (j < M)
             {
@@ -1400,8 +1334,9 @@ int BayesW::runMpiGibbs_bW()
                 double vi4_1 = 0.0;
                 double vi4_2 = 0.0;
 
-                used_data_beta.sigmaG1 = sigmaG[cur_group];
-                used_data_beta.sigmaG2 = sigmaG2[cur_group];
+                // In the first epoch the numerator is sigmaG
+                used_data_beta.sigmaG_upper = sigmaG[cur_group];
+                used_data_beta.sigmaG_lower = sigmaG2[cur_group];
                 used_data_beta.rho = Rho[cur_group];
 
                 marginal_likelihoods(0) = marginal_likelihood_0(cur_group); //Each group has now different marginal likelihood at 0
@@ -1540,24 +1475,7 @@ int BayesW::runMpiGibbs_bW()
                 {
                     used_data_beta.mixture_value_other = 0;
                 }
-                if (false)
-                {
-                    cout << "C block" << endl;
-                    cout << "Marker "  << j << " reached " << "C1" << endl; 
-
-                    cout << "marginal likelihoods size = " << marginal_likelihoods.size() << endl;
-                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << endl;
-                    cout << "vi pars = " << vi_sum << ", " << vi_2 << "," << vi_1 << ", " << vi_0 << endl;
-                    cout << "vi_tau pars = " << vi3_sum << ", " << vi3_2 << "," << vi3_1 << ", " << vi3_0 << endl;
-                    cout << "pi values = " << pi_L(cur_group, 0) << ", " << pi_L(cur_group, 1) << "," << pi_L(cur_group, 2) << endl;
-
-                    marginal_likelihood_vec_calc_test(pi_L.row(cur_group), marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
-                                                      vi3_sum, vi3_2, vi3_1, vi3_0,
-                                                      mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
-                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << "," << marginal_likelihoods(2) << endl;
-
-                }
-
+             
                 marginal_likelihood_vec_calc(pi_L.row(cur_group), marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
                                              vi3_sum, vi3_2, vi3_1, vi3_0,
                                              mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
@@ -1576,13 +1494,10 @@ int BayesW::runMpiGibbs_bW()
                             Beta(marker) = 0.0;
                             cass(cur_group, 0) += 1;
                             components[marker] = k;
-                            //if(j % 1 == 0) cout << "Epoch 1 no sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
-
                         }
                         // If is not 0th component then sample using ARS
                         else
                         {
-           // cout << "Epoch 1 sample " << j << "; p=" << p << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
                             //used_data_beta.sum_failure = sum_failure(marker);
                             used_data_beta.mean = mave[marker];
                             used_data_beta.sd = mstd[marker];
@@ -1672,6 +1587,9 @@ int BayesW::runMpiGibbs_bW()
 
                 //////////////////////////
                 //Do same for second epoch
+                used_data_beta.sigmaG_upper = sigmaG2[cur_group];
+                used_data_beta.sigmaG_lower = sigmaG[cur_group];
+
                 marginal_likelihoods(0) = marginal_likelihood2_0(cur_group); //Each group has now different marginal likelihood at 0
                 used_data_beta.sum_failure = sum_failure2[marker];
                 //printf("m %3d -> sum fail = %20.15f\n", marker, sum_failure[marker]);
@@ -1687,27 +1605,11 @@ int BayesW::runMpiGibbs_bW()
                     used_data_beta.mixture_value_other = 0;
                 }
 
-                if (false)
-                {
-                    cout << "EPOCH 2!" << endl;
-                    cout << "marginal likelihoods size = " << marginal_likelihoods.size() << endl;
-                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << endl;
-                    cout << "vi pars = " << vi2_sum << ", " << vi2_2 << "," << vi2_1 << ", " << vi2_0 << endl;
-                    cout << "vi_tau pars = " << vi4_sum << ", " << vi4_2 << "," << vi4_1 << ", " << vi4_0 << endl;
-                    cout << "pi values = " << pi_L2(cur_group, 0) << ", " << pi_L2(cur_group, 1) << "," << pi_L2(cur_group, 2) << endl;
-
-                    marginal_likelihood_vec_calc2_test(pi_L.row(cur_group), marginal_likelihoods, quad_points, vi2_sum, vi2_2, vi2_1, vi2_0,
-                                                      vi4_sum, vi4_2, vi4_1, vi4_0,
-                                                      mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
-                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << "," << marginal_likelihoods(2) << endl;
-
-                }
-
+           
                 // Now we use residuals 2 and 4
-                marginal_likelihood_vec_calc2(pi_L2.row(cur_group), marginal_likelihoods, quad_points, vi2_sum, vi2_2, vi2_1, vi2_0,
-                                              vi4_sum, vi4_2, vi4_1, vi4_0,
+                marginal_likelihood_vec_calc(pi_L2.row(cur_group), marginal_likelihoods, quad_points, vi2_sum, vi2_2, vi2_1, vi2_0,
+                                              -vi4_sum, -vi4_2, -vi4_1, -vi4_0,
                                               mave[marker], mstd[marker], mave[marker] / mstd[marker], cur_group, used_data_beta);
-                // cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << endl;
                 // Calculate the probability that marker is 0
                 acum = marginal_likelihoods(0) / marginal_likelihoods.sum();
        
@@ -1722,8 +1624,6 @@ int BayesW::runMpiGibbs_bW()
                             Beta2(marker) = 0.0;
                             cass2(cur_group, 0) += 1;
                             components2[marker] = k;
-
-                            //if(j % 1 == 0) cout << "Epoch 2 no sample " << j << "; p=" << p2 << "M likelihoods: "<< marginal_likelihoods(0) << "," << marginal_likelihoods(1)  << endl;
 
                         }
                         // If is not 0th component then sample using ARS
@@ -1741,9 +1641,10 @@ int BayesW::runMpiGibbs_bW()
                             used_data_beta.vi_1 = vi2_1;
                             used_data_beta.vi_2 = vi2_2;
 
-                            used_data_beta.vi_tau_0 = vi4_0;
-                            used_data_beta.vi_tau_1 = vi4_1;
-                            used_data_beta.vi_tau_2 = vi4_2;
+                            // Here we use negative exp residuals
+                            used_data_beta.vi_tau_0 = -vi4_0;
+                            used_data_beta.vi_tau_1 = -vi4_1;
+                            used_data_beta.vi_tau_2 = -vi4_2;
 
                             //printf("safe_limit: 2.0 * sqrt(%20.17f * %20.17f)\n", sumSigmaG, used_data_beta.mixture_value);
                             double safe_limit = 2.0 * std::sqrt(sumSigmaG2 * used_data_beta.mixture_value); // Need to think is this safe enough
@@ -1767,7 +1668,7 @@ int BayesW::runMpiGibbs_bW()
                             //printf("beta:  %20.17f, safe_limit = %20.17f\n", Beta2(marker), safe_limit);
                             //printf("xinit: %20.17f %20.17f %20.17f %20.17f\n", xinit[0], xinit[1], xinit[2], xinit[3]);
 
-                            err = arms(xinit, ninit, &xl, &xr, beta_dens2, &used_data_beta, &convex,
+                            err = arms(xinit, ninit, &xl, &xr, beta_dens, &used_data_beta, &convex,
                                        npoint, dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
 
                             errorCheck(err);
@@ -1932,7 +1833,6 @@ int BayesW::runMpiGibbs_bW()
                 //MPI_Barrier(MPI_COMM_WORLD);
                 double tb = MPI_Wtime();
                 check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta, &cumSumDeltaBetas, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-                check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta2, &cumSumDeltaBetas2, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
                 double te = MPI_Wtime();
                 tot_sync_ar1 += te - tb;
@@ -1943,13 +1843,236 @@ int BayesW::runMpiGibbs_bW()
             else
             {
                 cumSumDeltaBetas = task_sum_abs_deltabeta;
+            }
+
+            //For residuals 2 and 4
+            if (nranks > 1 && (sinceLastSync2 >= opt.syncRate || j == lmax - 1))
+            {
+                //MPI_Barrier(MPI_COMM_WORLD);
+                double tb = MPI_Wtime();
+                check_mpi(MPI_Allreduce(&task_sum_abs_deltabeta2, &cumSumDeltaBetas2, 1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                double te = MPI_Wtime();
+                tot_sync_ar1 += te - tb;
+                it_sync_ar1 += te - tb;
+                tot_nsync_ar1 += 1;
+                it_nsync_ar1 += 1;
+            }
+            else
+            {
                 cumSumDeltaBetas2 = task_sum_abs_deltabeta2;
             }
+
             //printf("%d/%d/%d: deltaBeta = %20.15f = %10.7f - %10.7f; sumDeltaBetas = %15.10f\n", iteration, rank, marker, deltaBeta, betaOld, beta, cumSumDeltaBetas);
 
+            // Update for residuals containing Beta
             if (cumSumDeltaBetas != 0.0 && (sinceLastSync >= opt.syncRate || j == lmax - 1))
             {
+                // Update local copy of epsilon
+                //MPI_Barrier(MPI_COMM_WORLD);
+                if (nranks > 1)
+                {
+                    double tb = MPI_Wtime();
 
+                    // Sparse synchronization
+                    // ----------------------
+                    //TODO - sparse sync yet to be thought and implemented
+                    if (opt.sparseSync)
+                    {
+                        uint task_m2s = (uint)mark2sync.size();
+
+                        // Build task markers to sync statistics: mu | dbs | mu | dbs | ...
+                        double *task_stat = (double *)_mm_malloc(size_t(task_m2s) * 2 * sizeof(double), 64);
+                        check_malloc(task_stat, __LINE__, __FILE__);
+
+                        // Compute total number of elements to be sent by each task
+                        uint task_size = 0;
+                        for (int i = 0; i < task_m2s; i++)
+                        {
+                            task_size += (N1L[mark2sync[i]] + N2L[mark2sync[i]] + NML[mark2sync[i]] + 3);
+                            task_stat[2 * i + 0] = mave[mark2sync[i]];
+                            task_stat[2 * i + 1] = mstd[mark2sync[i]] * dbet2sync[i]; //CHANGE mstd later!
+                            //printf("Task %3d, m2s %d/%d: 1: %8lu, 2: %8lu, m: %8lu, info: 3); stats are (%15.10f, %15.10f)\n", rank, i, task_m2s, N1L[ mark2sync[i] ], N2L[ mark2sync[i] ], NML[ mark2sync[i] ], task_stat[2 * i + 0], task_stat[2 * i + 1]);
+                        }
+                        //printf("Task %3d final task_size = %8d elements to send from task_m2s = %d markers to sync.\n", rank, task_size, task_m2s);
+                        //fflush(stdout);
+
+                        // Get the total numbers of markers and corresponding indices to gather
+
+                        const int NEL = 2;
+                        uint task_info[NEL] = {};
+                        task_info[0] = task_m2s;
+                        task_info[1] = task_size;
+
+                        check_mpi(MPI_Allgather(task_info, NEL, MPI_UNSIGNED, glob_info, NEL, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                        int tdisp_ = 0, sdisp_ = 0, glob_m2s = 0, glob_size = 0;
+                        for (int i = 0; i < nranks; i++)
+                        {
+                            tasks_len[i] = glob_info[2 * i + 1];
+                            tasks_dis[i] = tdisp_;
+                            tdisp_ += tasks_len[i];
+                            stats_len[i] = glob_info[2 * i] * 2;
+                            stats_dis[i] = sdisp_;
+                            sdisp_ += glob_info[2 * i] * 2;
+                            glob_size += tasks_len[i];
+                            glob_m2s += glob_info[2 * i];
+                        }
+                        //printf("glob_info: markers to sync: %d, with glob_size = %7d elements (sum of all task_size)\n", glob_m2s, glob_size);
+                        //fflush(stdout);
+
+                        // Build task's array to spread: | marker 1                             | marker 2
+                        //                               | n1 | n2 | nm | data1 | data2 | datam | n1 | n2 | nm | data1 | ...
+                        // -------------------------------------------------------------------------------------------------
+                        uint *task_dat = (uint *)_mm_malloc(size_t(task_size) * sizeof(uint), 64);
+                        check_malloc(task_dat, __LINE__, __FILE__);
+
+                        int loc = 0;
+                        for (int i = 0; i < task_m2s; i++)
+                        {
+                            task_dat[loc] = N1L[mark2sync[i]];
+                            loc += 1;
+                            task_dat[loc] = N2L[mark2sync[i]];
+                            loc += 1;
+                            task_dat[loc] = NML[mark2sync[i]];
+                            loc += 1;
+                            for (uint ii = 0; ii < N1L[mark2sync[i]]; ii++)
+                            {
+                                task_dat[loc] = I1[N1S[mark2sync[i]] + ii];
+                                loc += 1;
+                            }
+                            for (uint ii = 0; ii < N2L[mark2sync[i]]; ii++)
+                            {
+                                task_dat[loc] = I2[N2S[mark2sync[i]] + ii];
+                                loc += 1;
+                            }
+                            for (uint ii = 0; ii < NML[mark2sync[i]]; ii++)
+                            {
+                                task_dat[loc] = IM[NMS[mark2sync[i]] + ii];
+                                loc += 1;
+                            }
+                        }
+                        assert(loc == task_size);
+
+                        // Allocate receive buffer for all the data
+                        uint *glob_dat = (uint *)_mm_malloc(size_t(glob_size) * sizeof(uint), 64);
+                        check_malloc(glob_dat, __LINE__, __FILE__);
+
+                        check_mpi(MPI_Allgatherv(task_dat, task_size, MPI_UNSIGNED,
+                                                 glob_dat, tasks_len, tasks_dis, MPI_UNSIGNED, MPI_COMM_WORLD),
+                                  __LINE__, __FILE__);
+                        _mm_free(task_dat);
+
+                        double *glob_stats = (double *)_mm_malloc(size_t(glob_size * 2) * sizeof(double), 64);
+                        check_malloc(glob_stats, __LINE__, __FILE__);
+
+                        check_mpi(MPI_Allgatherv(task_stat, task_m2s * 2, MPI_DOUBLE,
+                                                 glob_stats, stats_len, stats_dis, MPI_DOUBLE, MPI_COMM_WORLD),
+                                  __LINE__, __FILE__);
+                        _mm_free(task_stat);
+
+                        // Compute global delta epsilon deltaSum
+                        size_t loci = 0;
+                        for (int i = 0; i < glob_m2s; i++)
+                        {
+                            //printf("m2s %d/%d (loci = %d): %d, %d, %d\n", i, glob_m2s, loci, glob_dat[loci], glob_dat[loci + 1], glob_dat[loci + 2]);
+
+                            double lambda0 = glob_stats[2 * i + 1] * (0.0 - glob_stats[2 * i]);
+                            //printf("rank %d lambda0 = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", rank, lambda0, glob_stats[2 * i], glob_stats[2 * i + 1]);
+
+                            // Set all to 0 contribution
+                            if (i == 0)
+                            {
+                                //TODO - fix sparse sync
+                                //set_array(deltaSum, lambda0, Ntot);
+                            }
+                            else
+                            {
+                                //offset_array(deltaSum, lambda0, Ntot);
+                            }
+
+                            // M -> revert lambda 0 (so that equiv to add 0.0)
+                            size_t S = loci + (size_t)(3 + glob_dat[loci] + glob_dat[loci + 1]);
+                            size_t L = glob_dat[loci + 2];
+                            //cout << "task " << rank << " M: start = " << S << ", len = " << L <<  endl;
+                            sparse_add(deltaSum, -lambda0, glob_dat, S, L);
+
+                            // 1 -> add dbet * sig * ( 1.0 - mu)
+                            double lambda = glob_stats[2 * i + 1] * (1.0 - glob_stats[2 * i]);
+                            //printf("1: lambda = %15.10f, l-l0 = %15.10f\n", lambda, lambda - lambda0);
+                            S = loci + 3;
+                            L = glob_dat[loci];
+                            //cout << "1: start = " << S << ", len = " << L <<  endl;
+                            sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
+
+                            // 2 -> add dbet * sig * ( 2.0 - mu)
+                            lambda = glob_stats[2 * i + 1] * (2.0 - glob_stats[2 * i]);
+                            S = loci + 3 + glob_dat[loci];
+                            L = glob_dat[loci + 1];
+                            //cout << "2: start = " << S << ", len = " << L <<  endl;
+                            sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
+
+                            loci += 3 + glob_dat[loci] + glob_dat[loci + 1] + glob_dat[loci + 2];
+                        }
+
+                        _mm_free(glob_stats);
+                        _mm_free(glob_dat);
+
+                        mark2sync.clear();
+                        dbet2sync.clear();
+                    }
+                    else
+                    {
+                        check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                        check_mpi(MPI_Allreduce(&dEpsSum3[0], &deltaSum3[0], Ntot2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+                    }
+
+                    add_arrays(epsilon, tmpEps, deltaSum, Ntot1);
+                    add_arrays(epsilon3, tmpEps3, deltaSum3, Ntot2);
+
+                    double te = MPI_Wtime();
+                    tot_sync_ar2 += te - tb;
+                    it_sync_ar2 += te - tb;
+                    tot_nsync_ar2 += 1;
+                    it_nsync_ar2 += 1;
+                }
+                else
+                { // case nranks == 1
+                    add_arrays(epsilon, tmpEps, dEpsSum, Ntot1);
+                    add_arrays(epsilon3, tmpEps3, dEpsSum3, Ntot2);
+                }
+
+                // Do a update currently locally for vi vector
+                for (int vi_ind = 0; vi_ind < Ntot1; vi_ind++)
+                {
+                    vi[vi_ind] = expl((long double)(used_data.alpha * epsilon[vi_ind] - EuMasc));
+                }
+
+                for (int vi_ind = 0; vi_ind < Ntot2; vi_ind++)
+                {
+                    vi3[vi_ind] = expl((long double)(used_data.alpha * epsilon3[vi_ind] - EuMasc));
+                }
+                double end_sync = MPI_Wtime();
+                //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
+
+                // Store epsilon state at last synchronization
+                copy_array(tmpEps, epsilon, Ntot1);
+                copy_array(tmpEps3, epsilon3, Ntot2);
+
+                // Reset local sum of delta epsilon
+                set_array(dEpsSum, 0.0, Ntot1);
+                set_array(dEpsSum3, 0.0, Ntot2);
+
+                // Reset cumulated sum of delta betas
+                cumSumDeltaBetas = 0.0;
+                task_sum_abs_deltabeta = 0.0;
+
+                sinceLastSync = 0;
+            }
+
+            // And update for residuals containing Beta2
+            if (cumSumDeltaBetas2 != 0.0 && (sinceLastSync2 >= opt.syncRate || j == lmax - 1)) //TODO - to think sinceLastSync parameter behaviour for two epochs
+            {
                 // Update local copy of epsilon
                 //MPI_Barrier(MPI_COMM_WORLD);
 
@@ -1962,7 +2085,6 @@ int BayesW::runMpiGibbs_bW()
                     //TODO - sparse sync yet to be thought and implemented
                     if (opt.sparseSync)
                     {
-
                         uint task_m2s = (uint)mark2sync.size();
 
                         // Build task markers to sync statistics: mu | dbs | mu | dbs | ...
@@ -2108,16 +2230,11 @@ int BayesW::runMpiGibbs_bW()
                     }
                     else
                     {
-
-                        check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot1, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
                         check_mpi(MPI_Allreduce(&dEpsSum2[0], &deltaSum2[0], Ntot2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-                        check_mpi(MPI_Allreduce(&dEpsSum3[0], &deltaSum3[0], Ntot2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
                         check_mpi(MPI_Allreduce(&dEpsSum4[0], &deltaSum4[0], Ntot2, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
                     }
 
-                    add_arrays(epsilon, tmpEps, deltaSum, Ntot1);
                     add_arrays(epsilon2, tmpEps2, deltaSum2, Ntot2);
-                    add_arrays(epsilon3, tmpEps3, deltaSum3, Ntot2);
                     add_arrays(epsilon4, tmpEps4, deltaSum4, Ntot2);
 
                     double te = MPI_Wtime();
@@ -2128,48 +2245,36 @@ int BayesW::runMpiGibbs_bW()
                 }
                 else
                 { // case nranks == 1
-                    add_arrays(epsilon, tmpEps, dEpsSum, Ntot1);
                     add_arrays(epsilon2, tmpEps2, dEpsSum2, Ntot2);
-                    add_arrays(epsilon3, tmpEps3, dEpsSum3, Ntot2);
                     add_arrays(epsilon4, tmpEps4, dEpsSum4, Ntot2);
                 }
 
                 // Do a update currently locally for vi vector
-                for (int vi_ind = 0; vi_ind < Ntot1; vi_ind++)
-                {
-                    vi[vi_ind] = expl((long double)(used_data.alpha * epsilon[vi_ind] - EuMasc));
-                }
-
                 for (int vi_ind = 0; vi_ind < Ntot2; vi_ind++)
                 {
                     vi2[vi_ind] = expl((long double)(used_data.alpha * epsilon2[vi_ind] - EuMasc));
-                    vi3[vi_ind] = expl((long double)(used_data.alpha * epsilon3[vi_ind] - EuMasc));
                     vi4[vi_ind] = expl((long double)(used_data.alpha * epsilon4[vi_ind] - EuMasc));
                 }
                 double end_sync = MPI_Wtime();
                 //printf("INFO   : synchronization time = %8.3f ms\n", (end_sync - beg_sync) * 1000.0);
 
                 // Store epsilon state at last synchronization
-                copy_array(tmpEps, epsilon, Ntot1);
                 copy_array(tmpEps2, epsilon2, Ntot2);
-                copy_array(tmpEps3, epsilon3, Ntot2);
                 copy_array(tmpEps4, epsilon4, Ntot2);
 
                 // Reset local sum of delta epsilon
-                set_array(dEpsSum, 0.0, Ntot1);
                 set_array(dEpsSum2, 0.0, Ntot2);
-                set_array(dEpsSum3, 0.0, Ntot2);
                 set_array(dEpsSum4, 0.0, Ntot2);
 
                 // Reset cumulated sum of delta betas
-                cumSumDeltaBetas = 0.0;
-                task_sum_abs_deltabeta = 0.0;
-
                 cumSumDeltaBetas2 = 0.0;
                 task_sum_abs_deltabeta2 = 0.0;
 
-                sinceLastSync = 0;
+                sinceLastSync2 = 0;
             }
+
+
+
 
         } // END PROCESSING OF ALL MARKERS
 

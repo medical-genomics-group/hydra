@@ -50,7 +50,7 @@ struct pars_beta_sparse {
 	double mixture_value; 
 
 	// Store the current variables
-	double alpha, sigmaG1, sigmaG2;
+	double alpha, sigmaG_upper, sigmaG_lower;
 
 	// Parameter for inter-epoch correlation
 	double rho;
