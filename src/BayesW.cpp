@@ -1079,8 +1079,6 @@ int BayesW::runMpiGibbs_bW()
         int it_nsync_ar1 = 0;
         int it_nsync_ar2 = 0;
 
-        g1.setZero(); g2.setZero();
-
         /* 1. Intercept (mu) */
         //Removed sampleMu function on its own
         int err = 0;
@@ -2276,6 +2274,16 @@ int BayesW::runMpiGibbs_bW()
 
         //PROFILE
         //continue;
+
+        double cov=0;
+        double var1=0, var2=0;
+        for (int ind=0; ind<(Ntot1+Ntot2); ind++)
+        {
+            cov+=(g1[ind]-g1.mean())*(g2[ind]-g2.mean());
+            var1+=(g1[ind]-g1.mean())*(g1[ind]-g1.mean());
+            var2+=(g2[ind]-g2.mean())*(g2[ind]-g2.mean());
+        }
+        cout << "iter: "<< iteration<< ", corr(g1, g2)="<< cov/sqrt(var1*var2)<<endl;
 
         printf("rank %d it %d  beta_squaredNorm[0] = %20.15f, beta_squaredNorm2[0] = %20.15f, beta1_beta2[0] = %20.15f\n",
                rank, iteration, beta_squaredNorm[0], beta_squaredNorm2[0], beta1_beta2[0]);
