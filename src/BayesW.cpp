@@ -1037,7 +1037,7 @@ int BayesW::runMpiGibbs_bW()
     uint n_thinned_saved = 0;
 
 
-    VectorXd g1(Ntot1+Ntot2), g2(Ntot1+Ntot2);
+    MatrixXd g1(Ntot1+Ntot2, numGroups), g2(Ntot1+Ntot2, numGroups);
     g1.setZero(); g2.setZero();
     
     
@@ -1538,23 +1538,23 @@ int BayesW::runMpiGibbs_bW()
                             
                             for (int ind=0; ind<(Ntot1+Ntot2); ind++)
                             {
-                                g1(ind)-=Beta(marker)*mave[marker]/mstd[marker];
+                                g1(ind, cur_group)-=Beta(marker)*mave[marker]/mstd[marker];
                             }
                             for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
                             {
-                                g1(I1[ind])+= Beta(marker)/mstd[marker]; 
+                                g1(I1[ind], cur_group)+= Beta(marker)/mstd[marker]; 
                             }
                             for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
                             {
-                                g1(I1_2[ind]+Ntot1)+= Beta(marker)/mstd[marker];
+                                g1(I1_2[ind]+Ntot1, cur_group)+= Beta(marker)/mstd[marker];
                             }
                             for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
-                                g1(I2[ind])+= 2*Beta(marker)/mstd[marker];
+                                g1(I2[ind], cur_group)+= 2*Beta(marker)/mstd[marker];
                             }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
-                                g1(I2_2[ind]+Ntot1)+= 2*Beta(marker)/mstd[marker];
+                                g1(I2_2[ind]+Ntot1, cur_group)+= 2*Beta(marker)/mstd[marker];
                             }
 
                             //cout << "Sampled beta1 = " <<  Beta(marker) << endl;
@@ -1671,23 +1671,23 @@ int BayesW::runMpiGibbs_bW()
                            // cout << "Sampled beta2 = " <<  Beta2(marker) << endl;
                             for (int ind=0; ind<(Ntot1+Ntot2); ind++)
                             {
-                                g2(ind) -=Beta2(marker)* mave[marker]/mstd[marker];
+                                g2(ind, cur_group) -=Beta2(marker)* mave[marker]/mstd[marker];
                             }
                             for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
                             {
-                                g2(I1_2[ind]+Ntot1)+= Beta2(marker)/mstd[marker];
+                                g2(I1_2[ind]+Ntot1, cur_group)+= Beta2(marker)/mstd[marker];
                             }
                             for (int ind = N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
                             {
-                                g2(I1[ind])+= Beta2(marker)/mstd[marker];
+                                g2(I1[ind], cur_group)+= Beta2(marker)/mstd[marker];
                             }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
-                                g2(I2_2[ind]+Ntot1)+= 2*Beta2(marker)/mstd[marker];
+                                g2(I2_2[ind]+Ntot1, cur_group)+= 2*Beta2(marker)/mstd[marker];
                             } 
                             for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
-                                g2(I2[ind])+= 2*Beta2(marker)/mstd[marker];
+                                g2(I2[ind], cur_group)+= 2*Beta2(marker)/mstd[marker];
                             }
 
                             cass2(cur_group, k) += 1;
@@ -2275,16 +2275,6 @@ int BayesW::runMpiGibbs_bW()
         //PROFILE
         //continue;
 
-        double cov=0;
-        double var1=0, var2=0;
-        for (int ind=0; ind<(Ntot1+Ntot2); ind++)
-        {
-            cov+=(g1[ind]-g1.mean())*(g2[ind]-g2.mean());
-            var1+=(g1[ind]-g1.mean())*(g1[ind]-g1.mean());
-            var2+=(g2[ind]-g2.mean())*(g2[ind]-g2.mean());
-        }
-        cout << "iter: "<< iteration<< ", corr(g1, g2)="<< cov/sqrt(var1*var2)<<endl;
-
         printf("rank %d it %d  beta_squaredNorm[0] = %20.15f, beta_squaredNorm2[0] = %20.15f, beta1_beta2[0] = %20.15f\n",
                rank, iteration, beta_squaredNorm[0], beta_squaredNorm2[0], beta1_beta2[0]);
 
@@ -2343,12 +2333,27 @@ int BayesW::runMpiGibbs_bW()
                 // get vector of parameters for the current group
                 dirc = data.dPriors.row(gg).transpose().array();
             }
+
+            double cov=0;
+            double var1=0, var2=0;
+            double ind_mean=(g1.block(0,gg,Ntot1+Ntot2,1)).mean();
+            double ind_mean2=(g2.block(0,gg,Ntot1+Ntot2,1)).mean();
+            for (int ind=0; ind<(Ntot1+Ntot2); ind++)
+            {
+                cov+=(g1(ind, gg)-ind_mean)*(g2(ind, gg)-ind_mean2);
+                var1+=(g1(ind, gg)-ind_mean)*(g1(ind, gg)-ind_mean);
+                var2+=(g2(ind, gg)-ind_mean2)*(g2(ind, gg)-ind_mean2);
+            }
+            
+            //cout << "iter: "<< iteration<< ", corr(g1, g2)="<< cov/sqrt(var1*var2)<<endl;
             // 4. Sample sigmaG
             // TODO - Figure out how to sample
             //sigmaG[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0[gg]), (double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
             sigmaG[gg] = beta_squaredNorm(gg) + 0.001;
             sigmaG2[gg] = beta_squaredNorm2(gg) + 0.001;
-            Rho[gg] = beta1_beta2(gg) / sqrt(sigmaG[gg] * sigmaG2[gg]+ 1);  // + 1 for now
+            //Rho[gg] = beta1_beta2(gg) / sqrt(sigmaG[gg] * sigmaG2[gg]+ 1);  // + 1 for now
+            Rho[gg] = cov/sqrt(var1*var2);
+            //cout << "Rho: "<< Rho[gg] << endl;
 
             // 5. Sample prior mixture component probability from Dirichlet distribution
             VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
