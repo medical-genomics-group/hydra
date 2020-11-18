@@ -2336,8 +2336,8 @@ int BayesW::runMpiGibbs_bW()
 
             double cov=0;
             double var1=0, var2=0;
-            double ind_mean=(g1.block(0,gg,Ntot1+Ntot2,1)).mean();
-            double ind_mean2=(g2.block(0,gg,Ntot1+Ntot2,1)).mean();
+            double ind_mean=(g1.col(gg)).mean();
+            double ind_mean2=(g2.col(gg)).mean();
             for (int ind=0; ind<(Ntot1+Ntot2); ind++)
             {
                 cov+=(g1(ind, gg)-ind_mean)*(g2(ind, gg)-ind_mean2);
