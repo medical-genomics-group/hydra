@@ -233,6 +233,10 @@ void Options::inputOptions(const int argc, const char* argv[]){
             numberIndividuals2 = atoi(argv[++i]);
             ss << "--number-individuals2 " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--markerWindowLen")) {    //EO
+            markerWindowLen = atoi(argv[++i]);
+            ss << "--markerWindowLen " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--chain-length")) {
             chainLength = atoi(argv[++i]);
             ss << "--chain-length " << argv[i] << "\n";

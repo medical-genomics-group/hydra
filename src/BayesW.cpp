@@ -392,6 +392,7 @@ int BayesW::runMpiGibbs_bW()
     //TODO: Write new functions for Ntot1 and Ntot2 to read from different epochs
     uint Ntot1 = data.set_Ntot1(rank, opt);
     uint Ntot2 = data.set_Ntot2(rank, opt);
+    uint Ntot = Ntot1 + Ntot2;
 
     const uint Mtot = data.set_Mtot(rank, opt);
 
@@ -1036,11 +1037,12 @@ int BayesW::runMpiGibbs_bW()
     // A counter on previously saved thinned iterations
     uint n_thinned_saved = 0;
 
+    
+    cout <<"markerWindowLen: "<< opt.markerWindowLen<<endl;
+    int markerWindowLen = opt.markerWindowLen;
+    MatrixXd g1 = MatrixXd::Zero(markerWindowLen, Ntot*numGroups);
+    MatrixXd g2 = MatrixXd::Zero(markerWindowLen, Ntot*numGroups);
 
-    MatrixXd g1(Ntot1+Ntot2, numGroups), g2(Ntot1+Ntot2, numGroups);
-    g1.setZero(); g2.setZero();
-    
-    
     // Main iteration loop
     // -------------------
     //bool replay_it = false;
@@ -1078,6 +1080,9 @@ int BayesW::runMpiGibbs_bW()
         double it_sync_ar2 = 0.0;
         int it_nsync_ar1 = 0;
         int it_nsync_ar2 = 0;
+
+        g1.row(iteration % markerWindowLen).setZero();
+        g2.row(iteration % markerWindowLen).setZero();
 
         /* 1. Intercept (mu) */
         //Removed sampleMu function on its own
@@ -1535,26 +1540,27 @@ int BayesW::runMpiGibbs_bW()
                             errorCheck(err);
 
                             Beta(marker) = xsamp[0]; // Save the new result
-                            
-                            for (int ind=0; ind<(Ntot1+Ntot2); ind++)
+      
+                            double temp = Beta(marker)/mstd[marker];
+                            for (int ind=0; ind<Ntot; ind++)
                             {
-                                g1(ind, cur_group)-=Beta(marker)*mave[marker]/mstd[marker];
+                                g1(iteration % markerWindowLen, Ntot*cur_group+ind)-=temp*mave[marker];
                             }
                             for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
                             {
-                                g1(I1[ind], cur_group)+= Beta(marker)/mstd[marker]; 
+                                g1(iteration % markerWindowLen, I1[ind]+ Ntot*cur_group)+= temp; 
                             }
                             for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
                             {
-                                g1(I1_2[ind]+Ntot1, cur_group)+= Beta(marker)/mstd[marker];
+                                g1(iteration % markerWindowLen, I1_2[ind]+Ntot1 +Ntot*cur_group)+= temp;
                             }
                             for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
-                                g1(I2[ind], cur_group)+= 2*Beta(marker)/mstd[marker];
+                                g1(iteration % markerWindowLen, I2[ind] + Ntot*cur_group)+= 2*temp;
                             }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
-                                g1(I2_2[ind]+Ntot1, cur_group)+= 2*Beta(marker)/mstd[marker];
+                                g1(iteration % markerWindowLen, I2_2[ind]+Ntot1 +Ntot*cur_group)+= 2*temp;
                             }
 
                             //cout << "Sampled beta1 = " <<  Beta(marker) << endl;
@@ -1669,25 +1675,27 @@ int BayesW::runMpiGibbs_bW()
 
                             Beta2(marker) = xsamp[0]; // Save the new result
                            // cout << "Sampled beta2 = " <<  Beta2(marker) << endl;
-                            for (int ind=0; ind<(Ntot1+Ntot2); ind++)
+
+                            double temp = Beta2(marker)/mstd[marker];
+                            for (int ind=0; ind<Ntot; ind++)
                             {
-                                g2(ind, cur_group) -=Beta2(marker)* mave[marker]/mstd[marker];
+                                g2(iteration % markerWindowLen, Ntot*cur_group+ind)-=temp*mave[marker];
+                            }
+                            for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
+                            {
+                                g2(iteration % markerWindowLen, I1[ind]+ Ntot*cur_group)+= temp; 
                             }
                             for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
                             {
-                                g2(I1_2[ind]+Ntot1, cur_group)+= Beta2(marker)/mstd[marker];
+                                g2(iteration % markerWindowLen, I1_2[ind]+Ntot1 +Ntot*cur_group)+= temp;
                             }
-                            for (int ind = N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
+                            for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
-                                g2(I1[ind], cur_group)+= Beta2(marker)/mstd[marker];
+                                g2(iteration % markerWindowLen, I2[ind] + Ntot*cur_group)+= 2*temp;
                             }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
-                                g2(I2_2[ind]+Ntot1, cur_group)+= 2*Beta2(marker)/mstd[marker];
-                            } 
-                            for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
-                            {
-                                g2(I2[ind], cur_group)+= 2*Beta2(marker)/mstd[marker];
+                                g2(iteration % markerWindowLen, I2_2[ind]+Ntot1 +Ntot*cur_group)+= 2*temp;
                             }
 
                             cass2(cur_group, k) += 1;
@@ -2334,17 +2342,39 @@ int BayesW::runMpiGibbs_bW()
                 dirc = data.dPriors.row(gg).transpose().array();
             }
 
-            double cov=0;
-            double var1=0, var2=0;
-            double ind_mean=(g1.col(gg)).mean();
-            double ind_mean2=(g2.col(gg)).mean();
-            for (int ind=0; ind<(Ntot1+Ntot2); ind++)
-            {
-                cov+=(g1(ind, gg)-ind_mean)*(g2(ind, gg)-ind_mean2);
-                var1+=(g1(ind, gg)-ind_mean)*(g1(ind, gg)-ind_mean);
-                var2+=(g2(ind, gg)-ind_mean2)*(g2(ind, gg)-ind_mean2);
-            }
+            double cov=0.0;
+            double var1=0.0, var2=0.0;
             
+            VectorXd g1_K_mean(Ntot);
+            VectorXd g2_K_mean(Ntot);
+            if (iteration>=markerWindowLen)
+            {
+                for (int ind=0; ind<Ntot; ind++)
+                {
+                    g1_K_mean(ind)=(g1.col(gg*Ntot+ind)).mean();
+                    g2_K_mean(ind)=(g2.col(gg*Ntot+ind)).mean();
+                }
+            }
+            else
+            {
+                g1_K_mean= (g1.block(0,gg*Ntot,iteration+1, Ntot )).colwise().mean();
+                g2_K_mean= (g2.block(0,gg*Ntot,iteration+1, Ntot )).colwise().mean();
+            }
+            double ind_mean=g1_K_mean.mean();
+            double ind_mean2=g2_K_mean.mean();
+            for (int ind=0; ind<Ntot; ind++)
+            {
+                cov+=(g1_K_mean(ind)-ind_mean)*(g2_K_mean(ind)-ind_mean2);
+                var1+=(g1_K_mean(ind)-ind_mean)*(g1_K_mean(ind)-ind_mean);
+                var2+=(g2_K_mean(ind)-ind_mean2)*(g2_K_mean(ind)-ind_mean2);
+            }
+            if ((var1 != 0) && (var2 != 0))
+                Rho[gg]=std::max(std::min(cov/sqrt(var1*var2), 0.9995), -0.9995);
+            else
+                Rho[gg]=0;   
+            cout << "Window corr(g1,g2): "<< Rho[gg]<<endl;
+
+
             //cout << "iter: "<< iteration<< ", corr(g1, g2)="<< cov/sqrt(var1*var2)<<endl;
             // 4. Sample sigmaG
             // TODO - Figure out how to sample
@@ -2352,7 +2382,7 @@ int BayesW::runMpiGibbs_bW()
             sigmaG[gg] = beta_squaredNorm(gg) + 0.001;
             sigmaG2[gg] = beta_squaredNorm2(gg) + 0.001;
             //Rho[gg] = beta1_beta2(gg) / sqrt(sigmaG[gg] * sigmaG2[gg]+ 1);  // + 1 for now
-            Rho[gg] = cov/sqrt(var1*var2);
+        
             //cout << "Rho: "<< Rho[gg] << endl;
 
             // 5. Sample prior mixture component probability from Dirichlet distribution

@@ -77,6 +77,7 @@ public:
     string covariatesFile2;       
     unsigned numberIndividuals2   = 0;
     double epochPoint;
+    unsigned markerWindowLen      = 50;
 
     string mcmcOutDir  = "";
     string mcmcOutNam  = "default_output_name";
