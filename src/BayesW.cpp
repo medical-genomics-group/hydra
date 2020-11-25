@@ -41,39 +41,6 @@
 BayesW::~BayesW() {}
 
 // Pass the vector post_marginals of marginal likelihoods by reference
-/*
-void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n,
-                                          double vi_sum, double vi_2, double vi_1, double vi_0,
-                                          double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
-                                          double mean, double sd,
-                                          double mean_sd_ratio, unsigned int group_index,
-                                          const pars_beta_sparse used_data_beta)
-{
-
-    double s = 0;
-    double M = 1; //auxiliary variables
-    double M_pow_mean = 1;
-    if (used_data_beta.mixture_value_other != 0) // SEO : before it was  == 0 - is it now correct?
-    {
-        s = -used_data_beta.alpha * used_data_beta.rho * sqrt(used_data_beta.mixture_value * used_data_beta.sigmaG1 / used_data_beta.mixture_value_other/ used_data_beta.sigmaG2)  * used_data_beta.beta_other / sd;
-        M = exp(s);
-        M_pow_mean = exp(-mean*s);
-    }
-
-    double exp_sum = (mean * mean * (vi_0 + vi_tau_0) + M * ((1 - mean) * (1 - mean) * (vi_1 + vi_tau_1) + M * (2 - mean) * (2 - mean) * (vi_2 + vi_tau_2))) / (sd * sd);
-    double C_k_other = used_data_beta.mixture_value_other;
-
-    for (int i = 0; i < km1; i++)
-    {
-        //Calculate the sigma for the adaptive G-H
-        double sigma = 1.0 / sqrt(1.0 + used_data_beta.alpha * used_data_beta.alpha * used_data_beta.sigmaG1 * M_pow_mean * (1 - used_data_beta.rho * used_data_beta.rho) * used_data_beta.mixture_value * exp_sum);
-
-        post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index, i), sigma, n, vi_sum, vi_2, vi_1, vi_0, vi_tau_2, vi_tau_1, vi_tau_0, mean, sd, mean_sd_ratio,
-                                                                                    used_data_beta, used_data_beta.sigmaG1, used_data_beta.sigmaG2, used_data_beta.beta_other, C_k_other, vi_tau_sum);
-    }
-}
-*/
-
 void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n,
                                            double vi_sum, double vi_2, double vi_1, double vi_0,
                                            double vi_tau_sum, double vi_tau_2, double vi_tau_1, double vi_tau_0,
@@ -1016,7 +983,7 @@ int BayesW::runMpiGibbs_bW()
         }
     }
 
-    VectorXd sum_beta_squaredNorm, sum_beta_squaredNorm2, sum_beta1_beta2;
+    VectorXd sum_beta_squaredNorm, sum_beta_squaredNorm2;
 
     double beta, betaOld, deltaBeta, p, acum;
     double beta2, betaOld2, deltaBeta2, p2;
@@ -1032,8 +999,6 @@ int BayesW::runMpiGibbs_bW()
     beta_squaredNorm2.resize(numGroups);
     sum_beta_squaredNorm2.resize(numGroups);
 
-    beta1_beta2.resize(numGroups);
-    sum_beta1_beta2.resize(numGroups);
     // A counter on previously saved thinned iterations
     uint n_thinned_saved = 0;
 
@@ -1042,6 +1007,9 @@ int BayesW::runMpiGibbs_bW()
     int markerWindowLen = opt.markerWindowLen;
     MatrixXd g1 = MatrixXd::Zero(markerWindowLen, Ntot*numGroups);
     MatrixXd g2 = MatrixXd::Zero(markerWindowLen, Ntot*numGroups);
+    VectorXd sum_g1 =VectorXd::Zero(Ntot * numGroups);
+    VectorXd sum_g2 =VectorXd::Zero(Ntot * numGroups);
+
 
     // Main iteration loop
     // -------------------
@@ -1541,10 +1509,13 @@ int BayesW::runMpiGibbs_bW()
 
                             Beta(marker) = xsamp[0]; // Save the new result
       
-                            double temp = Beta(marker)/mstd[marker];
+                            double temp = Beta(marker) / mstd[marker];
+                            double temp_ave = temp * mave[marker] ;
+                            double temp2 = 2 * temp;
+
                             for (int ind=0; ind<Ntot; ind++)
                             {
-                                g1(iteration % markerWindowLen, Ntot*cur_group+ind)-=temp*mave[marker];
+                                g1(iteration % markerWindowLen, Ntot*cur_group+ind) -= temp_ave;
                             }
                             for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
                             {
@@ -1556,11 +1527,11 @@ int BayesW::runMpiGibbs_bW()
                             }
                             for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
-                                g1(iteration % markerWindowLen, I2[ind] + Ntot*cur_group)+= 2*temp;
+                                g1(iteration % markerWindowLen, I2[ind] + Ntot*cur_group)+= temp2;
                             }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
-                                g1(iteration % markerWindowLen, I2_2[ind]+Ntot1 +Ntot*cur_group)+= 2*temp;
+                                g1(iteration % markerWindowLen, I2_2[ind]+Ntot1 +Ntot*cur_group)+= temp2;
                             }
 
                             //cout << "Sampled beta1 = " <<  Beta(marker) << endl;
@@ -1676,14 +1647,17 @@ int BayesW::runMpiGibbs_bW()
                             Beta2(marker) = xsamp[0]; // Save the new result
                            // cout << "Sampled beta2 = " <<  Beta2(marker) << endl;
 
-                            double temp = Beta2(marker)/mstd[marker];
+                            double temp = Beta2(marker) / mstd[marker];
+                            double temp_ave = temp * mave[marker] ;
+                            double temp2 = 2 * temp;
+
                             for (int ind=0; ind<Ntot; ind++)
                             {
-                                g2(iteration % markerWindowLen, Ntot*cur_group+ind)-=temp*mave[marker];
+                                g2(iteration % markerWindowLen, Ntot*cur_group+ind) -= temp_ave;
                             }
                             for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
                             {
-                                g2(iteration % markerWindowLen, I1[ind]+ Ntot*cur_group)+= temp; 
+                                g2(iteration % markerWindowLen, I1[ind]+ Ntot*cur_group) += temp; 
                             }
                             for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
                             {
@@ -1691,11 +1665,11 @@ int BayesW::runMpiGibbs_bW()
                             }
                             for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
-                                g2(iteration % markerWindowLen, I2[ind] + Ntot*cur_group)+= 2*temp;
+                                g2(iteration % markerWindowLen, I2[ind] + Ntot*cur_group)+= temp2;
                             }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
-                                g2(iteration % markerWindowLen, I2_2[ind]+Ntot1 +Ntot*cur_group)+= 2*temp;
+                                g2(iteration % markerWindowLen, I2_2[ind]+Ntot1 +Ntot*cur_group)+= temp2;
                             }
 
                             cass2(cur_group, k) += 1;
@@ -1705,10 +1679,6 @@ int BayesW::runMpiGibbs_bW()
                             beta_squaredNorm2[groups[MrankS[rank] + marker]] += Beta2[marker] * Beta2[marker];
                             //If the first epoch marker was also included, add the product to the covariance
 
-                            if (Beta[marker] != 0)
-                            {
-                                beta1_beta2[groups[MrankS[rank] + marker]] += Beta[marker] * Beta2[marker];
-                            }
                         }
                         break;
                     }
@@ -2283,8 +2253,8 @@ int BayesW::runMpiGibbs_bW()
         //PROFILE
         //continue;
 
-        printf("rank %d it %d  beta_squaredNorm[0] = %20.15f, beta_squaredNorm2[0] = %20.15f, beta1_beta2[0] = %20.15f\n",
-               rank, iteration, beta_squaredNorm[0], beta_squaredNorm2[0], beta1_beta2[0]);
+        printf("rank %d it %d  beta_squaredNorm[0] = %20.15f, beta_squaredNorm2[0] = %20.15f\n",
+               rank, iteration, beta_squaredNorm[0], beta_squaredNorm2[0]);
 
         //printf("==> after eps sync it %d, rank %d, epsilon[0] = %15.10f %15.10f\n", iteration, rank, epsilon[0], epsilon[Ntot-1]);
 
@@ -2295,7 +2265,9 @@ int BayesW::runMpiGibbs_bW()
             MPI_Barrier(MPI_COMM_WORLD);
             check_mpi(MPI_Allreduce(beta_squaredNorm.data(), sum_beta_squaredNorm.data(), beta_squaredNorm.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             check_mpi(MPI_Allreduce(beta_squaredNorm2.data(), sum_beta_squaredNorm2.data(), beta_squaredNorm2.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            check_mpi(MPI_Allreduce(beta1_beta2.data(), sum_beta1_beta2.data(), beta_squaredNorm.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+            check_mpi(MPI_Allreduce(g1.row(iteration % markerWindowLen).data(), sum_g1.data(), Ntot*numGroups, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(g2.row(iteration % markerWindowLen).data(), sum_g2.data(), Ntot*numGroups, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
             check_mpi(MPI_Allreduce(cass.data(), sum_cass.data(), cass.size(), MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             check_mpi(MPI_Allreduce(cass2.data(), sum_cass2.data(), cass2.size(), MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -2305,7 +2277,10 @@ int BayesW::runMpiGibbs_bW()
 
             beta_squaredNorm = sum_beta_squaredNorm;
             beta_squaredNorm2 = sum_beta_squaredNorm2;
-            beta1_beta2 = sum_beta1_beta2;
+
+            g1.row(iteration % markerWindowLen) = sum_g1;
+            g2.row(iteration % markerWindowLen) = sum_g2;
+
         }
 
         if (rank < 0)
@@ -2378,9 +2353,10 @@ int BayesW::runMpiGibbs_bW()
             //cout << "iter: "<< iteration<< ", corr(g1, g2)="<< cov/sqrt(var1*var2)<<endl;
             // 4. Sample sigmaG
             // TODO - Figure out how to sample
-            //sigmaG[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0[gg]), (double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
-            sigmaG[gg] = beta_squaredNorm(gg) + 0.001;
-            sigmaG2[gg] = beta_squaredNorm2(gg) + 0.001;
+            sigmaG[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0[gg]), (double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
+            sigmaG2[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0_2[gg]), (double)(beta_sigma + 0.5 * double(m0_2[gg])) * beta_squaredNorm2(gg));
+            //sigmaG[gg] = beta_squaredNorm(gg) + 0.001;
+            //sigmaG2[gg] = beta_squaredNorm2(gg) + 0.001;
             //Rho[gg] = beta1_beta2(gg) / sqrt(sigmaG[gg] * sigmaG2[gg]+ 1);  // + 1 for now
         
             //cout << "Rho: "<< Rho[gg] << endl;
