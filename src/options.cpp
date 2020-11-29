@@ -167,18 +167,16 @@ void Options::inputOptions(const int argc, const char* argv[]){
             //for (int i=0; i<nphen; i++)
             //    cout << " " << i << ": " << phenotypeFiles[i] << endl;
         }
-
-	else if (!strcmp(argv[i], "--pheno2")) {
+	    else if (!strcmp(argv[i], "--pheno2")) {
             phenotypeFile2 = argv[++i];
             ss << "--pheno2 " << argv[i] << "\n";
 	    multi_phen = false;
         }
-
         // Failure vector file
         else if (!strcmp(argv[i], "--failure")) {
         	failureFile = argv[++i];
         	ss << "--failure " << argv[i] << "\n";
-	}
+	    }
         else if (!strcmp(argv[i], "--failure2")) {
                 failureFile2 = argv[++i];
                 ss << "--failure2 " << argv[i] << "\n";
@@ -302,6 +300,16 @@ void Options::inputOptions(const int argc, const char* argv[]){
             covariatesFile2 = argv[++i];
             ss << "--covariates2 " << argv[i] << "\n";
         }
+        else if(!strcmp(argv[i], "--covariatesEpochSpec")) {
+            covariatesEpochSpec = true;
+            covariatesFileEpochSpec = argv[++i];
+            ss << "--covariatesEpochSpec " << argv[i] << "\n";
+        }
+        else if(!strcmp(argv[i], "--covariates2EpochSpec")) {
+            covariatesEpochSpec = true;
+            covariatesFile2EpochSpec = argv[++i];
+            ss << "--covariates2EpochSpec " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--epochPoint")) {
             epochPoint = atof(argv[++i]);
             ss << "--epochPoint" << argv[i] << "\n";
@@ -312,7 +320,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
             throw (errmsg.str());
         }
     }
-
     options_s = ss.str();
     //cout << ss.str() << endl;
 
@@ -346,7 +353,6 @@ void Options::inputOptions(const int argc, const char* argv[]){
     //------------------------------------------------------------
     if ( (!sparseBsn.empty() && sparseDir.empty()) || (sparseBsn.empty() && !sparseDir.empty()))
         throw "--sparse-dir and --sparse-basename must either be both set or unset";
-
 }
 
 void Options::readFile(const string &file){  // input options from file

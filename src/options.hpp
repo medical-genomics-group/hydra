@@ -74,7 +74,8 @@ public:
     string bedFile2;  
     string failureFile2;
     string phenotypeFile2;
-    string covariatesFile2;       
+    string covariatesFile2;  
+    string covariatesFile2EpochSpec;     
     unsigned numberIndividuals2   = 0;
     double epochPoint;
     unsigned markerWindowLen      = 50;
@@ -86,9 +87,11 @@ public:
     string sparseBsn   = "";
     string optionFile;
     string covariatesFile;         // for extra covariates.
-    bool   covariates  = false;    // for extra covatiates.
-    bool   compress    = false;
-    bool   deltaUpdate = true;     // Use the delta epsilon to pass the message in mpi
+    string covariatesFileEpochSpec;
+    bool   covariates           = false;    // for extra covatiates.
+    bool   covariatesEpochSpec  = false;
+    bool   compress             = false;
+    bool   deltaUpdate          = true;     // Use the delta epsilon to pass the message in mpi
 
     // Use BED representation over SPARSE if fraction of non-zero elements (fnz)
     // is greater than this threshold:

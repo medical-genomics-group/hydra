@@ -1824,7 +1824,6 @@ void Data::readPhenCovFiles(const string &phenFile, const string covFile, const 
     assert(line == numInds);
 
     numFixedEffects = values.size() / (line - nas);
-    cout << "numFixedEffect = " << numFixedEffects << endl;
 
     X = Map<const Matrix<double, Dynamic, Dynamic, RowMajor>>(values.data(), (line - nas), numFixedEffects);
 
@@ -1837,6 +1836,7 @@ void Data::readPhenCovFiles(const string &phenFile, const string covFile, const 
 //(S)EO: combined reading of a .phen and .cov and .fail files
 //    Assume .cov and .phen to be consistent with .fam and .bed!
 //--------------------------------------------------------------
+/*
 void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank) {
 
     uint numInds_local = numberIndividuals;
@@ -1908,7 +1908,167 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
     dfail.conservativeResize(numInds_local-nas);
 
 }
+*/
 
+void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, MatrixXd& dX, unsigned int* numbFixedEffects ,const int rank) {
+
+    uint numInds_local = numberIndividuals;
+    dest.setZero(numInds_local);
+    dfail.setZero(numInds_local);
+
+    ifstream inp(phenFile.c_str());
+    if (!inp)
+        throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
+
+    ifstream inc(covFile.c_str());
+    if (!inc)
+        throw ("Error: can not open the covariates file [" + covFile + "] to read.");
+
+    ifstream inf(failFile.c_str());
+    if (!inf)
+        throw ("Error: can not open the failure file [" + failFile + "] to read.");
+
+    uint line = 0, nas = 0, nonas = 0;
+    string sep(" \t");
+    Gadget::Tokenizer colDataP,  colDataC, colDataF;
+    string            inputStrP, inputStrC, inputStrF;
+    std::vector<double> values;
+    while (getline(inp, inputStrP)) {
+        getline(inc, inputStrC);
+        getline(inf, inputStrF);
+        colDataP.getTokens(inputStrP, sep);
+        colDataC.getTokens(inputStrC, sep);
+        colDataF.getTokens(inputStrF, sep);
+        bool naC = false;
+        for (int i=2; i<colDataC.size(); i++) {
+            if (colDataC[i] == "NA") {
+                naC = true;
+                break;
+            }
+        }
+
+        if (colDataP[1+1] != "NA" && naC == false && colDataF[0] != "-9") {
+            dest[nonas] = double( atof(colDataP[1+1].c_str()) );
+            dfail[nonas] = double( atof(colDataF[0].c_str()) );
+            for (int i=2; i<colDataC.size(); i++) {
+                values.push_back(std::stod(colDataC[i]));
+            }
+            nonas += 1;
+        } else {
+            if (rank == 0)
+                cout << "NA(s) detected on line " << line << ": naC? " << naC << ", naP? " << colDataP[1+1] << ", naF? " << colDataF[0]  << endl;
+            NAsInds.push_back(line);
+            nas += 1;
+        }
+        
+        line += 1;
+    }
+    inp.close();
+    inc.close();
+    inf.close();
+    assert(nonas + nas == numInds_local);
+
+    assert(line == numInds_local);
+
+    *numbFixedEffects = values.size() / (line - nas);
+
+    dX = Map<const Matrix<double, Dynamic, Dynamic, RowMajor>>(values.data(), (line - nas), *numbFixedEffects);
+
+    numNAs = nas;
+
+    dest.conservativeResize(numInds_local-nas);
+    dfail.conservativeResize(numInds_local-nas);
+
+}
+
+void Data::readPhenFailCovCovESFiles(const string &phenFile, const string covFile, const string covFile_ES, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, MatrixXd& dX, MatrixXd& dX_ES, unsigned int* numbFixedEffects, unsigned int* numbFixedEffects_ES, unsigned * numNA, const int rank) {
+
+    uint numInds_local = numberIndividuals;
+    dest.setZero(numInds_local);
+    dfail.setZero(numInds_local);
+
+    ifstream inp(phenFile.c_str());
+    if (!inp)
+        throw ("Error: can not open the phenotype file [" + phenFile + "] to read.");
+
+    ifstream inc(covFile.c_str());
+    if (!inc)
+        throw ("Error: can not open the covariates file [" + covFile + "] to read.");
+    
+    ifstream inces(covFile_ES.c_str());
+    if (!inc)
+        throw ("Error: can not open the epoch-specific covariates file [" + covFile_ES + "] to read.");
+
+    ifstream inf(failFile.c_str());
+    if (!inf)
+        throw ("Error: can not open the failure file [" + failFile + "] to read.");
+
+    uint line = 0, nas = 0, nonas = 0;
+    string sep(" \t");
+    Gadget::Tokenizer colDataP,  colDataC, colDataF, colDataC_ES;
+    string            inputStrP, inputStrC, inputStrF, inputStrC_ES;
+    std::vector<double> values;
+    std::vector<double> values_ES;
+    while (getline(inp, inputStrP)) {
+        getline(inc, inputStrC);
+        getline(inf, inputStrF);
+        getline(inces, inputStrC_ES);
+        colDataP.getTokens(inputStrP, sep);
+        colDataC.getTokens(inputStrC, sep);
+        colDataF.getTokens(inputStrF, sep);
+        colDataC_ES.getTokens(inputStrC_ES, sep);
+        bool naC = false;
+        for (int i=2; i<colDataC.size(); i++) {
+            if (colDataC[i] == "NA") {
+                naC = true;
+                break;
+            }
+        }
+        for (int i=2; i<colDataC_ES.size(); i++) {
+            if (colDataC_ES[i] == "NA") {
+                naC = true;
+                break;
+            }
+        }
+        if (colDataP[1+1] != "NA" && naC == false && colDataF[0] != "-9") {
+            dest[nonas] = double( atof(colDataP[1+1].c_str()) );
+            dfail[nonas] = double( atof(colDataF[0].c_str()) );
+            for (int i=2; i<colDataC.size(); i++) {
+                values.push_back(std::stod(colDataC[i]));
+            }
+            for (int i=2; i<colDataC_ES.size(); i++) {
+                values_ES.push_back(std::stod(colDataC_ES[i]));
+            }
+            nonas += 1;
+        } else {
+            if (rank == 0)
+                cout << "NA(s) detected on line " << line << ": naC? " << naC << ", naP? " << colDataP[1+1] << ", naF? " << colDataF[0]  << endl;
+            NAsInds.push_back(line);
+            nas += 1;
+        }
+        
+        line += 1;
+    }
+    inp.close();
+    inc.close();
+    inf.close();
+    inces.close();
+    assert(nonas + nas == numInds_local);
+
+    assert(line == numInds_local);
+
+    *numbFixedEffects = values.size() / (line - nas);
+    *numbFixedEffects_ES = values_ES.size() / (line - nas);
+
+    dX = Map<const Matrix<double, Dynamic, Dynamic, RowMajor>>(values.data(), (line - nas), *numbFixedEffects);
+    dX_ES = Map<const Matrix<double, Dynamic, Dynamic, RowMajor>>(values_ES.data(), (line - nas), *numbFixedEffects_ES);
+
+    *numNA = nas;
+
+    dest.conservativeResize(numInds_local-nas);
+    dfail.conservativeResize(numInds_local-nas);
+
+}
 
 //SEO: Function to read phenotype and failure files simultaneously (without covariates)
 void Data::readPhenFailFiles(const string &phenFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank) {

@@ -82,6 +82,9 @@ public:
 
     // Original data
     MatrixXd X;              // coefficient matrix for fixed effects
+    MatrixXd X2;             // for second epoch
+    MatrixXd X_ES;           // coefficient matrix for epoch - specific fixed effects
+    MatrixXd X2_ES;          // for second epoch
     MatrixXd Z;
     VectorXf D;              // 2pqn
 
@@ -112,12 +115,14 @@ public:
     map<string, IndInfo*> indInfoMap;
     
     unsigned numFixedEffects = 0;
+    unsigned numFixedEffectsEpochSpec =0;
 
     unsigned numSnps = 0;
     unsigned numInds = 0;
     unsigned numInds2 = 0;  // For the second epoch 
 
     unsigned numNAs  = 0;
+    unsigned numNAs2  = 0;
 
     vector<uint> NAsInds;
     vector<int>  blocksStarts;
@@ -344,9 +349,13 @@ public:
 
     // Functions to read for bayesW
     //
-    void readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
+    //void readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
+
+    void readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, MatrixXd& dX, unsigned int * numbFixedEffects, const int rank);
 
     void readPhenFailFiles(const string &phenFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
+
+    void readPhenFailCovCovESFiles(const string &phenFile, const string covFile, const string covFile_ES, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, MatrixXd& dX, MatrixXd& dX_ES, unsigned int* numbFixedEffects, unsigned int* numbFixedEffects_ES, unsigned * numNA, const int rank);
 
     template<typename M>
     M readCSVFile(const string &covariateFile);

@@ -20,10 +20,35 @@ double gamma_dens(double x, void *norm_data)
 	double y;
 
 	pars p = *(static_cast<pars *>(norm_data));
-
 	// Cast voided pointer into pointer to struct norm_parm
 	// Prior is the same currently for intercepts and fixed effects
-	return -p.alpha * x * p.sum_failure - (((p.epsilon - p.X_j * x) * p.alpha).array() - EuMasc).exp().sum() - x * x / (2 * p.sigma_covariate);
+	//return -p.alpha * x * p.sum_failure - (((p.epsilon - p.X_j * x) * p.alpha).array() - EuMasc).exp().sum() - x * x / (2 * p.sigma_covariate);
+	return -p.alpha * x * (p.sum_failure + p.sum_failure2) - expmEuMasc * ((((p.epsilon - p.X_j * x) * p.alpha).array() ).exp().sum() 
+			+ (((p.epsilon2 - p.X_j2 * x) * p.alpha).array() ).exp().sum()
+			+ (((p.epsilon3 - p.X_j2 * x) * p.alpha).array() ).exp().sum()
+			- (((p.epsilon4 - p.X_j2 * x) * p.alpha).array() ).exp().sum() ) - x * x / (2 * p.sigma_covariate);
+};
+
+// Functions for the log density of some epoch specific "fixed" covariate effect
+// Epoch 1 estimation
+double gamma_dens_ES(double x, void *norm_data)
+{
+	double y;
+	pars p = *(static_cast<pars *>(norm_data));
+	// Cast voided pointer into pointer to struct norm_parm
+	// Prior is the same currently for intercepts and fixed effects
+	return -p.alpha * x * p.sum_failure  - expmEuMasc * ((((p.epsilon - p.X_j * x) * p.alpha).array() ).exp().sum() 
+			+ (((p.epsilon3 - p.X_j2 * x) * p.alpha).array() ).exp().sum() ) - x * x / (2 * p.sigma_covariate);
+};
+//Epoch 2 estimation
+double gamma_dens2_ES(double x, void *norm_data)
+{
+	double y;
+	pars p = *(static_cast<pars *>(norm_data));
+	// Cast voided pointer into pointer to struct norm_parm
+	// Prior is the same currently for intercepts and fixed effects
+	return -p.alpha * x * p.sum_failure2 - expmEuMasc * ((((p.epsilon2 - p.X_j2 * x) * p.alpha).array() ).exp().sum()
+			- (((p.epsilon4 - p.X_j2 * x) * p.alpha).array() ).exp().sum() ) - x * x / (2 * p.sigma_covariate);
 };
 
 // Function for the log density of alpha

@@ -79,9 +79,9 @@ public:
     int runMpiGibbs_bW();
     
 private:
-    void init(unsigned int individualCount, unsigned int individualCount2, unsigned int Mtot, unsigned int fixedCount);
+    void init(unsigned int individualCount, unsigned int individualCount2, unsigned int Mtot, unsigned int fixedCount, unsigned int fixedCount_ES);
 
-	void init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot1, const uint Ntot2, const uint fixtot,
+	void init_from_restart(const int K, const uint M, const uint  Mtot, const uint Ntot1, const uint Ntot2, const uint fixtot, const uint fixtot_ES,
                            const int* MrankS, const int* MrankL, const bool use_xfiles_in_restart);
 
 	void marginal_likelihood_vec_calc(VectorXd prior_prob,

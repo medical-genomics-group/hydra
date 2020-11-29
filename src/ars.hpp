@@ -29,6 +29,7 @@ struct pars {
 
 	//  of sum(X_j*failure)
 	double sum_failure;
+	double sum_failure2;
 
 	// Mu-specific variables
 	double sigma_mu;

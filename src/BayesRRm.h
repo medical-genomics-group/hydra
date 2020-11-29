@@ -53,6 +53,8 @@ class BayesRRm
 
     MatrixXd X;         // "fixed effects" matrix.
     VectorXd gamma;     // fixed effects coefficients
+    VectorXd gamma_ES;  // epoch-specific fixed effects 
+    VectorXd gamma2_ES;
 
     // Component variables
     MatrixXd priorPi;   // prior probabilities for each component

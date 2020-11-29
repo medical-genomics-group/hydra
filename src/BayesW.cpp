@@ -76,7 +76,7 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
 }
 
 
-void BayesW::init(unsigned int individualCount, unsigned int individualCount2, unsigned int Mtot, unsigned int fixedCount)
+void BayesW::init(unsigned int individualCount, unsigned int individualCount2, unsigned int Mtot, unsigned int fixedCount, unsigned int fixedCount_ES)
 {
     // Read the failure indicator vector
     if (individualCount != (data.fail).size())
@@ -87,6 +87,8 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
 
     // Linear model variables
     gamma = VectorXd(fixedCount);
+    gamma_ES = VectorXd(fixedCount_ES);
+    gamma2_ES = VectorXd(fixedCount_ES);
 
     //phenotype vector
     y = VectorXd();
@@ -183,6 +185,8 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     Beta2.setZero();
 
     gamma.setZero();
+    gamma_ES.setZero();
+    gamma2_ES.setZero();
 
     //initialize epsilon vector as the phenotype vector
     y = data.y.cast<double>().array();
@@ -235,6 +239,7 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
 
     gamma_restart.resize(fixedCount);
     gamma_restart.setZero();
+    // TODO: restart variables for epoch-specific fixed effects
 
     xI_restart.resize(fixedCount);
 
@@ -266,11 +271,11 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     used_data_alpha.d = used_data.d;
 }
 
-void BayesW::init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntot1, const uint Ntot2, const uint fixtot,
+void BayesW::init_from_restart(const int K, const uint M, const uint Mtot, const uint Ntot1, const uint Ntot2, const uint fixtot, const uint fixtot_ES,
                                const int *MrankS, const int *MrankL, const bool use_xfiles_in_restart)
 {
     //Use the regular bW initialisation
-    init(Ntot1, Ntot2, Mtot, fixtot);
+    init(Ntot1, Ntot2, Mtot, fixtot, fixtot_ES);
 
     //TODO SEO - fix for epoch restarts
     // data.read_mcmc_output_csv_file_bW(opt.mcmcOut, opt.thin, opt.save, K, mu, sigmaG, used_data.alpha, pi_L,
@@ -302,6 +307,7 @@ void BayesW::init_from_restart(const int K, const uint M, const uint Mtot, const
     data.read_mcmc_output_idx_file(opt.mcmcOut, "mrk", M, iteration_to_restart_from, opt.bayesType,
                                    markerI_restart);
 
+    
     if (opt.covariates)
     {
         data.read_mcmc_output_gam_file_bW(opt.mcmcOut, opt.save, fixtot, gamma_restart);
@@ -310,6 +316,7 @@ void BayesW::init_from_restart(const int K, const uint M, const uint Mtot, const
                                        xI_restart);
     }
 
+    
     // Adjust starting iteration number.
     iteration_start = iteration_to_restart_from + 1;
 
@@ -322,6 +329,7 @@ int BayesW::runMpiGibbs_bW()
 {
     tau = log(opt.epochPoint); // Cut-off for defining two epochs
     const unsigned int numFixedEffects(data.numFixedEffects);
+    const unsigned int numFixedEffectsEpochSpec(data.numFixedEffectsEpochSpec);
 
     char buff[LENBUF];
     char buff_gamma[LENBUF_gamma];
@@ -459,7 +467,7 @@ int BayesW::runMpiGibbs_bW()
     if (opt.restart)
     {
         //TODO: Fix restart
-        init_from_restart(K, M, Mtot, Ntot1, Ntot2, numFixedEffects, MrankS, MrankL, opt.useXfilesInRestart);
+        init_from_restart(K, M, Mtot, Ntot1, Ntot2, numFixedEffects,numFixedEffectsEpochSpec, MrankS, MrankL, opt.useXfilesInRestart);
         if (rank == 0)
             data.print_restart_banner(opt.mcmcOut.c_str(), iteration_to_restart_from, iteration_start);
 
@@ -497,7 +505,7 @@ int BayesW::runMpiGibbs_bW()
         //@@@EO srand(opt.seed);
         //TODO: SEO - fix NAs
 
-        init(Ntot1, Ntot2, Mtot, numFixedEffects); //- data.numNAs
+        init(Ntot1, Ntot2, Mtot, numFixedEffects, numFixedEffectsEpochSpec); //- data.numNAs
     }
 
     cass.resize(numGroups, K); //rows are groups columns are mixtures
@@ -744,7 +752,7 @@ int BayesW::runMpiGibbs_bW()
     //if (rank == 0) printf("INFO   : start computing statistics on Ntot = %d individuals\n", Ntot);
     double dN = (double)(Ntot1 + Ntot2);
     double dNm1 = (double)(Ntot1 + Ntot2 - 1);
-    double *mave, *mstd, *sum_failure, *sum_failure2, *sum_failure_fix;
+    double *mave, *mstd, *sum_failure, *sum_failure2, *sum_failure_fix, *sum_failure_fix2, *sum_failure_fix_epoch_spec, *sum_failure_fix2_epoch_spec;
 
     mave = (double *)_mm_malloc(size_t(M) * sizeof(double), 64);
     check_malloc(mave, __LINE__, __FILE__);
@@ -757,6 +765,12 @@ int BayesW::runMpiGibbs_bW()
 
     sum_failure_fix = (double *)_mm_malloc(size_t(numFixedEffects) * sizeof(double), 64);
     check_malloc(sum_failure_fix, __LINE__, __FILE__);
+    sum_failure_fix2 = (double *)_mm_malloc(size_t(numFixedEffects) * sizeof(double), 64);
+    check_malloc(sum_failure_fix2, __LINE__, __FILE__);
+    sum_failure_fix_epoch_spec = (double *)_mm_malloc(size_t(numFixedEffectsEpochSpec) * sizeof(double), 64);
+    check_malloc(sum_failure_fix_epoch_spec, __LINE__, __FILE__);
+    sum_failure_fix2_epoch_spec = (double *)_mm_malloc(size_t(numFixedEffectsEpochSpec) * sizeof(double), 64);
+    check_malloc(sum_failure_fix2_epoch_spec, __LINE__, __FILE__);
 
     dalloc += 5 * size_t(M) * sizeof(double) / 1E9;   //SEO - Is this correct? Previously it was 2
 
@@ -809,6 +823,15 @@ int BayesW::runMpiGibbs_bW()
         for (int fix_i = 0; fix_i < numFixedEffects; fix_i++)
         {
             sum_failure_fix[fix_i] = ((data.X.col(fix_i).cast<double>()).array() * used_data_alpha.failure_vector.array()).sum();
+            sum_failure_fix2[fix_i] = ((data.X2.col(fix_i).cast<double>()).array() * used_data_alpha.failure_vector2.array()).sum();
+        }
+    }
+    if (opt.covariatesEpochSpec)
+    {
+        for (int fix_i = 0; fix_i < numFixedEffectsEpochSpec; fix_i++)
+        {
+            sum_failure_fix_epoch_spec[fix_i] = ((data.X_ES.col(fix_i).cast<double>()).array() * used_data_alpha.failure_vector.array()).sum();
+            sum_failure_fix2_epoch_spec[fix_i] = ((data.X2_ES.col(fix_i).cast<double>()).array() * used_data_alpha.failure_vector2.array()).sum();
         }
     }
 
@@ -956,7 +979,6 @@ int BayesW::runMpiGibbs_bW()
         }*/
 
         markerI = markerI_restart;
-
         if (opt.covariates)
         {
             for (int i = 0; i < numFixedEffects; i++)
@@ -1010,7 +1032,6 @@ int BayesW::runMpiGibbs_bW()
     VectorXd sum_g1 =VectorXd::Zero(Ntot * numGroups);
     VectorXd sum_g2 =VectorXd::Zero(Ntot * numGroups);
 
-
     // Main iteration loop
     // -------------------
     //bool replay_it = false;
@@ -1048,7 +1069,7 @@ int BayesW::runMpiGibbs_bW()
         double it_sync_ar2 = 0.0;
         int it_nsync_ar1 = 0;
         int it_nsync_ar2 = 0;
-
+ 
         g1.row(iteration % markerWindowLen).setZero();
         g2.row(iteration % markerWindowLen).setZero();
 
@@ -1098,7 +1119,7 @@ int BayesW::runMpiGibbs_bW()
             epsilon3[mu_ind] = (used_data.epsilon3)[mu_ind] - mu;
             epsilon4[mu_ind] = (used_data.epsilon4)[mu_ind] - mu;
         }
-
+        
         ////////// End sampling mu
         /* 1a. Fixed effects (gammas) */
         if (opt.covariates)
@@ -1136,7 +1157,9 @@ int BayesW::runMpiGibbs_bW()
                 xr = gamma_old + 0.075; // Initial left and right (pseudo) extremes
 
                 used_data.X_j = data.X.col(xI[fix_i]).cast<double>(); //Take from the fixed effects matrix
+                used_data.X_j2 = data.X2.col(xI[fix_i]).cast<double>();
                 used_data.sum_failure = sum_failure_fix[xI[fix_i]];
+                used_data.sum_failure2 = sum_failure_fix2[xI[fix_i]];
 
                 for (int k = 0; k < Ntot1; k++)
                 {
@@ -1144,25 +1167,32 @@ int BayesW::runMpiGibbs_bW()
                 }
                 for (int k = 0; k < Ntot2; k++)
                 {
-                    (used_data.epsilon2)[k] = epsilon2[k] + used_data.X_j[k] * gamma_old; // we adjust the residual with the respect to the previous gamma value
+                    (used_data.epsilon2)[k] = epsilon2[k] + used_data.X_j2[k] * gamma_old; // we adjust the residual with the respect to the previous gamma value
+                    (used_data.epsilon3)[k] = epsilon3[k] + used_data.X_j2[k] * gamma_old;
+                    (used_data.epsilon4)[k] = epsilon4[k] + used_data.X_j2[k] * gamma_old;
                 }
+                
                 //TODO - Fix covariates by concatenating epsilons here
                 // Sample using ARS
+
                 err = arms(xinit, ninit, &xl, &xr, gamma_dens, &used_data, &convex,
                            npoint, dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
                 errorCheck(err);
-
+                
                 //Use only rank 0
                 check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
                 gamma(xI[fix_i]) = xsamp[0]; // Save the new result
+                //cout << "sampled gamma: "<< gamma(xI[fix_i])<< endl; 
                 for (int k = 0; k < Ntot1; k++)
                 {
                     epsilon[k] = (used_data.epsilon)[k] - used_data.X_j[k] * gamma(xI[fix_i]); // we adjust the residual with the respect to the previous gamma value
                 }
                 for (int k = 0; k < Ntot2; k++)
                 {
-                    epsilon2[k] = (used_data.epsilon2)[k] - used_data.X_j[k] * gamma(xI[fix_i]); // we adjust the residual with the respect to the previous gamma value
+                    epsilon2[k] = (used_data.epsilon2)[k] - used_data.X_j2[k] * gamma(xI[fix_i]); // we adjust the residual with the respect to the previous gamma value
+                    epsilon3[k] = (used_data.epsilon3)[k] - used_data.X_j2[k] * gamma(xI[fix_i]);
+                    epsilon4[k] = (used_data.epsilon4)[k] - used_data.X_j2[k] * gamma(xI[fix_i]);
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
             }
@@ -1170,6 +1200,141 @@ int BayesW::runMpiGibbs_bW()
 
         ////////// End sampling gamma
 
+        /* 1a. Epoch specific fixed effects (gammas) */
+        if (opt.covariatesEpochSpec)
+        {
+            //Epoch 1 fixed effects
+
+            double gamma_old = 0;
+            //std::shuffle(xI.begin(), xI.end(), dist.rng);
+            boost::uniform_int<> unii(0, numFixedEffects - 1);
+            boost::variate_generator<boost::mt19937 &, boost::uniform_int<>> generator(dist.rng, unii);
+            if (opt.shuffleMarkers)
+            {
+                boost::range::random_shuffle(xI, generator);
+            }
+
+            //Use only rank 0 shuffling
+            check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+            MPI_Barrier(MPI_COMM_WORLD);
+
+            for (int fix_i = 0; fix_i < numFixedEffectsEpochSpec; fix_i++)
+            {
+                gamma_old = gamma_ES(xI[fix_i]);
+
+                neval = 0;
+                xsamp[0] = 0;
+                convex = 1.0;
+                dometrop = 0;
+                xprev = 0.0;
+
+                xinit[0] = gamma_old - 0.075 / 30; // Initial abscissae
+                xinit[1] = gamma_old;
+                xinit[2] = gamma_old + 0.075 / 60;
+                xinit[3] = gamma_old + 0.075 / 30;
+
+                xl = gamma_old - 0.075;
+                xr = gamma_old + 0.075; // Initial left and right (pseudo) extremes
+
+                used_data.X_j = data.X_ES.col(xI[fix_i]).cast<double>(); //Take from the fixed effects matrix
+                used_data.X_j2 = data.X2_ES.col(xI[fix_i]).cast<double>();
+                used_data.sum_failure = sum_failure_fix_epoch_spec[xI[fix_i]];
+
+                for (int k = 0; k < Ntot1; k++)
+                {
+                    (used_data.epsilon)[k] = epsilon[k] + used_data.X_j[k] * gamma_old; // we adjust the residual with the respect to the previous gamma value
+                }
+                for (int k = 0; k < Ntot2; k++)
+                {
+                    (used_data.epsilon3)[k] = epsilon3[k] + used_data.X_j2[k] * gamma_old;
+                }
+                
+                //TODO - Fix covariates by concatenating epsilons here
+                // Sample using ARS
+
+                err = arms(xinit, ninit, &xl, &xr, gamma_dens_ES, &used_data, &convex,
+                           npoint, dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
+                errorCheck(err);
+                
+                //Use only rank 0
+                check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                gamma_ES(xI[fix_i]) = xsamp[0]; // Save the new result
+                //cout << "sampled ES gamma, epoch 1: "<< gamma_ES(xI[fix_i])<< endl; 
+                for (int k = 0; k < Ntot1; k++)
+                {
+                    epsilon[k] = (used_data.epsilon)[k] - used_data.X_j[k] * gamma_ES(xI[fix_i]); // we adjust the residual with the respect to the previous gamma value
+                }
+                for (int k = 0; k < Ntot2; k++)
+                {
+                    epsilon3[k] = (used_data.epsilon3)[k] - used_data.X_j2[k] * gamma_ES(xI[fix_i]);
+                }
+                MPI_Barrier(MPI_COMM_WORLD);
+            }
+
+            //Epoch 2 fixed effects
+
+            if (opt.shuffleMarkers)
+            {
+                boost::range::random_shuffle(xI, generator);
+            }
+
+            //Use only rank 0 shuffling
+            check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+            MPI_Barrier(MPI_COMM_WORLD);
+
+            for (int fix_i = 0; fix_i < numFixedEffectsEpochSpec; fix_i++)
+            {
+                gamma_old = gamma2_ES(xI[fix_i]);
+
+                neval = 0;
+                xsamp[0] = 0;
+                convex = 1.0;
+                dometrop = 0;
+                xprev = 0.0;
+
+                xinit[0] = gamma_old - 0.075 / 30; // Initial abscissae
+                xinit[1] = gamma_old;
+                xinit[2] = gamma_old + 0.075 / 60;
+                xinit[3] = gamma_old + 0.075 / 30;
+
+                xl = gamma_old - 0.075;
+                xr = gamma_old + 0.075; // Initial left and right (pseudo) extremes
+
+                used_data.X_j2 = data.X2_ES.col(xI[fix_i]).cast<double>();
+                used_data.sum_failure2 = sum_failure_fix2_epoch_spec[xI[fix_i]];
+
+                for (int k = 0; k < Ntot2; k++)
+                {
+                    (used_data.epsilon2)[k] = epsilon2[k] + used_data.X_j2[k] * gamma_old; // we adjust the residual with the respect to the previous gamma value
+                    (used_data.epsilon4)[k] = epsilon4[k] + used_data.X_j2[k] * gamma_old;
+                }
+                
+                //TODO - Fix covariates by concatenating epsilons here
+                // Sample using ARS
+
+                err = arms(xinit, ninit, &xl, &xr, gamma_dens2_ES, &used_data, &convex,
+                           npoint, dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
+                errorCheck(err);
+                
+                //Use only rank 0
+                check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+                gamma2_ES(xI[fix_i]) = xsamp[0]; // Save the new 
+                //cout << "sampled ES gamma, epoch 2: "<< gamma2_ES(xI[fix_i])<< endl; 
+
+                for (int k = 0; k < Ntot2; k++)
+                {
+                    epsilon2[k] = (used_data.epsilon2)[k] - used_data.X_j2[k] * gamma2_ES(xI[fix_i]); // we adjust the residual with the respect to the previous gamma value
+                    epsilon4[k] = (used_data.epsilon4)[k] - used_data.X_j2[k] * gamma2_ES(xI[fix_i]);
+                }
+                MPI_Barrier(MPI_COMM_WORLD);
+            }
+        }   
+
+        ////////// End sampling epoch specific gamma 
         // ARS parameters
         neval = 0;
         xsamp[0] = 0;
@@ -1209,7 +1374,7 @@ int BayesW::runMpiGibbs_bW()
         used_data.alpha = xsamp[0];
         used_data_beta.alpha = xsamp[0];
         MPI_Barrier(MPI_COMM_WORLD);
-
+        //cout << "sampled alpha: "<< xsamp[0]<< endl;
         // Calculate the vector of exponent of the adjusted residuals
         for (int i = 0; i < Ntot1; ++i)
         {
@@ -1645,7 +1810,6 @@ int BayesW::runMpiGibbs_bW()
                             errorCheck(err);
 
                             Beta2(marker) = xsamp[0]; // Save the new result
-                           // cout << "Sampled beta2 = " <<  Beta2(marker) << endl;
 
                             double temp = Beta2(marker) / mstd[marker];
                             double temp_ave = temp * mave[marker] ;
@@ -2353,8 +2517,8 @@ int BayesW::runMpiGibbs_bW()
             //cout << "iter: "<< iteration<< ", corr(g1, g2)="<< cov/sqrt(var1*var2)<<endl;
             // 4. Sample sigmaG
             // TODO - Figure out how to sample
-            sigmaG[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0[gg]), (double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
-            sigmaG2[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0_2[gg]), (double)(beta_sigma + 0.5 * double(m0_2[gg])) * beta_squaredNorm2(gg));
+            sigmaG[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0[gg]), (double)(beta_sigma + 0.5 * (double(m0[gg] * beta_squaredNorm(gg)))));
+            sigmaG2[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0_2[gg]), (double)(beta_sigma + 0.5 * (double(m0_2[gg] * beta_squaredNorm2(gg)))));
             //sigmaG[gg] = beta_squaredNorm(gg) + 0.001;
             //sigmaG2[gg] = beta_squaredNorm2(gg) + 0.001;
             //Rho[gg] = beta1_beta2(gg) / sqrt(sigmaG[gg] * sigmaG2[gg]+ 1);  // + 1 for now
@@ -2380,11 +2544,12 @@ int BayesW::runMpiGibbs_bW()
 
         sumSigmaG = sigmaG.sum();   // Keep in memory for safe limit calculations
         sumSigmaG2 = sigmaG2.sum(); // similarly for epoch 2
-
+ 
         //Print results
+        /*
         if(rank == 0){
             cout << iteration << ". " << m0.sum() << "|" << m0_2.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sumSigmaG << ": " <<  sumSigmaG2 << "; "<< beta1_beta2(0) << endl;
-        }
+        } */
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
@@ -2401,6 +2566,7 @@ int BayesW::runMpiGibbs_bW()
                    beta_squaredNorm.sum(), int(m0.sum()));
             fflush(stdout);
         }
+
 
         //cout<< "inv scaled parameters "<< v0G+m0 << "__"<< (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0) << endl;
         //printf("inv scaled parameters %20.15f __ %20.15f\n", v0G+m0, (Beta.squaredNorm()*m0+v0G*s02G)/(v0G+m0));
@@ -2500,7 +2666,7 @@ int BayesW::runMpiGibbs_bW()
                     }
                 }
             }
-
+            
             // Write iteration number
             if (rank == 0)
             {
