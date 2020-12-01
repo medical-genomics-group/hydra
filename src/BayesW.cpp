@@ -333,13 +333,15 @@ int BayesW::runMpiGibbs_bW()
 
     char buff[LENBUF];
     char buff_gamma[LENBUF_gamma];
+    char buff_gamma_es[LENBUF_gamma_es];
+    char buff_gamma2_es[LENBUF_gamma2_es];
     int nranks, rank, name_len, result;
     double dalloc = 0.0;
 
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-    MPI_File outfh, betfh, bet2fh, epsfh, eps2fh, eps3fh, eps4fh, gamfh, cpnfh, cpn2fh, mrkfh, xivfh;
+    MPI_File outfh, betfh, bet2fh, epsfh, eps2fh, eps3fh, eps4fh, gamfh, cpnfh, cpn2fh, mrkfh, xivfh, gamesfh, gam2esfh,xiesvfh;
     MPI_File xbetfh, xcpnfh, xbet2fh, xcpn2fh;
     MPI_Status status;
     MPI_Info info;
@@ -456,7 +458,10 @@ int BayesW::runMpiGibbs_bW()
     string xcpn2fp = opt.mcmcOut + ".xcpn2";
 
     string gamfp = opt.mcmcOut + ".gam";
+    string gamesfp = opt.mcmcOut + ".games";
+    string gam2esfp = opt.mcmcOut + ".gam2es";
     string xivfp = opt.mcmcOut + ".xiv";
+    string xiesvfp = opt.mcmcOut + ".xiesv";
     string rngfp = opt.mcmcOut + ".rng." + std::to_string(rank);
     string mrkfp = opt.mcmcOut + ".mrk." + std::to_string(rank);
     string epsfp = opt.mcmcOut + ".eps." + std::to_string(rank);
@@ -497,6 +502,8 @@ int BayesW::runMpiGibbs_bW()
         eps4fp = opt.mcmcOut + ".eps4." + std::to_string(rank);
 
         gamfp = opt.mcmcOut + ".gam";
+        gamesfp = opt.mcmcOut + ".games";
+        gam2esfp = opt.mcmcOut + ".gam2es";
         xivfp = opt.mcmcOut + ".xiv";
     }
     else
@@ -535,6 +542,8 @@ int BayesW::runMpiGibbs_bW()
     std::vector<unsigned int> xI(data.X.cols());
     std::iota(xI.begin(), xI.end(), 0);
     xI_restart.resize(data.X.cols());
+    std::vector<unsigned int> xI_ES(data.X_ES.cols());
+    std::iota(xI_ES.begin(), xI_ES.end(), 0);
 
     //    dist.reset_rng((uint)(opt.seed + rank*1000));
 
@@ -582,7 +591,10 @@ int BayesW::runMpiGibbs_bW()
         MPI_File_delete(xcpn2fp.c_str(), MPI_INFO_NULL);
 
         MPI_File_delete(gamfp.c_str(), MPI_INFO_NULL);
+        MPI_File_delete(gamesfp.c_str(), MPI_INFO_NULL);
+        MPI_File_delete(gam2esfp.c_str(), MPI_INFO_NULL);
         MPI_File_delete(xivfp.c_str(), MPI_INFO_NULL);
+        MPI_File_delete(xiesvfp.c_str(), MPI_INFO_NULL);
     }
     MPI_File_delete(epsfp.c_str(), MPI_INFO_NULL);
     MPI_File_delete(eps2fp.c_str(), MPI_INFO_NULL);
@@ -605,7 +617,10 @@ int BayesW::runMpiGibbs_bW()
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xcpn2fp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xcpn2fh), __LINE__, __FILE__);
 
     check_mpi(MPI_File_open(MPI_COMM_WORLD, gamfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &gamfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, gamesfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &gamesfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, gam2esfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &gam2esfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_WORLD, xivfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xivfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_open(MPI_COMM_WORLD, xiesvfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &xiesvfh), __LINE__, __FILE__);
 
     check_mpi(MPI_File_open(MPI_COMM_SELF, epsfp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &epsfh), __LINE__, __FILE__);
     check_mpi(MPI_File_open(MPI_COMM_SELF, eps2fp.c_str(), MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL, MPI_INFO_NULL, &eps2fh), __LINE__, __FILE__);
@@ -834,6 +849,7 @@ int BayesW::runMpiGibbs_bW()
             sum_failure_fix2_epoch_spec[fix_i] = ((data.X2_ES.col(fix_i).cast<double>()).array() * used_data_alpha.failure_vector2.array()).sum();
         }
     }
+
 
     MPI_Barrier(MPI_COMM_WORLD);
 
@@ -1085,8 +1101,8 @@ int BayesW::runMpiGibbs_bW()
         double xinit[4] = {0.95 * mu, mu, 1.005 * mu, 1.01 * mu}; // Initial abscissae
         double *p_xinit = xinit;
 
-        double xl = 2;
-        double xr = 5; //xl and xr and the maximum and minimum values between which we sample
+        double xl = opt.muLower;
+        double xr = opt.muUpper; //xl and xr and the maximum and minimum values between which we sample
 
         //Update before sampling
         for (int mu_ind = 0; mu_ind < Ntot1; mu_ind++)
@@ -1204,24 +1220,23 @@ int BayesW::runMpiGibbs_bW()
         if (opt.covariatesEpochSpec)
         {
             //Epoch 1 fixed effects
-
             double gamma_old = 0;
             //std::shuffle(xI.begin(), xI.end(), dist.rng);
-            boost::uniform_int<> unii(0, numFixedEffects - 1);
+            boost::uniform_int<> unii(0, numFixedEffectsEpochSpec - 1);
             boost::variate_generator<boost::mt19937 &, boost::uniform_int<>> generator(dist.rng, unii);
             if (opt.shuffleMarkers)
             {
-                boost::range::random_shuffle(xI, generator);
+                boost::range::random_shuffle(xI_ES, generator);
             }
 
             //Use only rank 0 shuffling
-            check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Bcast(xI_ES.data(), xI_ES.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
             MPI_Barrier(MPI_COMM_WORLD);
 
             for (int fix_i = 0; fix_i < numFixedEffectsEpochSpec; fix_i++)
             {
-                gamma_old = gamma_ES(xI[fix_i]);
+                gamma_old = gamma_ES(xI_ES[fix_i]);
 
                 neval = 0;
                 xsamp[0] = 0;
@@ -1237,9 +1252,9 @@ int BayesW::runMpiGibbs_bW()
                 xl = gamma_old - 0.075;
                 xr = gamma_old + 0.075; // Initial left and right (pseudo) extremes
 
-                used_data.X_j = data.X_ES.col(xI[fix_i]).cast<double>(); //Take from the fixed effects matrix
-                used_data.X_j2 = data.X2_ES.col(xI[fix_i]).cast<double>();
-                used_data.sum_failure = sum_failure_fix_epoch_spec[xI[fix_i]];
+                used_data.X_j = data.X_ES.col(xI_ES[fix_i]).cast<double>(); //Take from the fixed effects matrix
+                used_data.X_j2 = data.X2_ES.col(xI_ES[fix_i]).cast<double>();
+                used_data.sum_failure = sum_failure_fix_epoch_spec[xI_ES[fix_i]];
 
                 for (int k = 0; k < Ntot1; k++)
                 {
@@ -1249,7 +1264,6 @@ int BayesW::runMpiGibbs_bW()
                 {
                     (used_data.epsilon3)[k] = epsilon3[k] + used_data.X_j2[k] * gamma_old;
                 }
-                
                 //TODO - Fix covariates by concatenating epsilons here
                 // Sample using ARS
 
@@ -1260,34 +1274,33 @@ int BayesW::runMpiGibbs_bW()
                 //Use only rank 0
                 check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-                gamma_ES(xI[fix_i]) = xsamp[0]; // Save the new result
-                //cout << "sampled ES gamma, epoch 1: "<< gamma_ES(xI[fix_i])<< endl; 
+                gamma_ES(xI_ES[fix_i]) = xsamp[0]; // Save the new result
+                //cout << "sampled ES gamma, epoch 1: "<< gamma_ES(xI_ES[fix_i])<< endl; 
                 for (int k = 0; k < Ntot1; k++)
                 {
-                    epsilon[k] = (used_data.epsilon)[k] - used_data.X_j[k] * gamma_ES(xI[fix_i]); // we adjust the residual with the respect to the previous gamma value
+                    epsilon[k] = (used_data.epsilon)[k] - used_data.X_j[k] * gamma_ES(xI_ES[fix_i]); // we adjust the residual with the respect to the previous gamma value
                 }
                 for (int k = 0; k < Ntot2; k++)
                 {
-                    epsilon3[k] = (used_data.epsilon3)[k] - used_data.X_j2[k] * gamma_ES(xI[fix_i]);
+                    epsilon3[k] = (used_data.epsilon3)[k] - used_data.X_j2[k] * gamma_ES(xI_ES[fix_i]);
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
             }
 
             //Epoch 2 fixed effects
 
-            if (opt.shuffleMarkers)
+            /*if (opt.shuffleMarkers)
             {
-                boost::range::random_shuffle(xI, generator);
-            }
-
+                boost::range::random_shuffle(xI_ES, generator);
+            }*/
             //Use only rank 0 shuffling
-            check_mpi(MPI_Bcast(xI.data(), xI.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+            //check_mpi(MPI_Bcast(xI_ES.data(), xI_ES.size(), MPI_INT, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-            MPI_Barrier(MPI_COMM_WORLD);
+            //MPI_Barrier(MPI_COMM_WORLD);
 
             for (int fix_i = 0; fix_i < numFixedEffectsEpochSpec; fix_i++)
             {
-                gamma_old = gamma2_ES(xI[fix_i]);
+                gamma_old = gamma2_ES(xI_ES[fix_i]);
 
                 neval = 0;
                 xsamp[0] = 0;
@@ -1303,8 +1316,8 @@ int BayesW::runMpiGibbs_bW()
                 xl = gamma_old - 0.075;
                 xr = gamma_old + 0.075; // Initial left and right (pseudo) extremes
 
-                used_data.X_j2 = data.X2_ES.col(xI[fix_i]).cast<double>();
-                used_data.sum_failure2 = sum_failure_fix2_epoch_spec[xI[fix_i]];
+                used_data.X_j2 = data.X2_ES.col(xI_ES[fix_i]).cast<double>();
+                used_data.sum_failure2 = sum_failure_fix2_epoch_spec[xI_ES[fix_i]];
 
                 for (int k = 0; k < Ntot2; k++)
                 {
@@ -1322,13 +1335,13 @@ int BayesW::runMpiGibbs_bW()
                 //Use only rank 0
                 check_mpi(MPI_Bcast(&xsamp[0], 1, MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-                gamma2_ES(xI[fix_i]) = xsamp[0]; // Save the new 
-                //cout << "sampled ES gamma, epoch 2: "<< gamma2_ES(xI[fix_i])<< endl; 
+                gamma2_ES(xI_ES[fix_i]) = xsamp[0]; // Save the new 
+                //cout << "sampled ES gamma, epoch 2: "<< gamma2_ES(xI_ES[fix_i])<< endl; 
 
                 for (int k = 0; k < Ntot2; k++)
                 {
-                    epsilon2[k] = (used_data.epsilon2)[k] - used_data.X_j2[k] * gamma2_ES(xI[fix_i]); // we adjust the residual with the respect to the previous gamma value
-                    epsilon4[k] = (used_data.epsilon4)[k] - used_data.X_j2[k] * gamma2_ES(xI[fix_i]);
+                    epsilon2[k] = (used_data.epsilon2)[k] - used_data.X_j2[k] * gamma2_ES(xI_ES[fix_i]); // we adjust the residual with the respect to the previous gamma value
+                    epsilon4[k] = (used_data.epsilon4)[k] - used_data.X_j2[k] * gamma2_ES(xI_ES[fix_i]);
                 }
                 MPI_Barrier(MPI_COMM_WORLD);
             }
@@ -1347,8 +1360,8 @@ int BayesW::runMpiGibbs_bW()
         xinit[3] = (used_data.alpha) * 1.10;
 
         // Initial left and right (pseudo) extremes
-        xl = 0.0;
-        xr = 40.0;
+        xl = opt.alphaLower;
+        xr = opt.alphaUpper;
 
         //Give the residual to alpha structure
         //used_data_alpha.epsilon = epsilon;
@@ -2665,6 +2678,45 @@ int BayesW::runMpiGibbs_bW()
                         check_mpi(MPI_File_write_at(xivfh, offset, xI.data(), numFixedEffects, MPI_INT, &status), __LINE__, __FILE__);
                     }
                 }
+
+                //Save epoch-specific covariates
+                if (opt.covariatesEpochSpec)
+                {
+                    cx = snprintf(buff_gamma_es, LENBUF_gamma_es, "%5d", iteration);
+                    for (int ii = 0; ii < numFixedEffectsEpochSpec; ++ii)
+                    {
+                        cx = snprintf(&buff_gamma_es[strlen(buff_gamma_es)], LENBUF_gamma_es - strlen(buff_gamma_es), ", %20.17f", gamma_ES(ii));
+                        assert(cx > 0);
+                    }
+                    cx = snprintf(&buff_gamma_es[strlen(buff_gamma_es)], LENBUF_gamma_es - strlen(buff_gamma_es), "\n");
+                    assert(cx > 0);
+                    offset = size_t(n_thinned_saved) * strlen(buff_gamma_es);
+
+                    check_mpi(MPI_File_write_at(gamesfh, offset, &buff_gamma_es, strlen(buff_gamma_es), MPI_CHAR, &status), __LINE__, __FILE__);
+                    //Save the order of the covariates
+                    if (iteration > 0 && iteration % opt.save == 0)
+                    {
+                        offset = 0;
+                        check_mpi(MPI_File_write_at(xiesvfh, offset, &iteration, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+                        offset = sizeof(uint);
+                        check_mpi(MPI_File_write_at(xiesvfh, offset, &numFixedEffectsEpochSpec, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+
+                        offset = sizeof(uint) + sizeof(uint);
+                        check_mpi(MPI_File_write_at(xiesvfh, offset, xI_ES.data(), numFixedEffectsEpochSpec, MPI_INT, &status), __LINE__, __FILE__);
+                    }
+
+                    cx = snprintf(buff_gamma2_es, LENBUF_gamma2_es, "%5d", iteration);
+                    for (int ii = 0; ii < numFixedEffectsEpochSpec; ++ii)
+                    {
+                        cx = snprintf(&buff_gamma2_es[strlen(buff_gamma2_es)], LENBUF_gamma2_es - strlen(buff_gamma2_es), ", %20.17f", gamma2_ES(ii));
+                        assert(cx > 0);
+                    }
+                    cx = snprintf(&buff_gamma2_es[strlen(buff_gamma2_es)], LENBUF_gamma2_es - strlen(buff_gamma2_es), "\n");
+                    assert(cx > 0);
+                    offset = size_t(n_thinned_saved) * strlen(buff_gamma2_es);
+
+                    check_mpi(MPI_File_write_at(gam2esfh, offset, &buff_gamma2_es, strlen(buff_gamma2_es), MPI_CHAR, &status), __LINE__, __FILE__);
+                }
             }
             
             // Write iteration number
@@ -2825,7 +2877,10 @@ int BayesW::runMpiGibbs_bW()
     // check_mpi(MPI_File_close(&acufh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&mrkfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&xivfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&xiesvfh), __LINE__, __FILE__);
     check_mpi(MPI_File_close(&gamfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&gamesfh), __LINE__, __FILE__);
+    check_mpi(MPI_File_close(&gam2esfh), __LINE__, __FILE__);
 
     // Release memory
     _mm_free(y);

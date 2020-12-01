@@ -31,6 +31,9 @@ public:
     unsigned int 	K            = opt.S.size() + 1;  // Number of mixtures + 0 class
     unsigned int    km1          = opt.S.size();      // Number of mixtures 
     const size_t    LENBUF_gamma = 3500;              // Not more than 160 "fixed effects can be used at the moment 
+    const size_t    LENBUF_gamma_es = 3500;              // Not more than 160 " epoch - specific fixed effects can be used at the moment 
+    const size_t    LENBUF_gamma2_es = 3500;              // Not more than 160 "epoch - specific fixed effects can be used at the moment 
+
 
     double tau = log(61.0); // Later we need to read from the data what is the breaking point
 

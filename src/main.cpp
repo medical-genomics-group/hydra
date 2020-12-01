@@ -80,8 +80,8 @@ int main(int argc, const char * argv[]) {
                     }
                     else if (opt.covariates) {
                         if (opt.bayesType == "bayesWMPI") {
-                            data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X, &data.numFixedEffects ,rank);
-                            data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2, &data.numFixedEffects ,rank);
+                            data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X, &data.numFixedEffects, &data.numNAs ,rank);
+                            data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2, &data.numFixedEffects, &data.numNAs2 ,rank);
                             //cout << data.X2.rows() << "x" << data.X2.cols()<< endl;
                             //data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
                         } else {
@@ -90,8 +90,8 @@ int main(int argc, const char * argv[]) {
                     } 
                     else  if (opt.covariatesEpochSpec) {
                         if (opt.bayesType == "bayesWMPI") {
-                            data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFileEpochSpec, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X_ES, &data.numFixedEffectsEpochSpec ,rank);
-                            data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2EpochSpec, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2_ES, &data.numFixedEffectsEpochSpec ,rank);
+                            data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFileEpochSpec, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X_ES, &data.numFixedEffectsEpochSpec, &data.numNAs ,rank);
+                            data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2EpochSpec, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2_ES, &data.numFixedEffectsEpochSpec, &data.numNAs2 ,rank);
                         }                         
                     } else {
                         if (opt.bayesType == "bayesWMPI") {
@@ -119,23 +119,23 @@ int main(int argc, const char * argv[]) {
                     if (opt.covariates || opt.covariatesEpochSpec){
                         if (opt.covariates) {
                             if (opt.bayesType == "bayesWMPI") {
-                                data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X, &data.numFixedEffects ,rank);
-                                data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2, &data.numFixedEffects ,rank);
+                                data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X, &data.numFixedEffects, &data.numNAs ,rank);
+                                data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2, &data.numFixedEffects, &data.numNAs2 ,rank);
                                 //data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
                             } else {
-                                data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X, &data.numFixedEffects,rank);
-                                data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2, &data.numFixedEffects ,rank);
+                                data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X, &data.numFixedEffects, &data.numNAs,rank);
+                                data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2, &data.numFixedEffects, &data.numNAs2 ,rank);
                                 //data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
                             }
                         }
                         if (opt.covariatesEpochSpec) {
                             if (opt.bayesType == "bayesWMPI") {
-                                data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFileEpochSpec, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X_ES, &data.numFixedEffectsEpochSpec ,rank);
-                                data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2EpochSpec, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2_ES, &data.numFixedEffectsEpochSpec ,rank);
+                                data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFileEpochSpec, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X_ES, &data.numFixedEffectsEpochSpec, &data.numNAs ,rank);
+                                data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2EpochSpec, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2_ES, &data.numFixedEffectsEpochSpec, &data.numNAs2 ,rank);
                                 //data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.failureFile, opt.numberIndividuals, data.y, data.fail, rank);
                             } else {
-                                data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFileEpochSpec, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X_ES, &data.numFixedEffectsEpochSpec ,rank);
-                                data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2EpochSpec, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2_ES, &data.numFixedEffectsEpochSpec ,rank);
+                                data.readPhenFailCovFiles(opt.phenotypeFiles[0], opt.covariatesFileEpochSpec, opt.failureFile, opt.numberIndividuals, data.y, data.fail, data.X_ES, &data.numFixedEffectsEpochSpec, &data.numNAs ,rank);
+                                data.readPhenFailCovFiles(opt.phenotypeFile2, opt.covariatesFile2EpochSpec, opt.failureFile2, opt.numberIndividuals2, data.y2, data.fail2, data.X2_ES, &data.numFixedEffectsEpochSpec, &data.numNAs2 ,rank);
                                 //data.readPhenCovFiles(opt.phenotypeFiles[0], opt.covariatesFile, opt.numberIndividuals, data.y, rank);
                             }
                         }                        

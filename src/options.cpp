@@ -231,6 +231,22 @@ void Options::inputOptions(const int argc, const char* argv[]){
             numberIndividuals2 = atoi(argv[++i]);
             ss << "--number-individuals2 " << argv[i] << "\n";
         }
+        else if (!strcmp(argv[i], "--alphaLower")) {    //EO
+            alphaLower = atof(argv[++i]);
+            ss << "--alphaLower " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--alphaUpper")) {    //EO
+            alphaUpper = atof(argv[++i]);
+            ss << "--alphaUpper " << argv[i] << "\n";
+        }
+         else if (!strcmp(argv[i], "--muLower")) {    //EO
+            muLower = atof(argv[++i]);
+            ss << "--muLower " << argv[i] << "\n";
+        }
+        else if (!strcmp(argv[i], "--muUpper")) {    //EO
+            muUpper = atof(argv[++i]);
+            ss << "--muUpper " << argv[i] << "\n";
+        }
         else if (!strcmp(argv[i], "--markerWindowLen")) {    //EO
             markerWindowLen = atoi(argv[++i]);
             ss << "--markerWindowLen " << argv[i] << "\n";

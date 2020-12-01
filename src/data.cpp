@@ -1910,7 +1910,7 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
 }
 */
 
-void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, MatrixXd& dX, unsigned int* numbFixedEffects ,const int rank) {
+void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, MatrixXd& dX, unsigned int* numbFixedEffects , unsigned int* numNA ,const int rank) {
 
     uint numInds_local = numberIndividuals;
     dest.setZero(numInds_local);
@@ -1974,7 +1974,7 @@ void Data::readPhenFailCovFiles(const string &phenFile, const string covFile, co
 
     dX = Map<const Matrix<double, Dynamic, Dynamic, RowMajor>>(values.data(), (line - nas), *numbFixedEffects);
 
-    numNAs = nas;
+    *numNA = nas;
 
     dest.conservativeResize(numInds_local-nas);
     dfail.conservativeResize(numInds_local-nas);

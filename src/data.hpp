@@ -351,7 +351,7 @@ public:
     //
     //void readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
 
-    void readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, MatrixXd& dX, unsigned int * numbFixedEffects, const int rank);
+    void readPhenFailCovFiles(const string &phenFile, const string covFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, MatrixXd& dX, unsigned int * numbFixedEffects, unsigned int * numNA, const int rank);
 
     void readPhenFailFiles(const string &phenFile, const string &failFile, const int numberIndividuals, VectorXd& dest, VectorXd& dfail, const int rank);
 

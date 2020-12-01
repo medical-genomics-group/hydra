@@ -79,6 +79,11 @@ public:
     unsigned numberIndividuals2   = 0;
     double epochPoint;
     unsigned markerWindowLen      = 50;
+    
+    double alphaLower   = 0;
+    double alphaUpper   = 40;
+    double muLower      = 2;
+    double muUpper      = 5;          
 
     string mcmcOutDir  = "";
     string mcmcOutNam  = "default_output_name";
