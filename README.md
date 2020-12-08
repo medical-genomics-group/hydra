@@ -47,4 +47,4 @@ cd hydra/src
 make
 ```
 
-You should obtain the executable hydra in src folder.
+You should obtain the executable `hydra` in src folder.
