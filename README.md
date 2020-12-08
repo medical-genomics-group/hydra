@@ -1,6 +1,6 @@
 # hydra
 
-Software for performing Bayesian penalized regression for complex trait analysis using hybrid-parallel algorithms.
+Software for performing Bayesian penalized regression for complex trait analysis using hybrid-parallel algorithms. 
 
 
 ### Clone the project
@@ -8,7 +8,7 @@ Software for performing Bayesian penalized regression for complex trait analysis
 git clone 
 ```
 
-For the moment the software is compatible with gcc and intel compilers, we are working to make it compatible with clang.
+For the moment the software is is only available in architectures AVX2 and AVX512 and is compatible with gcc and intel compilers, we are working to make it compatible with clang.
 
 In the README you will find installation instructions, go to the wiki (https://github.com/medical-genomics-group/hydra/wiki) for more information on the algorithms, analysis types available and options. 
 
@@ -50,11 +50,11 @@ mv hydra-master hydra
 
 ### 3. Compile
 
-You can compile by using CMake, create a directory (i.e build in the same directory as hydra):
+You can compile by simply using make :
 
 ```
-cd build
-cmake  -DCMAKE_BUILD_TYPE=Release ../hydra
+cd hydra/src
 make
 ```
+
 You should obtain the executable hydra in src folder.
