@@ -2,9 +2,8 @@
 
 Software for performing Bayesian penalized regression for complex trait analysis using hybrid-parallel algorithms. 
 
-For the moment the software is is only available in architectures AVX2 and AVX512 and is compatible with gcc and intel compilers, we are working to make it compatible with clang.
+For the moment the software is is only available in architectures AVX2 and AVX512 and is compatible with gcc and intel compilers, we are working to make it compatible with clang. In the README you will find installation instructions, go to the wiki (https://github.com/medical-genomics-group/hydra/wiki) for more information on the algorithms, analysis types available and options. 
 
-In the README you will find installation instructions, go to the wiki (https://github.com/medical-genomics-group/hydra/wiki) for more information on the algorithms, analysis types available and options. 
 
 ## Quick start
 
