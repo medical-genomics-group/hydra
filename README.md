@@ -13,9 +13,7 @@ Follow instructions to deploy software.
 The software has some pre-requisites to be installed.   
 
 eigen (http://eigen.tuxfamily.org/index.php?title=Main_Page)   
-boost (https://www.boost.org/)   
-cmake (https://cmake.org/)   
-
+boost (https://www.boost.org/)
 
 these can be easily installed in Linux:
 
