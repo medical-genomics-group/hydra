@@ -19,7 +19,6 @@ these can be easily installed in Linux:
 
 ```
 sudo apt-get install libeigen3-dev libboost-all-dev 
-
 ```
 
 ### 2. Clone or download
