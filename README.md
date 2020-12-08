@@ -18,7 +18,7 @@ boost (https://www.boost.org/)
 these can be easily installed in Linux:
 
 ```
-sudo apt-get install libeigen3-dev libboost-all-dev cmake 
+sudo apt-get install libeigen3-dev libboost-all-dev 
 
 ```
 
