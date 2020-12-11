@@ -1,0 +1,25 @@
+PLINK v2.00a3LM AVX2 Intel (23 Sep 2020)
+Options in effect:
+  --bfile t_M50K_N_5K
+  --extract snps_to_keep.txt
+  --make-bed
+  --out t_M10K_N_5K
+
+Hostname: h143
+Working directory: /work/ext-unil-ctgg/marion/hydra/example
+Start time: Thu Dec 10 17:08:11 2020
+
+Random number seed: 1607616491
+193101 MiB RAM detected; reserving 96550 MiB for main workspace.
+Using up to 36 threads (change this with --threads).
+5000 samples (0 females, 0 males, 5000 ambiguous; 5000 founders) loaded from
+t_M50K_N_5K.fam.
+50348 variants loaded from t_M50K_N_5K.bim.
+Note: No phenotype data present.
+--extract: 10000 variants remaining.
+10000 variants remaining after main filters.
+Writing t_M10K_N_5K.fam ... done.
+Writing t_M10K_N_5K.bim ... done.
+Writing t_M10K_N_5K.bed ... done.
+
+End time: Thu Dec 10 17:08:11 2020

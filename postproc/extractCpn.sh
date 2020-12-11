@@ -107,11 +107,14 @@ echo "remove _tmp files"
 rm $parsingFolder/$folder_name/${file_name}*tmp.cpnLong
 rm $parsingFolder/$folder_name/${file_name}_cpn.it
 
-echo "concat _rs files"
+if [ $rs_done -gt 1 ]
+	then
+	echo "concat _rs files"
+	cat $parsingFolder/$folder_name/${file_name}*.cpnLong > $parsingFolder/$folder_name/${file_name}.all.cpnLong
+	mv $parsingFolder/$folder_name/${file_name}.all.cpnLong $parsingFolder/$folder_name/${file_name}.cpnLong
+	rm $parsingFolder/$folder_name/${file_name}_*.cpnLong
+fi
 
-cat $parsingFolder/$folder_name/${file_name}*.cpnLong > $parsingFolder/$folder_name/${file_name}.all.cpnLong
-mv $parsingFolder/$folder_name/${file_name}.all.cpnLong $parsingFolder/$folder_name/${file_name}.cpnLong
-rm $parsingFolder/$folder_name/${file_name}_*.cpnLong
 #### END
 
 end_time=$(date -u +%s)
