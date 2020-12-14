@@ -107,11 +107,13 @@ echo "remove _tmp files"
 rm $parsingFolder/$folder_name/${file_name}*tmp.betLong
 rm $parsingFolder/$folder_name/${file_name}_bet.it
 
-echo "concat _rs files"
-
-cat $parsingFolder/$folder_name/${file_name}*.betLong > $parsingFolder/$folder_name/${file_name}.all.betLong
-mv $parsingFolder/$folder_name/${file_name}.all.betLong $parsingFolder/$folder_name/${file_name}.betLong
-rm $parsingFolder/$folder_name/${file_name}_*.betLong
+if [ $rs_done -gt 1 ]
+	then
+	echo "concat _rs files"
+	cat $parsingFolder/$folder_name/${file_name}*.betLong > $parsingFolder/$folder_name/${file_name}.all.betLong
+	mv $parsingFolder/$folder_name/${file_name}.all.betLong $parsingFolder/$folder_name/${file_name}.betLong
+	rm $parsingFolder/$folder_name/${file_name}_*.betLong
+fi
 
 
 #### END
