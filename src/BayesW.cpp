@@ -1030,10 +1030,8 @@ int BayesW::runMpiGibbs_bW() {
     }else{
         // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
         srand(opt.seed);
-        cout << "Read pars" << endl;
         init(Ntot - data.numNAs, Mtot,numFixedEffects);
     }
-    cout << "Done reading" << endl;
     cass.resize(numGroups,K); //rows are groups columns are mixtures
     MatrixXi sum_cass(numGroups,K);  // To store the sum of cass elements over all ranks
 
