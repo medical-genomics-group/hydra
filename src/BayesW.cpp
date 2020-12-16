@@ -755,10 +755,13 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	 const int Kt   = cva.size() + 1;			//Temporary K
 	 const int Ktm1 = Kt - 1; 
 
-    	 data.mS.resize(Mtot, Ktm1);
+    	 data.mS.resize(Mtot, Kt);
+
+    VectorXd cva_new(Kt);
+    cva_new << 0 , cva ; // Add the 0th mixture 
 
 	 for (int i=0; i<Mtot; i++)
-	   data.mS.row(i) = cva;
+	   data.mS.row(i) = cva_new;
 	
 	 if (opt.groupIndexFile != "" && opt.groupMixtureFile != "") {
 	   data.readGroupFile(opt.groupIndexFile);
@@ -768,8 +771,8 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	 printf("numGroups = %d, data.groups.size() = %lu, Mtot = %d\n", data.numGroups, data.groups.size(), Mtot);
 
          numGroups = data.numGroups;
-    	 K  = int(data.mS.cols()) + 1;  //Mixtures + 0th component. 
-  	 km1 = K - 1;		    //Just mixtures
+    	 K  = int(data.mS.cols());  //Mixtures + 0th component. 
+  	     km1 = K - 1;		    //Just mixtures
          sigmaG.resize(numGroups);
          sigmaG.setZero();
 
@@ -779,7 +782,7 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 
 	 //Populate cVa. We store only km1 values for mixtures
     	 for (int i=0; i < numGroups; i++) {
-        	cVa.row(i) = data.mS.row(i).segment(0,km1);
+        	cVa.row(i) = data.mS.row(i).segment(1,km1);
     	 }
 	
         // Component variables
@@ -796,7 +799,7 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	pi_L.col(1).array() = 1 - pi_L.col(0).array() - (km1 - 1)/Mtot;
 
 	marginal_likelihoods.setOnes();   //Initialize with just ones
-        marginal_likelihood_0.setOnes();
+    marginal_likelihood_0.setOnes();
 
 	Beta.setZero();
 	gamma.setZero();
@@ -1027,11 +1030,13 @@ int BayesW::runMpiGibbs_bW() {
     }else{
         // Set new random seed for the ARS in case of restart. In long run we should use dist object for simulating from uniform distribution
         srand(opt.seed);
-
         init(Ntot - data.numNAs, Mtot,numFixedEffects);
     }
     cass.resize(numGroups,K); //rows are groups columns are mixtures
     MatrixXi sum_cass(numGroups,K);  // To store the sum of cass elements over all ranks
+
+    // Define sumSigmaG for creating "safe limit"
+    double sumSigmaG = sigmaG.sum();
 
    // Build global repartition of markers over the groups
     VectorXi MtotGrp(numGroups);
@@ -1547,15 +1552,15 @@ int BayesW::runMpiGibbs_bW() {
                             used_data_beta.sd = mstd[marker];
                             used_data_beta.mean_sd_ratio = mave[marker]/mstd[marker];
                             //used_data_beta.used_mixture = k-1;
-			    used_data_beta.mixture_value = cVa(cur_group, k-1); //k-1 because cVa stores only non-zero in bW
+			                used_data_beta.mixture_value = cVa(cur_group, k-1); //k-1 because cVa stores only non-zero in bW
 
                             used_data_beta.vi_0 = vi_0;
                             used_data_beta.vi_1 = vi_1;
                             used_data_beta.vi_2 = vi_2;
 
                            // double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_classes(k-1));
-                            double safe_limit = 2 * sqrt(used_data_beta.sigmaG * used_data_beta.mixture_value); // Need to think is this safe enough if we have groups
-		 	    // ARS parameters
+                            double safe_limit = 2 * sqrt(sumSigmaG * used_data_beta.mixture_value); 
+		 	                // ARS parameters
                             neval = 0;
                             xsamp[0] = 0;
                             convex = 1.0;
@@ -1885,8 +1890,8 @@ int BayesW::runMpiGibbs_bW() {
  
         // 4. Sample sigmaG
 	for(int gg=0; gg < numGroups ; gg++){
-		sigmaG[gg]  = dist.inv_gamma_rng((double) (used_data.alpha_sigma + 0.5 * m0[gg]),(double)(used_data.beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
-        }
+		sigmaG[gg]  = dist.inv_gamma_rng((double) (used_data.alpha_sigma + 0.5 * m0[gg]),(double)(used_data.beta_sigma + 0.5 * double(m0[gg]) * beta_squaredNorm(gg) ) );
+    }
 	 check_mpi(MPI_Bcast(sigmaG.data(), sigmaG.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
       	
         // 5. Sample prior mixture component probability from Dirichlet distribution
@@ -1898,6 +1903,8 @@ int BayesW::runMpiGibbs_bW() {
 	}
 
         check_mpi(MPI_Bcast(pi_L.data(), pi_L.size(), MPI_DOUBLE, 0, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+	sumSigmaG = sigmaG.sum();  // Keep in memory for safe limit calculations
 
         //Print results
         if(rank == 0){
