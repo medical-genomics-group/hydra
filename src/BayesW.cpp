@@ -120,13 +120,15 @@ void BayesW::init(unsigned int individualCount, unsigned int individualCount2, u
     //Init the group variables
     data.groups.resize(Mtot);
     data.groups.setZero();
-    const int Kt = cva.size() + 1; //Temporary K
+    const int Kt = cva.size() + 1; //Mixtures + 1
     const int Ktm1 = Kt - 1;
 
-    data.mS.resize(Mtot, Ktm1);
+    data.mS.resize(Mtot, Kt);
+    VectorXd cva_new(Kt);
+    cva_new << 0, cva;
 
     for (int i = 0; i < Mtot; i++)
-        data.mS.row(i) = cva;
+        data.mS.row(i) = cva_new;
 
     if (opt.groupIndexFile != "" && opt.groupMixtureFile != "")
     {
