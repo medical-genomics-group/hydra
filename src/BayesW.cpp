@@ -377,6 +377,7 @@ int BayesW::runMpiGibbs_bW()
 
     //Reset the dist
     //@@@EO WHY THIS ONE ??? dist.reset_rng((uint)(opt.seed + rank*1000));
+    dist.reset_rng((uint)(opt.seed + rank*1000));
 
     if (rank == 0)
         printf("INFO   : Full dataset includes Mtot=%d markers and Ntot1=%d epoch 1 individuals, Ntot2=%d epoch 2 individuals.\n", Mtot, Ntot1, Ntot2);
