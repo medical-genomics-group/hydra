@@ -1608,7 +1608,7 @@ void Data::center_and_scale(double* __restrict__ vec, int* __restrict__ mask, co
         mean += vec[i] * mask[i];
 
     mean /= nonas;
-    //cout << "mean = " << mean << endl;
+    //printf("mean = %20.15f\n", mean);
 
     // Center
     for (int i=0; i<N; ++i)
