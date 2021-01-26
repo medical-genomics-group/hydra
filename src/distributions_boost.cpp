@@ -131,7 +131,7 @@ double Distributions_boost::component_probs(double b2,Eigen::VectorXd pi){
         return 1;
 }
 
-double Distributions_boost::beta_rng(double a,double b){
+double Distributions_boost::beta_rng(const double a, const double b) {
     boost::random::beta_distribution<double> mybeta(a, b);
     boost::random::variate_generator<boost::mt19937&, boost::random::beta_distribution<> > rand_beta(rng, mybeta);
     return rand_beta();
