@@ -202,7 +202,7 @@ void delta_epsilon_exchange(const bool opt_bedSync,
         else if (opt_sparseSync) {
 
             uint task_m2s = (uint) mark2sync.size();
-            //printf("task %3d has %3d markers to share at %d\n", rank, task_m2s, sinceLastSync);
+            //printf("task %3d has %3d markers to share.\n", rank, task_m2s);
             //fflush(stdout);
 
             // Build task markers to sync statistics: mu | dbs | mu | dbs | ...
@@ -221,7 +221,7 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                 }
                 task_stat[2 * i + 0] = mave[ mark2sync[i] ];
                 task_stat[2 * i + 1] = mstd[ mark2sync[i] ] * dbet2sync[i];
-                //printf("Task %3d, m2s %d/%d: 1: %8lu, 2: %8lu, m: %8lu, info: 3); stats are (%15.10f, %15.10f)\n", rank, i, task_m2s, N1L[ mark2sync[i] ], N2L[ mark2sync[i] ], NML[ mark2sync[i] ], task_stat[2 * i + 0], task_stat[2 * i + 1]);
+                //printf("Task %3d, m2s %d/%d: 1: %8lu, 2: %8lu, m: %8lu, info: 3); stats are (%15.10f, %15.10f)\n", rank, i, task_m2s, sparse_info->N1L[ mark2sync[i] ], sparse_info->N2L[ mark2sync[i] ], sparse_info->NML[ mark2sync[i] ], task_stat[2 * i + 0], task_stat[2 * i + 1]);
             }
             //printf("Task %3d final task_size = %8d elements to send from task_m2s = %d markers to sync.\n", rank, task_size, task_m2s);
             //fflush(stdout);
@@ -351,14 +351,14 @@ void delta_epsilon_exchange(const bool opt_bedSync,
 #endif                                
                     for (int ii=0; ii<fullb; ++ii) {
                                 
-                        __m256d p4c1  = _mm256_loadu_pd(&(dotp_lut_a[rawdata[ii] * 4]));
-                        __m256d p4c2  = _mm256_loadu_pd(&(dotp_lut_b[rawdata[ii] * 4]));
+                        __m256d p4c1  = _mm256_load_pd(&(dotp_lut_a[rawdata[ii] * 4]));
+                        __m256d p4c2  = _mm256_load_pd(&(dotp_lut_b[rawdata[ii] * 4]));
                                     
                         p4c1 = _mm256_sub_pd(p4c1, vmu_);
                         p4c2 = _mm256_mul_pd(p4c2, vsi_);
                         p4c2 = _mm256_mul_pd(p4c2, p4c1);
 
-                        __m256d p4dls = _mm256_loadu_pd(&(deltaSum[ii * 4])); 
+                        __m256d p4dls = _mm256_load_pd(&(deltaSum[ii * 4])); 
                                     
                         p4dls = _mm256_add_pd(p4dls, p4c2);
 
