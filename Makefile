@@ -24,7 +24,9 @@ EXEC     ?= hydra_g
 CXX       = mpic++
 BUILDDIR  = build_gcc
 CXXFLAGS += -fopenmp
-CXXFLAGS += -march=native
+CXXFLAGS += -march=skylake-avx512
+#CXXFLAGS += -march=native
+#CXXFLAGS += -mavx2
 
 else ifeq ($(CXX),icpc)
 
@@ -40,31 +42,31 @@ else
 
 endif
 
-
 ifeq (, $(shell which $(CXX)))
 $(error "no $(CXX) in $(PATH), please load relevant modules.")
 endif
 
-
-OBJ      := $(patsubst $(SOURCEDIR)/%.cpp,$(BUILDDIR)/%.o,$(SOURCES))
+OBJS	:= $(patsubst $(SOURCEDIR)/%.cpp, $(BUILDDIR)/%.o, $(SOURCES))
+DEPS	:= $(patsubst $(SOURCEDIR)/%.cpp, $(BUILDDIR)/%.d, $(SOURCES))
 
 LIBS      = -lz
 
+all: create_path $(BINDIR)/$(EXEC)
 
-all: dir $(BINDIR)/$(EXEC)
-
-$(BINDIR)/$(EXEC): $(OBJ)
+$(BINDIR)/$(EXEC): $(OBJS)
 	$(CXX) $(CXXFLAGS) $(LIBS) $^ -o $@
 
-$(OBJ): $(BUILDDIR)/%.o : $(SOURCEDIR)/%.cpp
-	$(CXX) $(CXXFLAGS) $(INCLUDE) -c $< -o $@
+$(BUILDDIR)/%.o: $(SOURCEDIR)/%.cpp Makefile
+	$(CXX) $(CXXFLAGS) $(INCLUDE) -MMD -MP -c $< -o $@
 
-dir:
+-include $(DEPS)
+
+create_path:
 	mkdir -p $(BUILDDIR)
 	mkdir -p $(BINDIR)
 
 clean:
-	rm -vf $(BUILDDIR)/*.o $(BINDIR)/$(EXEC)
+	rm -vf $(BUILDDIR)/*.o $(BUILDDIR)/*.d $(BINDIR)/$(EXEC)
 
 help:
 	@echo "Usage: make [ all | clean | help ]"
