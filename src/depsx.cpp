@@ -7,12 +7,11 @@
 #include "dotp_lut.h"
 
 // Update local copy of epsilon
-//MPI_Barrier(MPI_COMM_WORLD);
 
 void delta_epsilon_exchange(const bool opt_bedSync,
                             const bool opt_sparseSync,
-                            std::vector<int> mark2sync,
-                            std::vector<double> dbet2sync,
+                            std::vector<int>& mark2sync,
+                            std::vector<double>& dbet2sync,
                             const double* mave,
                             const double* mstd,
                             const size_t snpLenByt,
@@ -20,26 +19,22 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                             const bool* USEBED,
                             const sparse_info_t* sparse_info,
                             const uint Ntot,
-                            const Data data,
-                            const double* dEpsSum,
-                            const double* tmpEps,
-                            double* epsilon) {
-    
+                            const Data* data,
+                            const double* __restrict__ dEpsSum,
+                            const double* __restrict__ tmpEps,
+                            double* __restrict__ deltaSum,
+                            double* __restrict__ epsilon) {
+
     int rank, nranks;
     
     MPI_Comm_size(MPI_COMM_WORLD, &nranks);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
-
-    int *glob_info, *tasks_len, *tasks_dis, *stats_len, *stats_dis;
-
-    glob_info = (int*) _mm_malloc(size_t(nranks * 2) * sizeof(int), 64);  check_malloc(glob_info,  __LINE__, __FILE__);
-    tasks_len = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(tasks_len,  __LINE__, __FILE__);
-    tasks_dis = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(tasks_dis,  __LINE__, __FILE__);
-    stats_len = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(stats_len,  __LINE__, __FILE__);
-    stats_dis = (int*) _mm_malloc(size_t(nranks)     * sizeof(int), 64);  check_malloc(stats_dis,  __LINE__, __FILE__);
-    
-    double* deltaSum   = (double*)_mm_malloc(size_t(Ntot) * sizeof(double), 64);  check_malloc(deltaSum,   __LINE__, __FILE__);
+    int* glob_info = (int*) malloc(size_t(nranks * 2) * sizeof(int));  check_malloc(glob_info,  __LINE__, __FILE__);
+    int* tasks_len = (int*) malloc(size_t(nranks)     * sizeof(int));  check_malloc(tasks_len,  __LINE__, __FILE__);
+    int* tasks_dis = (int*) malloc(size_t(nranks)     * sizeof(int));  check_malloc(tasks_dis,  __LINE__, __FILE__);
+    int* stats_len = (int*) malloc(size_t(nranks)     * sizeof(int));  check_malloc(stats_len,  __LINE__, __FILE__);
+    int* stats_dis = (int*) malloc(size_t(nranks)     * sizeof(int));  check_malloc(stats_dis,  __LINE__, __FILE__);
 
     if (nranks > 1) {
 
@@ -76,17 +71,7 @@ void delta_epsilon_exchange(const bool opt_bedSync,
             }
             glob_size = tdisp_; // in bytes
                         
-            
-            //if (rank == 0) {
-            //for (int i=0; i<nranks; i++) 
-            //printf("| %d:%d", i, tasks_len[i]/(int)snpLenByt);
-            //printf(" |  => Tot = %d\n", glob_m2s);
-            //}
-            //fflush(stdout);
-            
             // Alloc to store all task's markers in BED format
-            //
-                        
             char* task_bed = (char*)_mm_malloc(snpLenByt * task_m2s, 64);  check_malloc(task_bed, __LINE__, __FILE__);
                         
             for (int i=0; i<mark2sync.size(); i++) {
@@ -99,23 +84,16 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                             
                 } else {
 
-                    data.get_bed_marker_from_sparse(&task_bed[(size_t)i * snpLenByt],
-                                                    Ntot,
-                                                    sparse_info->N1S[m2si], sparse_info->N1L[m2si], &sparse_info->I1[sparse_info->N1S[m2si]],
-                                                    sparse_info->N2S[m2si], sparse_info->N2L[m2si], &sparse_info->I2[sparse_info->N2S[m2si]],
-                                                    sparse_info->NMS[m2si], sparse_info->NML[m2si], &sparse_info->IM[sparse_info->NMS[m2si]]);
-                    // local check ;-)
-                    //size_t X1 = 0, X2 = 0, XM = 0;
-                    //data.sparse_data_get_sizes_from_raw(&task_bed[(size_t) i * snpLenByt], 1, snpLenByt, data.numNAs, X1, X2, XM);
-                    //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu #?# vs %9lu %9lu %9lu\n", rank, i, X1, X2, XM, N1L[m2si], N2L[m2si], NML[m2si]);
-                    //fflush(stdout);
-
+                    data->get_bed_marker_from_sparse(&task_bed[(size_t)i * snpLenByt],
+                                                     Ntot,
+                                                     sparse_info->N1S[m2si], sparse_info->N1L[m2si], &sparse_info->I1[sparse_info->N1S[m2si]],
+                                                     sparse_info->N2S[m2si], sparse_info->N2L[m2si], &sparse_info->I2[sparse_info->N2S[m2si]],
+                                                     sparse_info->NMS[m2si], sparse_info->NML[m2si], &sparse_info->IM[sparse_info->NMS[m2si]]);
                 }
             }
 
 
             // Collect BED data from all markers to sync from all tasks
-            //
             char* glob_bed = (char*)_mm_malloc(snpLenByt * glob_m2s, 64);  check_malloc(task_bed, __LINE__, __FILE__);
                         
             check_mpi(MPI_Allgatherv(task_bed, tasks_len[rank], MPI_CHAR,
@@ -127,8 +105,8 @@ void delta_epsilon_exchange(const bool opt_bedSync,
             check_mpi(MPI_Allgatherv(task_stat, task_m2s * 2, MPI_DOUBLE,
                                      glob_stats, stats_len, stats_dis, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__); 
 
+
             // Now apply corrections from each marker to sync
-            //
             for (int i=0; i<glob_m2s; i++) {
 
                 double lambda0 = glob_stats[2 * i + 1] * (0.0 - glob_stats[2 * i]);
@@ -138,13 +116,11 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                             
                 // Get sizes from BED data
                 // note: locally available from markers local to task but ignored for now
-                //
                 size_t X1 = 0, X2 = 0, XM = 0;
-                data.sparse_data_get_sizes_from_raw(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, data.numNAs, X1, X2, XM);
+                data->sparse_data_get_sizes_from_raw(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, data->numNAs, X1, X2, XM);
                 //printf("data.sparse_data_get_sizes_from_raw => (%2d, %3d): X1 = %9lu, X2 = %9lu, XM = %9lu ###\n", rank, i, X1, X2, XM);
                 //fflush(stdout);
                 // Allocate sparse structure
-                //
                 uint* XI1 = (uint*)_mm_malloc(X1 * sizeof(uint), 64);  check_malloc(XI1, __LINE__, __FILE__);
                 uint* XI2 = (uint*)_mm_malloc(X2 * sizeof(uint), 64);  check_malloc(XI2, __LINE__, __FILE__);
                 uint* XIM = (uint*)_mm_malloc(XM * sizeof(uint), 64);  check_malloc(XIM, __LINE__, __FILE__);
@@ -155,10 +131,10 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                 size_t fake_n1l = 0, fake_n2l = 0, fake_nml = 0;
                             
                 //EO: bed data already adjusted for NAs
-                data.sparse_data_fill_indices(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, data.numNAs,
-                                              &fake_n1s, &fake_n1l, XI1,
-                                              &fake_n2s, &fake_n2l, XI2,
-                                              &fake_nms, &fake_nml, XIM);
+                data->sparse_data_fill_indices(&glob_bed[(size_t) i * snpLenByt], 1, snpLenByt, data->numNAs,
+                                               &fake_n1s, &fake_n1l, XI1,
+                                               &fake_n2s, &fake_n2l, XI2,
+                                               &fake_nms, &fake_nml, XIM);
                 
                 // Use it
                 // Set all to 0 contribution
@@ -184,9 +160,6 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                 _mm_free(XI2);  XI2 = NULL;
                 _mm_free(XIM);  XIM = NULL;
             }
-            //fflush(stdout);
-
-            //MPI_Barrier(MPI_COMM_WORLD);
 
             _mm_free(glob_stats);
             _mm_free(glob_bed);                       
@@ -201,14 +174,17 @@ void delta_epsilon_exchange(const bool opt_bedSync,
         // ----------------------
         else if (opt_sparseSync) {
 
+            //printf("OPT_SPARSESYNC!\n");
+            
             uint task_m2s = (uint) mark2sync.size();
             //printf("task %3d has %3d markers to share.\n", rank, task_m2s);
             //fflush(stdout);
 
             // Build task markers to sync statistics: mu | dbs | mu | dbs | ...
-            double* task_stat = (double*) _mm_malloc(size_t(task_m2s) * 2 * sizeof(double), 64);
+            double* task_stat = (double*) malloc(size_t(task_m2s) * 2 * sizeof(double));
             check_malloc(task_stat, __LINE__, __FILE__);
 
+            
             // Compute total number of elements to be sent by each task
             uint task_size = 0;
             for (int i=0; i<task_m2s; i++) {
@@ -226,15 +202,17 @@ void delta_epsilon_exchange(const bool opt_bedSync,
             //printf("Task %3d final task_size = %8d elements to send from task_m2s = %d markers to sync.\n", rank, task_size, task_m2s);
             //fflush(stdout);
 
-            // Get the total numbers of markers and corresponding indices to gather
 
+            // Get the total numbers of markers and corresponding indices to gather
             const int NEL = 2;
             uint task_info[NEL] = {};
             task_info[0] = task_m2s;
             task_info[1] = task_size;
 
+            //double ts_allg = MPI_Wtime();
             check_mpi(MPI_Allgather(task_info, NEL, MPI_UNSIGNED, glob_info, NEL, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
-
+            //double te_allg = MPI_Wtime();
+            //printf(" time allg on rank %d = %6.3f ms for glob_size of %llu B.\n", rank, (te_allg - ts_allg) * 1000, NEL * sizeof(uint));
             int tdisp_ = 0, sdisp_ = 0, glob_m2s = 0, glob_size = 0;
             for (int i=0; i<nranks; i++) {
                 tasks_len[i]  = glob_info[2 * i + 1];
@@ -248,74 +226,83 @@ void delta_epsilon_exchange(const bool opt_bedSync,
             }
             //printf("glob_info: markers to sync: %d, with glob_size = %7d elements (sum of all task_size)\n", glob_m2s, glob_size);
             //fflush(stdout);
+            
 
             // Build task's array to spread: | marker 1                             | marker 2
             //                               | n1 | n2 | nm | data1 | data2 | datam | n1 | n2 | nm | data1 | ...
             // -------------------------------------------------------------------------------------------------
-            uint* task_dat = (uint*) _mm_malloc(size_t(task_size) * sizeof(uint), 64);
+            uint* task_dat = (uint*) malloc(size_t(task_size) * sizeof(uint));
             check_malloc(task_dat, __LINE__, __FILE__);
-
+            
             int loc = 0;
-
+            
             for (int i=0; i<task_m2s; i++) {
 
                 int m2si = mark2sync[i];
-                            
+                
                 if (USEBED[m2si]) {
-
+                    //printf("USEBED...%d/%d\n",i+1, task_m2s);
                     task_dat[loc++] = snpLenUint;  // bed data "as is" stored in uint
                     task_dat[loc++] = UINT_MAX;    // switch to detect a bed stored marker
                     task_dat[loc++] = 0;
-
+                    
                     const uint* rawdata = reinterpret_cast<uint*>(&sparse_info->I1[sparse_info->N1S[m2si]]);
-
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
                     for (int ii=0; ii<snpLenUint; ii++) {
-                        task_dat[loc++] = rawdata[ii];
+                        task_dat[loc+ii] = rawdata[ii];
                     }
+                    loc += snpLenUint;
 
-                } else {
-
+                } else {                    
+                    //printf("DONT_USEBED...%d/%d\n",i+1, task_m2s);
                     task_dat[loc++] = sparse_info->N1L[m2si];
                     task_dat[loc++] = sparse_info->N2L[m2si];
                     task_dat[loc++] = sparse_info->NML[m2si];
 
                     //cout << "1: " << loc << ", " << N1L[m2si] << endl;
                     for (uint ii = 0; ii < sparse_info->N1L[m2si]; ii++) {
-                        task_dat[loc] = sparse_info->I1[ sparse_info->N1S[m2si] + ii ];  loc += 1;
+                        task_dat[loc] = sparse_info->I1[ sparse_info->N1S[m2si] + ii ];
+                        loc += 1;
                     }  
-                    //cout << "2: " << loc << ", " << N2L[m2si] << endl;                                                                
+                    //cout << "2: " << loc << ", " << N2L[m2si] << endl;
                     for (uint ii = 0; ii < sparse_info->N2L[m2si]; ii++) {
-                        task_dat[loc] = sparse_info->I2[sparse_info-> N2S[m2si] + ii ];  loc += 1;
+                        task_dat[loc] = sparse_info->I2[sparse_info->N2S[m2si] + ii ];
+                        loc += 1;
                     }
                     //cout << "M: " << loc << ", " << NML[m2si] << endl;
                     for (uint ii = 0; ii < sparse_info->NML[m2si]; ii++) {
-                        task_dat[loc] = sparse_info->IM[ sparse_info->NMS[m2si] + ii ];  loc += 1;
+                        task_dat[loc] = sparse_info->IM[ sparse_info->NMS[m2si] + ii ];
+                        loc += 1;
                     }
                 }
             }
             //printf("loc vs task_size = %d vs %d\n", loc, task_size);
             assert(loc == task_size);
-
-                        
+            
+          
             // Allocate receive buffer for all the data
-            //if (rank == 0)
-            //    printf("glob_size = %d\n", glob_size);
-            uint* glob_dat = (uint*) _mm_malloc(size_t(glob_size) * sizeof(uint), 64);
+            uint* glob_dat = (uint*) malloc(size_t(glob_size) * sizeof(uint));
             check_malloc(glob_dat, __LINE__, __FILE__);
 
+            //MPI_Barrier(MPI_COMM_WORLD);
+            //double ts_allgv = MPI_Wtime();           
             check_mpi(MPI_Allgatherv(task_dat, task_size, MPI_UNSIGNED,
                                      glob_dat, tasks_len, tasks_dis, MPI_UNSIGNED, MPI_COMM_WORLD), __LINE__, __FILE__);
-            _mm_free(task_dat);
-            //cout << "glob_size = " << glob_size << endl;
+            //double te_allgv = MPI_Wtime();
+            //printf(" time allgv on rank %d = %6.3f ms for glob_size of %.3f MB.\n", rank, (te_allgv - ts_allgv) * 1000, size_t(glob_size) * sizeof(uint) / 1E6);
+            free(task_dat);
 
-            double* glob_stats = (double*) _mm_malloc(size_t(glob_size * 2) * sizeof(double), 64);
+            double* glob_stats = (double*) malloc(size_t(glob_size * 2) * sizeof(double));
             check_malloc(glob_stats, __LINE__, __FILE__);
 
             check_mpi(MPI_Allgatherv(task_stat, task_m2s * 2, MPI_DOUBLE,
                                      glob_stats, stats_len, stats_dis, MPI_DOUBLE, MPI_COMM_WORLD), __LINE__, __FILE__);
-            _mm_free(task_stat);
-
-
+            
+            free(task_stat);            
+            
+                          
             // Compute global delta epsilon deltaSum
             //
             size_t loci = 0;
@@ -328,10 +315,12 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                 //printf("rank %d lambda0 = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", rank, lambda0, glob_stats[2 * i], glob_stats[2 * i + 1]);
 
                 if (glob_dat[loci + 1] == UINT_MAX) {
-
+                    
                     // Reset vector
-                    if (i == 0)  set_array(deltaSum, 0.0, Ntot);
-
+                    if (i == 0)  
+                        set_array(deltaSum, 0.0, Ntot);
+                    
+                    
                     const uint8_t* rawdata = reinterpret_cast<uint8_t*>(&glob_dat[loci + 3]);
 
                     // main + remainder to avoid a test on idx < Ntot 
@@ -376,11 +365,11 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                             deltaSum[ii * 4 + iii] += (c1 - glob_stats[2 * i]) * c2 * glob_stats[2 * i + 1];
                         }
                     }
-                                
-                    loci += 3 + glob_dat[loci];  // + 1 contains UINT_MAX to mark BED data
 
+                    loci += 3 + glob_dat[loci];  // + 1 contains UINT_MAX to mark BED data
+                    
                 } else {
-                                
+                    
                     if (i == 0) {
                         set_array(deltaSum, lambda0, Ntot);
                     } else {
@@ -407,35 +396,34 @@ void delta_epsilon_exchange(const bool opt_bedSync,
                     L = glob_dat[loci + 1];
                     //cout << "2: start = " << S << ", len = " << L <<  endl;
                     sparse_add(deltaSum, lambda - lambda0, glob_dat, S, L);
+                    
 
                     loci += 3 + glob_dat[loci] + glob_dat[loci + 1] + glob_dat[loci + 2];
+            
                 }
-
             }
 
-            _mm_free(glob_stats);
-            _mm_free(glob_dat);
-
+            free(glob_stats);
+            free(glob_dat);
+            
             mark2sync.clear();
             dbet2sync.clear();
 
         } else {
-
+            //printf("NEITHER BED or SPARSE!!!\n");
             check_mpi(MPI_Allreduce(&dEpsSum[0], &deltaSum[0], Ntot, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
         }
-
+        
         add_arrays(epsilon, tmpEps, deltaSum, Ntot);
 
     } else { // case nranks == 1
 
         add_arrays(epsilon, tmpEps, dEpsSum, Ntot);
     }
-
-    _mm_free(glob_info);
-    _mm_free(tasks_len);
-    _mm_free(tasks_dis);
-    _mm_free(stats_len);
-    _mm_free(stats_dis);
-   
-    _mm_free(deltaSum);
+    
+    free(glob_info);
+    free(tasks_len);
+    free(tasks_dis);
+    free(stats_len);
+    free(stats_dis);
 }
