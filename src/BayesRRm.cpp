@@ -489,15 +489,12 @@ int BayesRRm::runMpiGibbs() {
 
     // Read the data (from sparse representation by default)
     // -----------------------------------------------------
-    size_t *N1S, *N1L,  *N2S, *N2L,  *NMS, *NML;
-    uint   *I1,         *I2,         *IM;
-
-    N1S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
-    N1L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
-    N2S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
-    N2L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
-    NMS = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
-    NML = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
+    size_t* N1S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1S, __LINE__, __FILE__);
+    size_t* N1L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N1L, __LINE__, __FILE__);
+    size_t* N2S = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2S, __LINE__, __FILE__);
+    size_t* N2L = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(N2L, __LINE__, __FILE__);
+    size_t* NMS = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NMS, __LINE__, __FILE__);
+    size_t* NML = (size_t*)_mm_malloc(size_t(M) * sizeof(size_t), 64);  check_malloc(NML, __LINE__, __FILE__);
     dalloc += 6.0 * double(M) * sizeof(size_t) / 1E9;
 
 
@@ -513,9 +510,8 @@ int BayesRRm::runMpiGibbs() {
 
 
     size_t taskBytes = 0;
-
     string sparseOut = opt.get_sparse_output_filebase(rank);
-
+    uint *I1, *I2, *IM;
     if (opt.readFromBedFile && !opt.readFromSparseFiles) {
 
         data.load_data_from_bed_file(opt.bedFile, Ntot, M, rank, MrankS[rank],
@@ -1087,7 +1083,7 @@ int BayesRRm::runMpiGibbs() {
                 tot_nsync_ar2 += 1;
                 it_nsync_ar2  += 1;
 
-                printf("INFO   : synchronization time = %8.3f ms\n", (te - tb) * 1000.0);
+                //printf("INFO   : synchronization time = %8.3f ms\n", (te - tb) * 1000.0);
 
                 // Store epsilon state at last synchronization
                 copy_array(tmpEps, epsilon, Ntot);
