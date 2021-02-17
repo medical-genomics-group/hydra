@@ -1,0 +1,33 @@
+
+#### INTEL
+
+module purge
+module load intel
+module load intel-mpi
+
+git clone https://github.com/intel/mpi-benchmarks.git
+
+cd mpi-benchmarks
+
+export CC=mpiicc
+export CXX=mpiicpc
+
+make IMB-MPI1
+
+srun -p debug -n 2 --cpu-bind=verbose,sockets ./IMB-MPI1 --include Allgatherv
+
+
+#### GCC
+
+echo "ibase=16;obase=2;010" | bc
+
+module purge
+module load gcc
+module load mvapich2
+
+export CC=mpicc
+export CXX=mpic++
+
+make IMB-MPI1
+
+srun -p debug -n 2 --cpu-bind=verbose,sockets ./IMB-MPI1 --include Allgatherv
