@@ -41,7 +41,7 @@
 
 BayesW::~BayesW() {}
 
-
+   
 // Pass the vector post_marginals of marginal likelihoods by reference
 void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_marginals, string n,
                                           double vi_sum, double vi_2, double vi_1, double vi_0,
@@ -57,6 +57,7 @@ void BayesW::marginal_likelihood_vec_calc(VectorXd prior_prob, VectorXd &post_ma
 
         //(i+1) because 0th is already pre-calculated
 		post_marginals(i + 1) = prior_prob(i + 1) * gauss_hermite_adaptive_integral(cVa(group_index,i), sigma, n, vi_sum,  vi_2,  vi_1,  vi_0, mean, sd, mean_sd_ratio, used_data_beta);
+        //cout << "integral = " << setprecision(17) << gauss_hermite_adaptive_integral(cVa(group_index,i), sigma, n, vi_sum,  vi_2,  vi_1,  vi_0, mean, sd, mean_sd_ratio, used_data_beta) << endl;
 	}
 }
 
@@ -86,13 +87,16 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	//Init the group variables
     data.groups.resize(Mtot);
     data.groups.setZero();
-    const int Kt   = cva.size() + 1;			//Temporary K
-    const int Ktm1 = Kt - 1; 
+    const int Kt   = cva.size() + 1;			//Mixtures + 1
+    const int Ktm1 = Kt - 1;                    //Just mixtures
 
-    data.mS.resize(Mtot, Ktm1);
+    data.mS.resize(Mtot, Kt);
+
+    VectorXd cva_new(Kt);
+    cva_new << 0 , cva ;
 
     for (int i=0; i<Mtot; i++)
-        data.mS.row(i) = cva;
+        data.mS.row(i) = cva_new;
 	
     if (opt.groupIndexFile != "" && opt.groupMixtureFile != "") {
         data.readGroupFile(opt.groupIndexFile);
@@ -103,6 +107,7 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 
     numGroups = data.numGroups;
     K  = int(data.mS.cols()) ;  //Mixtures + 0th component. 
+
     km1 = K - 1;		    //Just mixtures
     sigmaG.resize(numGroups);
     sigmaG.setZero();
@@ -138,7 +143,7 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	y = data.y.cast<double>().array();
 
 	epsilon = y;
-	mu = y.mean();       // mean or intercept
+	mu = 4.1;//y.mean();       // mean or intercept
 	// Initialize the variables in structures
 	//Save variance classes
 
@@ -146,8 +151,8 @@ void BayesW::init(unsigned int individualCount, unsigned int Mtot, unsigned int 
 	used_data_alpha.failure_vector = data.fail.cast<double>();
 
 	double denominator = (6 * ((y.array() - mu).square()).sum()/(y.size()-1));
-	used_data.alpha = PI/sqrt(denominator);    // The shape parameter initial value
-	used_data_beta.alpha = PI/sqrt(denominator);    // The shape parameter initial value
+	used_data.alpha = 10;//PI/sqrt(denominator);    // The shape parameter initial value
+	used_data_beta.alpha = 10;//PI/sqrt(denominator);    // The shape parameter initial value
 
 
 	for(int i=0; i<(y.size()); ++i){
@@ -564,8 +569,8 @@ int BayesW::runMpiGibbs_bW() {
     double temp_fail_sum = used_data_alpha.failure_vector.array().sum();
     for (int i=0; i<M; ++i) {
         // For now use the old way to compute means
-        mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));        
-
+        mave[i] = (double(N1L[i]) + 2.0 * double(N2L[i])) / (dN - double(NML[i]));      
+       
         tmp1 = double(N1L[i]) * (1.0 - mave[i]) * (1.0 - mave[i]);
         tmp2 = double(N2L[i]) * (2.0 - mave[i]) * (2.0 - mave[i]);
         tmp0 = double(Ntot - N1L[i] - N2L[i] - NML[i]) * (0.0 - mave[i]) * (0.0 - mave[i]);
@@ -931,7 +936,12 @@ int BayesW::runMpiGibbs_bW() {
 
                 marginal_likelihood_vec_calc(pi_L.row(cur_group) , marginal_likelihoods, quad_points, vi_sum, vi_2, vi_1, vi_0,
                                              mave[marker],mstd[marker], mave[marker]/mstd[marker], cur_group, used_data_beta);
-
+                if (false)
+                {
+                    cout << "EPOCH single! - " << j << ", "<< marker << endl;
+                    cout << "vi pars = " << vi_sum << ", " << vi_2 << "," << vi_1 << ", " << vi_0 << endl;        
+                    cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << "," << marginal_likelihoods(2) << endl;
+                }
                 // Calculate the probability that marker is 0
                 double acum = marginal_likelihoods(0)/marginal_likelihoods.sum();
 
@@ -989,7 +999,9 @@ int BayesW::runMpiGibbs_bW() {
 
 	                        errorCheck(err);
                             
-                            //printf("xsamp %5d %20.16f\n", j, xsamp[0]);
+                            //printf("xsamp %5d %20.16f", j, xsamp[0]);
+                            //cout << setprecision(16)<<"; vi pars = " << vi_sum << ", " << vi_2 << "," << vi_1 << ", " << vi_0 << " | Marginal likelihoods=";
+                            //cout << marginal_likelihoods(0) << "," << marginal_likelihoods(1) << "," << marginal_likelihoods(2) << endl;
                             //xsamp[0] = 0.00000111111;
                             
 
@@ -1322,9 +1334,9 @@ int BayesW::runMpiGibbs_bW() {
                 }
 		// 4. Sample sigmaG
 		sigmaG[gg]  = dist.inv_gamma_rng((double) (alpha_sigma + 0.5 * m0[gg]),(double)(beta_sigma + 0.5 * double(m0[gg])) * beta_squaredNorm(gg));
-
+        //sigmaG[gg] = beta_squaredNorm(gg) + 0.0001;
 		// 5. Sample prior mixture component probability from Dirichlet distribution
-                VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
+        VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
    		pi_L.row(gg) = dist.dirichlet_rng(dirin);
         }
 
@@ -1337,9 +1349,9 @@ int BayesW::runMpiGibbs_bW() {
 	sumSigmaG = sigmaG.sum();  // Keep in memory for safe limit calculations
 
         //Print results
-        //if(rank == 0){
-        //    cout << iteration << ". " << m0.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sigmaG.sum()  << endl;
-        //}
+        if(rank == 0){
+            cout << iteration << ". " << m0.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sigmaG.sum()  << endl;
+        }
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
