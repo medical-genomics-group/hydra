@@ -7,10 +7,8 @@
 void sparse_set(double*       __restrict__ vec,
                 const double               val,
                 const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
+    vec = (double*) __builtin_assume_aligned(vec, 64);
+    IX  = (uint*)   __builtin_assume_aligned(IX, 64);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -23,11 +21,8 @@ void sparse_set(double*       __restrict__ vec,
 void sparse_add(double*       __restrict__ vec,
                 const double               val,
                 const uint*   __restrict__ IX, const size_t NXS, const size_t NXL) {
-    
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
+    vec = (double*) __builtin_assume_aligned(vec, 64);
+    IX  = (uint*)   __builtin_assume_aligned(IX, 64);
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
@@ -42,10 +37,8 @@ double sparse_partial_sum(const double* __restrict__ vec,
                           const uint*   __restrict__ IX,
                           const size_t               NXS,
                           const size_t               NXL) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
+    vec = (double*) __builtin_assume_aligned(vec, 64);
+    IX  = (uint*)   __builtin_assume_aligned(IX, 64);
 
     double sum = 0.0;
 
@@ -90,11 +83,10 @@ double sparse_partial_sum(const long double* __restrict__ vec,
                           const uint*        __restrict__ IX,
                           const size_t                    NXS,
                           const size_t                    NXL) {
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
 
+    vec = (long double*) __builtin_assume_aligned(vec, 64);
+    IX  = (uint*)   __builtin_assume_aligned(IX, 64);
+    
     long double sum = 0.0;
 
 #ifdef _OPENMP
@@ -149,7 +141,7 @@ void sparse_scaadd(double*     __restrict__ vout,
     } else {
 
         double aux = mu * sig_inv * dMULT;
-        //printf("sparse_scaadd aux = %15.10f with mu = %15.10f, dbetsig = %15.10f\n", aux, mu, sig_inv * dMULT);
+        //printf("sparse_scaadd aux = %20.15f with mu = %20.15f, dbetsig = %20.15f\n", aux, mu, sig_inv * dMULT);
         set_array(vout, -aux, N);
 
         //cout << "sparse set on M: " << NMS << ", " << NML << endl;
@@ -172,12 +164,11 @@ double partial_sparse_dotprod(const double* __restrict__ vec,
                               const size_t               NXS,
                               const size_t               NXL,
                               const double               fac) {
-    
+    vec = (double*) __builtin_assume_aligned(vec, 64);
+    IX  = (uint*)   __builtin_assume_aligned(IX, 64);
+
     double dp = 0.0;
-#ifdef __INTEL_COMPILER
-    __assume_aligned(vec, 64);
-    __assume_aligned(IX,  64);
-#endif
+
 #ifdef _OPENMP
 #pragma omp parallel for reduction(+: dp)
 #endif
@@ -187,8 +178,6 @@ double partial_sparse_dotprod(const double* __restrict__ vec,
 
     dp *= fac;
 
-    //printf("dp = %20.16f\n", dp);
-
     return dp;
 }
 
@@ -197,11 +186,11 @@ double sparse_dotprod(const double* __restrict__ vin1,
                       const uint*   __restrict__ I1,      const size_t N1S,  const size_t N1L,
                       const uint*   __restrict__ I2,      const size_t N2S,  const size_t N2L,
                       const uint*   __restrict__ IM,      const size_t NMS,  const size_t NML,
-                      const double               mu,
+                      const double               mu, 
                       const double               sig_inv,
                       const int                  N,
                       const int                  marker) {
-    
+
     double dp  = 0.0;
 
     dp += partial_sparse_dotprod(vin1, I1, N1S, N1L, 1.0);
