@@ -76,8 +76,6 @@ class BayesRRm
     double   sigmaF8[8];
 
     // Linear model variables
-    //EO@@@ check for double declaration...
-    //DT@@@ solved, deleted double declaration and related functions.
     VectorXd Beta;       // effect sizes
     VectorXd y_tilde;    // variable containing the adjusted residuals to exclude the effects of a given marker
     VectorXd epsilon;    // variable containing the residuals
