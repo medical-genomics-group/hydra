@@ -270,7 +270,6 @@ int BayesW::runMpiGibbs_bW() {
 
 #ifdef _OPENMP
 #pragma omp parallel
-#endif
     {
         if (rank == 0) {
             int nt = omp_get_num_threads();
@@ -278,7 +277,7 @@ int BayesW::runMpiGibbs_bW() {
                 printf("INFO   : OMP parallel regions will use %d thread(s)\n", nt);
         }
     }
-
+#endif
 
     uint Ntot       = data.set_Ntot(rank, opt);
     const uint Mtot = data.set_Mtot(rank, opt);
