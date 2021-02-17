@@ -16,11 +16,17 @@ cat <<-HELP
 
 Call the script like this:
 
-sbatch $0 -c|--compiler {gcc|intel}, default is gcc
+sbatch $0 
+    -c|--compiler {gcc|intel} # default is gcc
+    --amplifier-only          # to skip Advisor
+    --advisor-only            # to skip Amplifier
 
 HELP
 exit 0
 }
+
+AMPLI=1
+ADVI=1
 
 # Parse Command Line Arguments
 while [ "$#" -gt 0 ]; do
@@ -28,6 +34,14 @@ while [ "$#" -gt 0 ]; do
         --compiler*|-c*)
             if [[ "$1" != *=* ]]; then shift; fi
             COMPILER="${1#*=}"
+            ;;
+        --amplifier-only)
+            AMPLI=1
+            ADVI=0
+            ;;
+        --advisor-only)
+            AMPLI=0
+            ADVI=1
             ;;
         --help|-h)
             print_help;;
@@ -40,6 +54,9 @@ while [ "$#" -gt 0 ]; do
     esac
     shift
 done
+
+echo "AMPLI ?" $AMPLI
+echo "ADVI  ?" $ADVI
 
 if [ $COMPILER == "gcc" ]; then
     echo "GCC"
@@ -112,16 +129,20 @@ CMD_TAIL="${CMD_TAIL} \
 env | grep SLURM_
 env | grep OMP_
 
-CMD="${CMD_BASE} ${AMPLXE1} ${CMD_TAIL}"
-echo CMD = $CMD
-#$CMD
+if [ $AMPLI == 1 ]; then
+    CMD="${CMD_BASE} ${AMPLXE1} ${CMD_TAIL}"
+    echo CMD = $CMD
+    $CMD
+fi
 
-CMD="${CMD_BASE} ${ADVIXE1} ${CMD_TAIL}"
-echo CMD = $CMD
-$CMD
-CMD="${CMD_BASE} ${ADVIXE2} ${CMD_TAIL}"
-echo CMD = $CMD
-$CMD
+if [ $ADVI == 1 ]; then
+    CMD="${CMD_BASE} ${ADVIXE1} ${CMD_TAIL}"
+    echo CMD = $CMD
+    $CMD
+    CMD="${CMD_BASE} ${ADVIXE2} ${CMD_TAIL}"
+    echo CMD = $CMD
+    $CMD
+fi
 
 echo 
 echo "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@"
