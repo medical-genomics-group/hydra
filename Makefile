@@ -18,9 +18,9 @@ CXXFLAGS += -std=c++17
 INCLUDE   = -I$(SOURCEDIR)
 #EO: with locally installed eigen (for gcc 8.3.0 @ SCITAS)
 #    EIGEN_ROOT must be exported manually (see compile_with_gcc.sh)
-INCLUDE  += -I$(EIGEN_ROOT) #/include/eigen3
+INCLUDE  += -I$(EIGEN_ROOT)
 #    otherwise loaded with Spack
-INCLUDE  += -I$(EIGEN_ROOT)/include/eigen3
+#INCLUDE  += -I$(EIGEN_ROOT)/include/eigen3
 INCLUDE  += -I$(BOOST_ROOT)/include
 
 ifeq ($(CXX),g++)
