@@ -15,7 +15,7 @@ void add_arrays(double*       __restrict__ out,
     in1 = (double*) __builtin_assume_aligned(in1, 64);
     in2 = (double*) __builtin_assume_aligned(in2, 64);
 #ifdef _OPENMP
-#pragma omp parallel for simd aligned(in1,in2,out:64) simdlen(8)
+#pragma omp parallel for simd aligned(in1,in2,out:64)
 #endif
     for (int i=0; i<SIZE; i++) {
         out[i]  = in1[i] + in2[i];
