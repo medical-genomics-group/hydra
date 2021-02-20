@@ -8,7 +8,8 @@ echo HYDRA_ROOT = $HYDRA_ROOT
 [[ "$HYDRA_ROOT" == *hydra ]] || (echo "HYDRA_ROOT ($HYDRA_ROOT) expected to end with \"hydra\"" && exit 1)
 
 module purge
-module load gcc/8.3.0 mvapich2 boost #eigen
+#module load gcc mvapich2 boost eigen
+module load gcc/8.3.0 mvapich2 boost
 module list
 
 # Local install of eigen to be able to use gcc/8.3.0
