@@ -12,9 +12,11 @@
 using namespace std;
 
 int main(int argc, const char * argv[]) {
+    cout << "A" << endl;
     MPI_Init(NULL, NULL);
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    cout << "B" << endl;
 
     Gadget::Timer timer;
     timer.setTime();

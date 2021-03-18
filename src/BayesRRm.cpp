@@ -966,9 +966,9 @@ int BayesRRm::runMpiGibbs() {
                             }
 
                             if (((logL.segment(k+1,K-(k+1)).array()-logL[k+1]).abs().array() > 700.0).any()) {
-                                acum += 0.0d; // we compare next mixture to the others, if to big diff we skip
+                                acum += 0.0; // we compare next mixture to the others, if to big diff we skip
                             } else{
-                                acum += 1.0d / ((logL.array()-logL[k+1]).exp().sum()); //if not , sample
+                                acum += 1.0 / ((logL.array()-logL[k+1]).exp().sum()); //if not , sample
                             }
                         }
                     }
@@ -1253,7 +1253,7 @@ int BayesRRm::runMpiGibbs() {
 
         MPI_Barrier(MPI_COMM_WORLD);
 
-        double e_sqn = 0.0d;
+        double e_sqn = 0.0;
         for (int i=0; i<Ntot; ++i) e_sqn += epsilon[i] * epsilon[i];
         //printf("e_sqn = %20.15f, v0E = %20.15f, s02E = %20.15f\n", e_sqn, v0E, s02E);
 

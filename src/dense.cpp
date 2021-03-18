@@ -231,6 +231,7 @@ void avx_bed_dot_product(uint* I1_data,
         __m256d vsum1 = _mm256_setzero_pd();
         __m256d vsum2 = _mm256_setzero_pd();
 #ifdef _OPENMP
+//#pragma omp parallel for reduction(+:vsum1,vsum2)
 #pragma omp parallel for reduction(addpd4:vsum1,vsum2)
 #endif                              
         for (int ii=0; ii<fullb; ++ii) {

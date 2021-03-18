@@ -1044,7 +1044,7 @@ int BayesW::runMpiGibbs_bW()
     uint n_thinned_saved = 0;
 
     
-    cout <<"markerWindowLen: "<< opt.markerWindowLen<<endl;
+    if(rank ==0) cout << "markerWindowLen: "<< opt.markerWindowLen<<endl;
     int markerWindowLen = opt.markerWindowLen;
     MatrixXd g1 = MatrixXd::Zero(markerWindowLen, Ntot*numGroups);
     MatrixXd g2 = MatrixXd::Zero(markerWindowLen, Ntot*numGroups);
@@ -1092,8 +1092,11 @@ int BayesW::runMpiGibbs_bW()
         g1.row(iteration % markerWindowLen).setZero();
         g2.row(iteration % markerWindowLen).setZero();
 
+        //Create temporary vectors for storing the genetic value of the current iteration
+        VectorXd g1_temp =VectorXd::Zero(Ntot * numGroups);
+        VectorXd g2_temp =VectorXd::Zero(Ntot * numGroups);
+
         /* 1. Intercept (mu) */
-        //Removed sampleMu function on its own
         int err = 0;
 
         int neval;
@@ -1118,7 +1121,6 @@ int BayesW::runMpiGibbs_bW()
             (used_data.epsilon3)[mu_ind] = epsilon3[mu_ind] + mu;
             (used_data.epsilon4)[mu_ind] = epsilon4[mu_ind] + mu;
         }
-
         // Use ARS to sample mu (with density mu_dens, using parameters from used_data)
         err = arms(xinit, ninit, &xl, &xr, mu_dens, &used_data, &convex, npoint,
                    dometrop, &xprev, xsamp, nsamp, qcent, xcent, ncent, &neval, dist);
@@ -1452,7 +1454,6 @@ int BayesW::runMpiGibbs_bW()
 
         // Loop over (shuffled) markers
         // ----------------------------
-
         for (int j = 0; j < lmax; j++)
         {
             sinceLastSync += 1;
@@ -1557,7 +1558,7 @@ int BayesW::runMpiGibbs_bW()
                     sparse_scaadd(tmp_deltaEps2, Beta2(marker),
                                   I1_2, N1S_2[marker], N1L_2[marker],
                                   I2_2, N2S_2[marker], N2L_2[marker],
-                                  IM, NMS_2[marker], NML_2[marker],
+                                  IM_2, NMS_2[marker], NML_2[marker],
                                   mave[marker], 1.0 / mstd[marker], Ntot2);
                     sparse_scaadd(tmp_deltaEps4, Beta2(marker),
                                   I1_2, N1S_2[marker], N1L_2[marker],
@@ -1696,23 +1697,23 @@ int BayesW::runMpiGibbs_bW()
 
                             for (int ind=0; ind<Ntot; ind++)
                             {
-                                g1(iteration % markerWindowLen, Ntot*cur_group+ind) -= temp_ave;
+                                g1_temp(Ntot*cur_group+ind) -= temp_ave;
                             }
                             for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
                             {
-                                g1(iteration % markerWindowLen, I1[ind]+ Ntot*cur_group)+= temp; 
+                                g1_temp(I1[ind]+ Ntot*cur_group)+= temp; 
                             }
                             for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
                             {
-                                g1(iteration % markerWindowLen, I1_2[ind]+Ntot1 +Ntot*cur_group)+= temp;
+                                g1_temp(I1_2[ind]+Ntot1 +Ntot*cur_group)+= temp;
                             }
                             for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
-                                g1(iteration % markerWindowLen, I2[ind] + Ntot*cur_group)+= temp2;
+                                g1_temp(I2[ind] + Ntot*cur_group)+= temp2;
                             }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
-                                g1(iteration % markerWindowLen, I2_2[ind]+Ntot1 +Ntot*cur_group)+= temp2;
+                                g1_temp(I2_2[ind]+Ntot1 +Ntot*cur_group)+= temp2;
                             }
 
                             //cout << "Sampled beta1 = " <<  Beta(marker) << endl;
@@ -1833,23 +1834,23 @@ int BayesW::runMpiGibbs_bW()
 
                             for (int ind=0; ind<Ntot; ind++)
                             {
-                                g2(iteration % markerWindowLen, Ntot*cur_group+ind) -= temp_ave;
+                                g2_temp(Ntot*cur_group+ind) -= temp_ave;
                             }
                             for (int ind=N1S[marker];ind<N1S[marker]+N1L[marker]; ind++)
                             {
-                                g2(iteration % markerWindowLen, I1[ind]+ Ntot*cur_group) += temp; 
+                                g2_temp(I1[ind]+ Ntot*cur_group) += temp; 
                             }
                             for (int ind=N1S_2[marker];ind<N1S_2[marker]+N1L_2[marker]; ind++)
                             {
-                                g2(iteration % markerWindowLen, I1_2[ind]+Ntot1 +Ntot*cur_group)+= temp;
+                                g2_temp(I1_2[ind]+Ntot1 +Ntot*cur_group)+= temp;
                             }
                             for (int ind=N2S[marker];ind<N2S[marker]+N2L[marker]; ind++)
                             {
-                                g2(iteration % markerWindowLen, I2[ind] + Ntot*cur_group)+= temp2;
+                                g2_temp(I2[ind] + Ntot*cur_group)+= temp2;
                             }
                             for (int ind=N2S_2[marker];ind<N2S_2[marker]+N2L_2[marker]; ind++)
                             {
-                                g2(iteration % markerWindowLen, I2_2[ind]+Ntot1 +Ntot*cur_group)+= temp2;
+                                g2_temp(I2_2[ind]+Ntot1 +Ntot*cur_group)+= temp2;
                             }
 
                             cass2(cur_group, k) += 1;
@@ -1858,7 +1859,6 @@ int BayesW::runMpiGibbs_bW()
                             // Write the sum of the beta squared to the vector
                             beta_squaredNorm2[groups[MrankS[rank] + marker]] += Beta2[marker] * Beta2[marker];
                             //If the first epoch marker was also included, add the product to the covariance
-
                         }
                         break;
                     }
@@ -1884,7 +1884,6 @@ int BayesW::runMpiGibbs_bW()
                 deltaBeta2 = betaOld2 - beta2;
 
                 //continue;
-
                 //if (deltaBeta != 0.0)
                 //printf("deltaBeta = %20.16f\n", deltaBeta);
 
@@ -2425,16 +2424,14 @@ int BayesW::runMpiGibbs_bW()
                 sinceLastSync2 = 0;
             }
 
-
-
-
         } // END PROCESSING OF ALL MARKERS
+
 
         //PROFILE
         //continue;
 
-        printf("rank %d it %d  beta_squaredNorm[0] = %20.15f, beta_squaredNorm2[0] = %20.15f\n",
-               rank, iteration, beta_squaredNorm[0], beta_squaredNorm2[0]);
+        //printf("rank %d it %d  beta_squaredNorm[0] = %20.15f, beta_squaredNorm2[0] = %20.15f\n",
+        //       rank, iteration, beta_squaredNorm[0], beta_squaredNorm2[0]);
 
         //printf("==> after eps sync it %d, rank %d, epsilon[0] = %15.10f %15.10f\n", iteration, rank, epsilon[0], epsilon[Ntot-1]);
 
@@ -2446,8 +2443,11 @@ int BayesW::runMpiGibbs_bW()
             check_mpi(MPI_Allreduce(beta_squaredNorm.data(), sum_beta_squaredNorm.data(), beta_squaredNorm.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             check_mpi(MPI_Allreduce(beta_squaredNorm2.data(), sum_beta_squaredNorm2.data(), beta_squaredNorm2.size(), MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
-            check_mpi(MPI_Allreduce(g1.row(iteration % markerWindowLen).data(), sum_g1.data(), Ntot*numGroups, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
-            check_mpi(MPI_Allreduce(g2.row(iteration % markerWindowLen).data(), sum_g2.data(), Ntot*numGroups, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            //check_mpi(MPI_Allreduce(g1.row(iteration % markerWindowLen).data(), sum_g1.data(), Ntot*numGroups, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            //check_mpi(MPI_Allreduce(g2.row(iteration % markerWindowLen).data(), sum_g2.data(), Ntot*numGroups, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+
+            check_mpi(MPI_Allreduce(g1_temp.data(), sum_g1.data(), Ntot*numGroups, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
+            check_mpi(MPI_Allreduce(g2_temp.data(), sum_g2.data(), Ntot*numGroups, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
 
             check_mpi(MPI_Allreduce(cass.data(), sum_cass.data(), cass.size(), MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
             check_mpi(MPI_Allreduce(cass2.data(), sum_cass2.data(), cass2.size(), MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD), __LINE__, __FILE__);
@@ -2460,7 +2460,9 @@ int BayesW::runMpiGibbs_bW()
 
             g1.row(iteration % markerWindowLen) = sum_g1;
             g2.row(iteration % markerWindowLen) = sum_g2;
-
+        }else{
+            g1.row(iteration % markerWindowLen) = g1_temp;
+            g2.row(iteration % markerWindowLen) = g2_temp;
         }
 
         if (rank < 0)
@@ -2496,7 +2498,6 @@ int BayesW::runMpiGibbs_bW()
                 // get vector of parameters for the current group
                 dirc = data.dPriors.row(gg).transpose().array();
             }
-
             double cov=0.0;
             double var1=0.0, var2=0.0;
             
@@ -2509,6 +2510,7 @@ int BayesW::runMpiGibbs_bW()
                     g1_K_mean(ind)=(g1.col(gg*Ntot+ind)).mean();
                     g2_K_mean(ind)=(g2.col(gg*Ntot+ind)).mean();
                 }
+
             }
             else
             {
@@ -2527,20 +2529,12 @@ int BayesW::runMpiGibbs_bW()
                 Rho[gg]=std::max(std::min(cov/sqrt(var1*var2), 0.9995), -0.9995);
             else
                 Rho[gg]=0;   
-            cout << "Window corr(g1,g2): "<< Rho[gg]<<endl;
 
-
-            //cout << "iter: "<< iteration<< ", corr(g1, g2)="<< cov/sqrt(var1*var2)<<endl;
             // 4. Sample sigmaG
             // TODO - Figure out how to sample
             sigmaG[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0[gg]), (double)(beta_sigma + 0.5 * (double(m0[gg] * beta_squaredNorm(gg)))));
             sigmaG2[gg] = dist.inv_gamma_rng((double)(alpha_sigma + 0.5 * m0_2[gg]), (double)(beta_sigma + 0.5 * (double(m0_2[gg] * beta_squaredNorm2(gg)))));
-            //sigmaG[gg] = beta_squaredNorm(gg) + 0.001;
-            //sigmaG2[gg] = beta_squaredNorm2(gg) + 0.001;
-            //Rho[gg] = beta1_beta2(gg) / sqrt(sigmaG[gg] * sigmaG2[gg]+ 1);  // + 1 for now
         
-            //cout << "Rho: "<< Rho[gg] << endl;
-
             // 5. Sample prior mixture component probability from Dirichlet distribution
             VectorXd dirin = cass.row(gg).transpose().array().cast<double>() + dirc.array();
             VectorXd dirin2 = cass2.row(gg).transpose().array().cast<double>() + dirc.array();
@@ -2562,10 +2556,10 @@ int BayesW::runMpiGibbs_bW()
         sumSigmaG2 = sigmaG2.sum(); // similarly for epoch 2
  
         //Print results
-        /*
+        
         if(rank == 0){
-            cout << iteration << ". " << m0.sum() << "|" << m0_2.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sumSigmaG << ": " <<  sumSigmaG2 << "; "<< beta1_beta2(0) << endl;
-        } */
+            cout << iteration << ". " << m0.sum() << "|" << m0_2.sum() <<"; "<< setprecision(7) << mu << "; " <<  used_data.alpha << "; " << sumSigmaG << ": " <<  sumSigmaG2 << "; "<<  Rho[0] << endl;
+        } 
 
         double end_it = MPI_Wtime();
         //if (rank == 0) printf("TIME_IT: Iteration %5d on rank %4d took %10.3f seconds\n", iteration, rank, end_it-start_it);
@@ -2573,13 +2567,13 @@ int BayesW::runMpiGibbs_bW()
         //printf("%d epssqn = %15.10f %15.10f %15.10f %6d => %15.10f\n", iteration, e_sqn, v0E, s02E, Ntot, sigmaE);
         if (rank == 0)
         {
-            printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f (%9.3f + %9.3f), n_sync = %8d (%8d + %8d) (%7.3f / %7.3f), betasq = %20.15f, m0 = %10d\n",
+            printf("RESULT : it %4d, rank %4d: proc = %9.3f s, sync = %9.3f (%9.3f + %9.3f), n_sync = %8d (%8d + %8d) (%7.3f / %7.3f), betasq = %10.5f\n",
                    iteration, rank, end_it - start_it,
                    it_sync_ar1 + it_sync_ar2, it_sync_ar1, it_sync_ar2,
                    it_nsync_ar1 + it_nsync_ar2, it_nsync_ar1, it_nsync_ar2,
                    (it_sync_ar1) / double(it_nsync_ar1) * 1000.0,
                    (it_sync_ar2) / double(it_nsync_ar2) * 1000.0,
-                   beta_squaredNorm.sum(), int(m0.sum()));
+                   beta_squaredNorm.sum());
             fflush(stdout);
         }
 

@@ -61,7 +61,7 @@ uint Data::set_Ntot2(const int rank, const Options opt) {
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
 //TODO: Deal with NAs for two epochs separately
-    cout << "Ep1: " << Ntot2 << ", " << numInds2 << endl;
+    cout << "Ep2: " << Ntot2 << ", " << numInds2 << endl;
 
     if (Ntot2 != numInds2 - numNAs) {
         if (rank == 0)
@@ -1608,7 +1608,7 @@ void Data::readFamFile(const string &famFile){
     }
     in.close();
     numInds = (unsigned) indInfoVec.size();
-    cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
+    //cout << numInds << " individuals to be included from [" + famFile + "]." << endl;
 }
 
 void Data::readFamFile2(const string &famFile){
@@ -1629,7 +1629,7 @@ void Data::readFamFile2(const string &famFile){
     }
     in.close();
     numInds2 = (unsigned) indInfoVec.size();
-    cout << numInds2 << " individuals to be included from [" + famFile + "]." << endl;
+    //cout << numInds2 << " individuals to be included from [" + famFile + "]." << endl;
 }
 
 void Data::readBimFile(const string &bimFile) {
