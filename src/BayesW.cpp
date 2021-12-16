@@ -1342,8 +1342,8 @@ int BayesW::runMpiGibbs_bW() {
         double xinit[4] = {0.95*mu, mu,  1.005*mu, 1.01*mu};     // Initial abscissae
         double *p_xinit = xinit;
 
-        double xl = 2;
-        double xr = 5;   //xl and xr and the maximum and minimum values between which we sample
+        double xl = 0.8 * mu;
+        double xr = 1.1 * mu;   //xl and xr and the maximum and minimum values between which we sample
 
         //Update before sampling
         for(int mu_ind=0; mu_ind < Ntot; mu_ind++){
@@ -1430,7 +1430,7 @@ int BayesW::runMpiGibbs_bW() {
 
         // Initial left and right (pseudo) extremes
         xl = 0.0;
-        xr = 40.0;
+        xr = (used_data.alpha)*1.30;
 
         //Give the residual to alpha structure
         //used_data_alpha.epsilon = epsilon;
