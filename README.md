@@ -40,7 +40,7 @@ mv hydra-master hydra
 ```
 
 
-### 3a. Load modules
+### 3. Load modules
 
 You need to load the modules boost, eigen, mpi and gcc/intel 
 
@@ -57,7 +57,7 @@ module load intel intel-mpi boost eigen
 
 However, given the specifications in your cluster, the modules might be called slightly differently.
 
-### 3b. Comile
+### 4. Compile
 
 You can compile using intel simply using make :
 
