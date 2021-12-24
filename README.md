@@ -40,13 +40,36 @@ mv hydra-master hydra
 ```
 
 
-### 3. Compile
+### 3a. Load modules
 
-You can compile by simply using make :
+You need to load the modules boost, eigen, mpi and gcc/intel 
+
+If you are using gcc compiler, for example, you need to type
+```
+module load gcc mvapich2 boost eigen
+```
+
+If you are using intel compiler, you need to type
+
+```
+module load intel intel-mpi boost eigen
+```
+
+However, given the specifications in your cluster, the modules might be called slightly differently.
+
+### 3b. Comile
+
+You can compile using intel simply using make :
 
 ```
 cd hydra/src
 make
 ```
 
-You should obtain the executable `hydra` in src folder.
+You can compile using gcc simply using make -f Makefile_G
+```
+cd hydra/src
+make -f Makefile_G
+```
+
+You should obtain the executable `hydra` if used intel compiler or `hydra_G` if used gcc compiler in src folder.
