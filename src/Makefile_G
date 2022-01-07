@@ -15,14 +15,13 @@ CXXFLAGS += -march=native
 CXXFLAGS += -D USE_MPI
 CXXFLAGS += -fopenmp
 
-INCLUDE  = -I$(EIGEN_ROOT)/include/eigen3
-INCLUDE += -I$(BOOST_ROOT)/include
-INCLUDE += -I$(MVAPICH2_ROOT)/include
+INCLUDE  = -I/usr/include/eigen3
+INCLUDE += -I/usr/include
 
 LIBS     = -lz
 
 #EO: remove BayesRRm_mt.cpp for now
-SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp compression.cpp
+SOURCES = main.cpp data.cpp BayesRRm.cpp BayesW_arms.cpp BayesW.cpp gadgets.cpp distributions_boost.cpp options.cpp samplewriter.cpp
 
 OBJECTS := $(patsubst %.cpp,%.o,$(SOURCES))
 
